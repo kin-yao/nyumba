@@ -1,0 +1,21 @@
+# Railway / Nixpacks build configuration for Nyumba (Laravel 12, PHP 8.2)
+
+[phases.setup]
+nixPkgs = ['php82', 'php82Packages.composer', 'nodejs_20']
+
+[phases.install]
+cmds = [
+  'composer install --no-dev --optimize-autoloader --no-interaction',
+  'npm install',
+  'npm run build'
+]
+
+[phases.build]
+cmds = [
+  # Recreate the Firebase Admin SDK credentials file from a base64 env var
+  'mkdir -p storage/app/private',
+  'if [ -n "$FIREBASE_CREDENTIALS_BASE64" ]; then echo "$FIREBASE_CREDENTIALS_BASE64" | base64 -d > storage/app/private/nyumba-d932c-firebase-adminsdk-fbsvc-dbcffe8b58.json; fi'
+]
+
+[start]
+cmd = 'php artisan migrate --force && php artisan optimize && php artisan serve --host 0.0.0.0 --port $PORT'
