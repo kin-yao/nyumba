@@ -28,6 +28,11 @@ class RequireEmailVerification
             return $next($request);
         }
 
+        // Admin users bypass email verification checks
+        if (auth()->user()->is_admin) {
+            return $next($request);
+        }
+
         if ($request->is('admin*') || $request->is('auth/*')) {
             return $next($request);
         }

@@ -27,6 +27,11 @@ class CheckSubscription
             return $next($request);
         }
 
+        // Admin users bypass all subscription checks
+        if (auth()->user()->is_admin) {
+            return $next($request);
+        }
+
         // Always allow admin routes
         if ($request->is('admin*')) {
             return $next($request);
