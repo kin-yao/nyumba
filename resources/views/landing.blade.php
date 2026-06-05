@@ -18,7 +18,7 @@
   --shadow:0 24px 60px -28px rgba(20,17,15,.32);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth;overflow-x:hidden;width:100%}
 body{font-family:'Satoshi',sans-serif;background:var(--paper);color:var(--ink);line-height:1.55;overflow-x:hidden;-webkit-font-smoothing:antialiased}
 img{display:block;max-width:100%}
 a{color:inherit;text-decoration:none}
@@ -53,8 +53,11 @@ a{color:inherit;text-decoration:none}
 .nav-links a:hover::after{right:0}
 .nav-cta{display:flex;gap:10px;align-items:center}
 .nav-cta .btn{padding:10px 18px;font-size:13px}
-.nav-burger{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:6px}
-.nav-burger span{width:22px;height:2px;background:var(--ink);display:block}
+.nav-burger{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:6px;z-index:70}
+.nav-burger span{width:22px;height:2px;background:var(--ink);display:block;transition:transform .25s,opacity .25s}
+.nav-burger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.nav-burger.open span:nth-child(2){opacity:0}
+.nav-burger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
 
 /* Hero */
 .hero{position:relative;background:var(--ink);overflow:hidden}
@@ -87,14 +90,14 @@ a{color:inherit;text-decoration:none}
 .trust-inner{display:flex;align-items:center;gap:40px;flex-wrap:wrap;justify-content:space-between}
 .trust-lead{font-family:'Clash Display',serif;font-weight:500;font-size:18px;max-width:280px;line-height:1.25}
 .trust-lead span{color:var(--green)}
-.trust-stats{display:flex}
+.trust-stats{display:flex;flex-wrap:wrap}
 .tstat{padding:6px 32px;border-left:1px solid var(--line)}
 .tstat:first-child{border-left:none;padding-left:0}
 .tstat .n{font-family:'Clash Display',serif;font-weight:600;font-size:34px;letter-spacing:-.03em;line-height:1}
 .tstat .l{font-family:'Cabinet Grotesk',sans-serif;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin-top:5px}
 
 /* About */
-.about{padding:90px 0}
+.about{padding:90px 0;overflow:hidden}
 .about-grid{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
 .about-visual{position:relative;padding:20px 0 20px 20px}
 .about-visual .deco{position:absolute;left:-6px;top:-14px;width:120px;height:120px;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;z-index:0}
@@ -201,33 +204,30 @@ a{color:inherit;text-decoration:none}
 @media(max-width:1040px){.fcards{grid-template-columns:repeat(3,1fr)}.svc-grid{grid-template-columns:repeat(2,1fr)}.pricing-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:980px){.foot-grid{grid-template-columns:1fr 1fr;gap:30px}.util-left .it.hide-sm{display:none}.contact-inner{grid-template-columns:1fr;gap:36px}}
 @media(max-width:860px){.about-grid{grid-template-columns:1fr;gap:44px}.about-visual{max-width:460px}}
-@media(max-width:760px){.nav-links,.nav-cta .btn-light{display:none}.nav-burger{display:flex}.util-right{display:none}.foot-grid{grid-template-columns:1fr 1fr}.foot-bottom{flex-direction:column;gap:6px;text-align:center}}
-@media(max-width:680px){.fcards-band{margin-top:-60px}.fcards{grid-template-columns:1fr 1fr}.tstat{padding:6px 20px}.about-points{grid-template-columns:1fr}.svc-grid{grid-template-columns:1fr}.pricing-grid{grid-template-columns:1fr}.contact-card{padding:40px 26px}}
+@media(max-width:760px){.nav-burger{display:flex}.nav-cta .btn-gold{display:none}.nav-links{display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;gap:0;background:var(--card);border-bottom:1px solid var(--line);box-shadow:0 16px 30px -18px rgba(20,17,15,.3);padding:6px 24px 14px}.nav-links.open{display:flex}.nav-links a{padding:14px 2px;border-bottom:1px solid var(--line);font-size:15px}.nav-links a:last-child{border-bottom:none}.nav-links a::after{display:none}.util-right{display:none}.foot-grid{grid-template-columns:1fr 1fr}.foot-bottom{flex-direction:column;gap:6px;text-align:center}}
+@media(max-width:680px){.fcards-band{margin-top:-60px}.fcards{grid-template-columns:1fr 1fr}.trust-stats{display:grid;grid-template-columns:repeat(2,auto);justify-content:start;gap:18px 28px;width:100%}.tstat{padding:0;border-left:none}.about-points{grid-template-columns:1fr}.svc-grid{grid-template-columns:1fr}.pricing-grid{grid-template-columns:1fr}.contact-card{padding:40px 26px}}
 @media(max-width:480px){.foot-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-
-
-
 <!-- Nav -->
 <nav class="nav">
   <div class="nav-inner">
     <a href="/" class="nav-logo"><img src="/images/logo.png" alt="Nyumba"></a>
-    <div class="nav-links">
+    <div class="nav-links" id="navLinks">
       <a href="#features">Features</a>
       <a href="#about">Why Nyumba</a>
       <a href="#pricing">Pricing</a>
       <a href="#contact">Contact</a>
+      <a href="/login">Sign in</a>
     </div>
     <div class="nav-cta">
       <a href="/login" class="btn btn-gold">Sign in</a>
       <a href="/register/step1" class="btn btn-green">Start free <span class="arr">&rarr;</span></a>
     </div>
-    <button class="nav-burger" onclick="document.querySelector('.nav-links').classList.toggle('open')" aria-label="Menu"><span></span><span></span><span></span></button>
+    <button class="nav-burger" id="navBurger" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
   </div>
 </nav>
-
 <!-- HERO -->
 <section class="hero">
   <div class="hero-photo">
@@ -447,6 +447,26 @@ a{color:inherit;text-decoration:none}
 </div>
 
 <script>
+  // Mobile menu toggle
+  (function(){
+    var burger=document.getElementById('navBurger');
+    var links=document.getElementById('navLinks');
+    if(burger&&links){
+      burger.addEventListener('click',function(){
+        var open=links.classList.toggle('open');
+        burger.classList.toggle('open',open);
+        burger.setAttribute('aria-expanded',open?'true':'false');
+      });
+      links.querySelectorAll('a').forEach(function(a){
+        a.addEventListener('click',function(){
+          links.classList.remove('open');
+          burger.classList.remove('open');
+          burger.setAttribute('aria-expanded','false');
+        });
+      });
+    }
+  })();
+  // Scroll reveal
   const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
   document.querySelectorAll('.rv').forEach((el,i)=>{el.style.transitionDelay=(i%4*70)+'ms';io.observe(el)});
   document.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('demo').classList.remove('open')});
