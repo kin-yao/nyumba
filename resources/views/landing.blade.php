@@ -3,511 +3,453 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nyumba — The operating system for Kenyan landlords.</title>
-<meta name="description" content="Automate rent collection, invoicing, SMS reminders and utility tracking for your Kenyan rental portfolio.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title>Nyumba — Collect rent, not excuses</title>
+<meta name="description" content="Automated invoicing, M-Pesa reconciliation, utility billing and SMS reminders for Kenyan rental portfolios.">
+
+<link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+<link href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600&f[]=satoshi@400,500,700&f[]=cabinet-grotesk@500,700&display=swap" rel="stylesheet">
+
 <style>
 :root{
-  --ink:#111110;
-  --paper:#f5f4f0;
-  --paper-2:#ece9e2;
-  --green:#1a6b52;
-  --green-2:#0f4433;
-  --olive:#145c45;
-  --moss:#0a2d20;
-  --gold:#c8965a;
-  --mute:#8a8880;
-  --line:#ddd8cf;
-  --white:#fff;
+  --ink:#14110f; --ink-2:#2b2722;
+  --paper:#f4f2ec; --paper-2:#ebe7dd; --card:#fff;
+  --green:#1a6b52; --green-deep:#0e3f30; --green-soft:#e4efe9;
+  --gold:#c2924f; --line:#ddd6c9; --mute:#857f73;
+  --shadow:0 24px 60px -28px rgba(20,17,15,.32);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{font-family:'Geist',sans-serif;background:var(--paper);color:var(--ink);overflow-x:hidden;line-height:1.5;-webkit-font-smoothing:antialiased}
+body{font-family:'Satoshi',sans-serif;background:var(--paper);color:var(--ink);line-height:1.55;overflow-x:hidden;-webkit-font-smoothing:antialiased}
 img{display:block;max-width:100%}
 a{color:inherit;text-decoration:none}
 
-.btn{display:inline-flex;align-items:center;gap:9px;padding:13px 20px;border-radius:999px;font-size:13px;font-weight:500;border:none;cursor:pointer;transition:all .22s;font-family:inherit}
-.btn-green{background:var(--green);color:var(--white)}
-.btn-green:hover{background:var(--green-2)}
-.btn-outline{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1px rgba(20,18,16,.3)}
-.btn-outline:hover{background:var(--ink);color:var(--paper);box-shadow:none}
-.btn-ghost-light{background:rgba(245,244,240,.1);color:var(--paper);box-shadow:inset 0 0 0 1px rgba(245,244,240,.2)}
-.btn-ghost-light:hover{background:rgba(245,244,240,.2)}
-.btn .ic{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.18);display:inline-flex;align-items:center;justify-content:center;font-size:10px}
+.display{font-family:'Clash Display',serif;font-weight:600;letter-spacing:-.025em;line-height:.96}
+.eyebrow{font-family:'Cabinet Grotesk',sans-serif;font-weight:700;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--green)}
+.eyebrow.light{color:rgba(244,242,236,.55)}
+.wrap{max-width:1280px;margin:0 auto;padding:0 24px}
 
-/* NAV */
-nav{position:fixed;top:16px;left:20px;right:20px;z-index:50;display:flex;align-items:center;justify-content:space-between;padding:10px 18px;background:rgba(17,17,16,.9);backdrop-filter:blur(20px);border-radius:999px;color:var(--paper)}
-.nav-logo{background:#fff;border-radius:7px;padding:4px 9px;display:flex;align-items:center}
-.nav-logo img{height:26px;width:auto;object-fit:contain}
-.nav-links{display:flex;gap:26px;font-size:13px}
-.nav-links a{opacity:.6;transition:opacity .2s}
-.nav-links a:hover{opacity:1}
-.nav-cta{display:flex;gap:8px;align-items:center}
-.nav-cta .btn{padding:8px 16px;font-size:13px}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:14px 24px;border-radius:4px;border:none;cursor:pointer;font-family:'Satoshi',sans-serif;font-size:14px;font-weight:700;transition:transform .2s,background .2s,color .2s}
+.btn .arr{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;background:rgba(255,255,255,.2)}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:var(--green-deep)}
+.btn-gold{background:var(--gold);color:var(--ink)}.btn-gold:hover{transform:translateY(-2px)}
+.btn-light{background:rgba(244,242,236,.12);color:var(--paper);box-shadow:inset 0 0 0 1px rgba(244,242,236,.25)}.btn-light:hover{background:rgba(244,242,236,.22)}
 
-/* HERO */
-.hero{min-height:100vh;padding:100px 20px 28px;display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:stretch}
-.hero-left{display:flex;flex-direction:column;justify-content:space-between;padding:10px 0}
-.hero-tag{display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:var(--paper);padding:7px 14px;border-radius:999px;font-family:'Geist Mono';font-size:10px;letter-spacing:.12em;text-transform:uppercase;width:fit-content;margin-bottom:28px}
-.hero-tag b{width:6px;height:6px;background:var(--gold);border-radius:50%;animation:pulse 2s infinite}
-@keyframes pulse{50%{opacity:.3}}
-h1.hero-h{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(52px,7.5vw,118px);letter-spacing:-.04em;line-height:.9;margin-bottom:22px}
-h1.hero-h em{font-style:italic;font-weight:400;color:var(--green)}
-.hero-sub{font-size:15px;color:var(--mute);line-height:1.65;max-width:440px;margin-bottom:30px}
-.hero-sub b{color:var(--ink);font-weight:500}
-.hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:44px}
-.hero-stats{display:flex;gap:0}
-.hs{padding:18px 26px;border-left:1px solid var(--line)}
-.hs:first-child{padding-left:0;border-left:none}
-.hs-n{font-family:'Fraunces',serif;font-weight:500;font-size:32px;letter-spacing:-.03em;line-height:1;color:var(--ink)}
-.hs-l{font-family:'Geist Mono';font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin-top:4px}
-.hero-right{position:relative;border-radius:20px;overflow:hidden;min-height:580px}
-.hero-right img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.hero-right .veil{position:absolute;inset:0;background:linear-gradient(180deg,transparent 50%,rgba(17,17,16,.78) 100%)}
-.hero-right .caption{position:absolute;bottom:28px;left:28px;right:28px;color:var(--paper)}
-.caption-tag{font-family:'Geist Mono';font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,244,240,.55);margin-bottom:8px}
-.caption-title{font-family:'Fraunces',serif;font-weight:500;font-size:26px;letter-spacing:-.02em;line-height:1.08}
+/* Utility bar */
+.util{background:var(--ink);color:rgba(244,242,236,.72);font-size:12.5px}
+.util-inner{max-width:1280px;margin:0 auto;padding:9px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.util-left{display:flex;gap:26px;align-items:center}
+.util-left .it{display:flex;gap:8px;align-items:center}
+.util-left .lbl{color:rgba(244,242,236,.4)}.util-left b{color:var(--paper);font-weight:500}
+.util-right{display:flex;gap:10px;align-items:center;color:rgba(244,242,236,.5)}
+.util-right .dot{width:5px;height:5px;border-radius:50%;background:var(--gold)}
 
-/* FEATURES */
-.feat{padding:80px 20px 60px}
-.feat-head{max-width:1400px;margin:0 auto 44px;display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:end}
-.feat-head .mono{font-family:'Geist Mono';font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--green);margin-bottom:12px}
-.feat-head h2{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(40px,5vw,70px);letter-spacing:-.035em;line-height:.93}
-.feat-head h2 em{font-style:italic;color:var(--green);font-weight:400}
-.feat-head p{font-family:'Fraunces',serif;font-style:italic;font-size:18px;line-height:1.45;color:var(--mute);max-width:420px;justify-self:end;align-self:end}
+/* Nav */
+.nav{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:60}
+.nav-inner{max-width:1280px;margin:0 auto;padding:0 24px;height:72px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo img{height:34px;width:auto;object-fit:contain}
+.nav-links{display:flex;gap:34px}
+.nav-links a{font-size:14px;font-weight:500;color:var(--ink-2);position:relative;padding:4px 0}
+.nav-links a::after{content:"";position:absolute;left:0;right:100%;bottom:-2px;height:2px;background:var(--green);transition:right .28s}
+.nav-links a:hover::after{right:0}
+.nav-cta{display:flex;gap:10px;align-items:center}
+.nav-cta .btn{padding:10px 18px;font-size:13px}
+.nav-burger{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:6px}
+.nav-burger span{width:22px;height:2px;background:var(--ink);display:block}
 
-/* BENTO — explicit grid placement, no empty space */
-.bento{
-  max-width:1400px;
-  margin:0 auto;
-  display:grid;
-  grid-template-columns:repeat(6,1fr);
-  grid-template-rows:260px 260px 260px 260px;
-  gap:12px;
-}
+/* Hero */
+.hero{position:relative;background:var(--ink);overflow:hidden}
+.hero-photo{position:absolute;inset:0}
+.hero-photo img{width:100%;height:100%;object-fit:cover;opacity:.34}
+.hero-photo::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,var(--ink) 30%,rgba(20,17,15,.55) 60%,rgba(20,17,15,.78))}
+.shard{position:absolute;top:0;bottom:0;pointer-events:none}
+.shard.a{left:-6%;width:46%;background:var(--green);opacity:.92;clip-path:polygon(0 0,72% 0,40% 100%,0 100%)}
+.shard.b{left:8%;width:44%;background:var(--green-deep);opacity:.85;clip-path:polygon(18% 0,60% 0,30% 100%,0 100%)}
+.shard.c{left:30%;width:30%;background:var(--gold);opacity:.16;clip-path:polygon(40% 0,72% 0,40% 100%,12% 100%)}
+.hero-inner{position:relative;z-index:2;max-width:1280px;margin:0 auto;padding:92px 24px 150px}
+.hero-badge{display:inline-flex;align-items:center;gap:9px;background:rgba(244,242,236,.1);border:1px solid rgba(244,242,236,.2);color:var(--paper);padding:8px 16px;border-radius:3px;font-family:'Cabinet Grotesk',sans-serif;font-weight:500;font-size:11px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:26px}
+.hero-badge b{width:6px;height:6px;border-radius:50%;background:var(--gold)}
+.hero h1{color:var(--paper);font-size:clamp(46px,7vw,92px);margin-bottom:24px;max-width:14ch}
+.hero h1 em{font-style:italic;font-weight:400;color:#9ed8c2}
+.hero-sub{font-size:16px;line-height:1.7;color:rgba(244,242,236,.7);max-width:460px;margin-bottom:34px}
+.hero-actions{display:flex;gap:12px;flex-wrap:wrap}
 
-/* Explicit positions */
-.b1{ grid-column:1/4; grid-row:1/3; } /* large image left, 2 rows */
-.b2{ grid-column:4/7; grid-row:1/2; } /* green card right top */
-.b3{ grid-column:4/5; grid-row:2/3; } /* small dark */
-.b4{ grid-column:5/6; grid-row:2/3; } /* small olive */
-.b5{ grid-column:6/7; grid-row:2/3; } /* small light */
-.b7{ grid-column:1/4; grid-row:3/5; } /* stat card left bottom, 2 rows */
-.b6{ grid-column:4/7; grid-row:3/5; } /* large image right, 2 rows */
+/* Feature cards */
+.fcards-band{margin-top:-88px;position:relative;z-index:5}
+.fcards{max-width:1280px;margin:0 auto;padding:0 24px;display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.fcard{background:var(--card);border-radius:8px;padding:26px 20px;box-shadow:var(--shadow);border-top:3px solid transparent;transition:transform .26s,border-color .26s}
+.fcard:hover{transform:translateY(-8px);border-top-color:var(--green)}
+.fcard .ic{width:46px;height:46px;border-radius:8px;background:var(--green-soft);display:flex;align-items:center;justify-content:center;margin-bottom:18px;color:var(--green)}
+.fcard h4{font-size:15px;font-weight:700;margin-bottom:6px;letter-spacing:-.01em}
+.fcard p{font-size:12.5px;color:var(--mute);line-height:1.5}
 
-.b{
-  border-radius:16px;overflow:hidden;position:relative;
-  padding:26px;display:flex;flex-direction:column;justify-content:space-between;
-}
-.b .tag{font-family:'Geist Mono';font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,244,240,.5)}
-.b h3{font-family:'Fraunces',serif;font-weight:500;font-size:22px;letter-spacing:-.02em;line-height:1.08}
-.b p{font-size:13px;line-height:1.55;margin-top:7px;max-width:320px}
+/* Trust */
+.trust{padding:56px 0 10px}
+.trust-inner{display:flex;align-items:center;gap:40px;flex-wrap:wrap;justify-content:space-between}
+.trust-lead{font-family:'Clash Display',serif;font-weight:500;font-size:18px;max-width:280px;line-height:1.25}
+.trust-lead span{color:var(--green)}
+.trust-stats{display:flex}
+.tstat{padding:6px 32px;border-left:1px solid var(--line)}
+.tstat:first-child{border-left:none;padding-left:0}
+.tstat .n{font-family:'Clash Display',serif;font-weight:600;font-size:34px;letter-spacing:-.03em;line-height:1}
+.tstat .l{font-family:'Cabinet Grotesk',sans-serif;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin-top:5px}
 
-.b.dark{background:var(--ink);color:var(--paper)}
-.b.dark p{color:rgba(245,244,240,.6)}
-.b.dark .tag{color:rgba(245,244,240,.45)}
+/* About */
+.about{padding:90px 0}
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
+.about-visual{position:relative;padding:20px 0 20px 20px}
+.about-visual .deco{position:absolute;left:-6px;top:-14px;width:120px;height:120px;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;z-index:0}
+.about-visual .deco i{background:var(--green);opacity:.16;border-radius:2px;transform:rotate(45deg)}
+.about-visual .deco i:nth-child(odd){opacity:.32}
+.about-photo{position:relative;z-index:1;border-radius:10px;overflow:hidden;aspect-ratio:5/4;box-shadow:var(--shadow);background:var(--paper-2)}
+.about-photo img{width:100%;height:100%;object-fit:cover}
+.about-play{position:absolute;right:-22px;bottom:30px;z-index:2;width:64px;height:64px;border-radius:50%;background:var(--green);color:#fff;border:none;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;box-shadow:0 14px 30px -10px rgba(26,107,82,.6);transition:transform .2s}
+.about-play:hover{transform:scale(1.06)}
+.about h2{font-size:clamp(32px,4vw,52px);margin:14px 0 20px;max-width:14ch}
+.about h2 em{font-style:italic;font-weight:400;color:var(--green)}
+.about-body{font-size:15px;color:var(--ink-2);line-height:1.7;border-left:2px solid var(--green);padding-left:18px;margin-bottom:26px;max-width:440px}
+.about-points{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:30px;max-width:440px}
+.apoint{display:flex;gap:12px;align-items:flex-start}
+.apoint .ic{width:40px;height:40px;flex-shrink:0;border-radius:8px;background:var(--green-soft);display:flex;align-items:center;justify-content:center;color:var(--green)}
+.apoint h5{font-size:14px;font-weight:700;margin-bottom:2px}
+.apoint p{font-size:12.5px;color:var(--mute);line-height:1.45}
+.about-cta{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.about-phone{display:flex;align-items:center;gap:11px}
+.about-phone .pic{width:42px;height:42px;border-radius:50%;background:var(--ink);color:var(--gold);display:flex;align-items:center;justify-content:center}
+.about-phone .lbl{font-size:11px;color:var(--mute);font-family:'Cabinet Grotesk',sans-serif;letter-spacing:.1em;text-transform:uppercase}
+.about-phone .num{font-family:'Clash Display',serif;font-weight:600;font-size:19px}
 
-.b.green{background:var(--green);color:var(--white)}
-.b.green .tag{color:rgba(255,255,255,.65)}
-.b.green p{color:rgba(255,255,255,.82)}
-.b.green h3{font-size:26px}
+/* Services */
+.svc{position:relative;background:var(--paper-2);padding:88px 0 100px;overflow:hidden}
+.svc::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,transparent 0 48%,rgba(255,255,255,.5) 48% 52%,transparent 52%),linear-gradient(135deg,transparent 0 73%,rgba(26,107,82,.05) 73% 76%,transparent 76%);pointer-events:none}
+.svc-head{text-align:center;position:relative;z-index:1;margin-bottom:50px}
+.svc-eyebrow{display:inline-flex;align-items:center;gap:10px;margin-bottom:14px}
+.svc-eyebrow .dash{width:26px;height:1px;background:var(--green)}
+.svc-head h2{font-size:clamp(30px,4vw,48px);max-width:16ch;margin:0 auto}
+.svc-head h2 em{font-style:italic;font-weight:400;color:var(--green)}
+.svc-grid{position:relative;z-index:1;display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.scard{background:var(--card);border-radius:10px;padding:32px 24px 28px;text-align:center;transition:transform .26s,box-shadow .26s;box-shadow:0 1px 0 rgba(20,17,15,.04)}
+.scard:hover{transform:translateY(-10px);box-shadow:var(--shadow)}
+.scard .ic{width:62px;height:62px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
+.scard h4{font-size:17px;font-weight:700;margin-bottom:8px}
+.scard .uline{width:34px;height:3px;background:var(--gold);margin:0 auto 14px;border-radius:2px}
+.scard p{font-size:13px;color:var(--mute);line-height:1.6}
 
-.b.olive{background:var(--olive);color:var(--paper)}
-.b.olive .tag{color:rgba(245,244,240,.55)}
-.b.olive p{color:rgba(245,244,240,.7)}
-
-.b.light{background:var(--paper-2);color:var(--ink)}
-.b.light .tag{color:var(--green)}
-.b.light p{color:var(--mute)}
-
-.b.moss{background:var(--moss);color:var(--paper)}
-.b.moss .tag{color:rgba(245,244,240,.45)}
-.b.moss p{color:rgba(245,244,240,.6)}
-
-.b.img-card{padding:0}
-.b.img-card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.b.img-card .ov{
-  position:absolute;inset:0;padding:28px;
-  display:flex;flex-direction:column;justify-content:flex-end;
-  background:linear-gradient(transparent 30%,rgba(17,17,16,.9));
-}
-.b.img-card .ov h3{color:var(--paper);font-size:28px;letter-spacing:-.025em}
-.b.img-card .ov .tag{color:rgba(245,244,240,.7);margin-bottom:10px}
-.b.img-card .ov p{color:rgba(245,244,240,.72);font-size:13px;line-height:1.55;margin-top:7px}
-
-.b-big-num{
-  font-family:'Fraunces',serif;font-weight:500;
-  font-size:clamp(60px,7vw,100px);letter-spacing:-.04em;line-height:.85;
-  color:var(--gold);
-}
-
-/* PRICING */
-.price{padding:80px 20px;background:var(--ink);color:var(--paper)}
-.price-head{max-width:1400px;margin:0 auto 48px;display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:end}
-.price-head .mono{font-family:'Geist Mono';font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:12px}
-.price-head h2{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(40px,5vw,70px);letter-spacing:-.035em;line-height:.93;color:var(--paper)}
-.price-head h2 em{font-style:italic;font-weight:400;color:var(--gold)}
-.price-head p{font-family:'Fraunces',serif;font-style:italic;font-size:18px;line-height:1.5;color:rgba(245,244,240,.5);max-width:400px;justify-self:end;align-self:end}
-
-.price-grid{max-width:1400px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.pc{background:rgba(245,244,240,.05);border-radius:18px;padding:28px;display:flex;flex-direction:column;border:1px solid rgba(245,244,240,.09);transition:border-color .25s}
-.pc:hover{border-color:rgba(245,244,240,.25)}
+/* Pricing */
+.pricing{padding:90px 0 100px;background:var(--ink);color:var(--paper)}
+.pricing-head{text-align:center;margin-bottom:48px}
+.pricing-head .eyebrow{display:inline-block;margin-bottom:14px}
+.pricing-head h2{font-size:clamp(30px,4vw,52px);color:var(--paper);max-width:18ch;margin:0 auto}
+.pricing-head h2 em{font-style:italic;font-weight:400;color:#9ed8c2}
+.pricing-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.pc{background:rgba(244,242,236,.05);border:1px solid rgba(244,242,236,.1);border-radius:12px;padding:30px 26px;display:flex;flex-direction:column;transition:transform .26s,border-color .26s}
+.pc:hover{transform:translateY(-8px);border-color:rgba(244,242,236,.3)}
 .pc.hot{background:var(--green);border-color:var(--green)}
-.pc .plan-name{font-family:'Geist Mono';font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(245,244,240,.5);margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
-.pc.hot .plan-name{color:rgba(255,255,255,.7)}
-.pc .badge{background:var(--gold);color:var(--moss);font-size:9px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;padding:3px 9px;border-radius:999px}
-.pc .amount{font-family:'Fraunces',serif;font-weight:500;font-size:44px;letter-spacing:-.04em;line-height:.9;color:var(--paper)}
-.pc .period{font-family:'Geist Mono';font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:rgba(245,244,240,.4);margin:8px 0 16px}
-.pc .desc{font-size:13px;color:rgba(245,244,240,.55);line-height:1.5;margin-bottom:20px;min-height:54px}
-.pc ul{list-style:none;margin-bottom:24px;display:flex;flex-direction:column;gap:9px}
-.pc li{font-size:13px;color:rgba(245,244,240,.72);display:flex;align-items:center;gap:10px;padding-bottom:9px;border-bottom:1px solid rgba(245,244,240,.08)}
-.pc.hot li{border-bottom-color:rgba(255,255,255,.12);color:rgba(255,255,255,.88)}
-.pc li::before{content:"";width:14px;height:1px;background:var(--gold);flex-shrink:0}
-.pc .cta-btn{display:block;text-align:center;padding:13px;background:rgba(245,244,240,.08);font-size:13px;font-weight:500;color:var(--paper);border-radius:10px;transition:all .2s;margin-top:auto;border:1px solid rgba(245,244,240,.1)}
-.pc .cta-btn:hover{background:var(--paper);color:var(--ink)}
-.pc.hot .cta-btn{background:var(--gold);color:var(--moss);border-color:transparent}
-.pc.hot .cta-btn:hover{background:var(--paper);color:var(--ink)}
-.price-note{max-width:1400px;margin:24px auto 0;text-align:center;font-family:'Fraunces',serif;font-style:italic;font-size:15px;color:rgba(245,244,240,.38)}
-.price-note b{color:var(--gold);font-style:normal;font-weight:500}
+.pc .pname{font-family:'Cabinet Grotesk',sans-serif;font-weight:700;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:rgba(244,242,236,.5);margin-bottom:18px;display:flex;justify-content:space-between;align-items:center}
+.pc.hot .pname{color:rgba(255,255,255,.78)}
+.pc .badge{background:var(--gold);color:var(--ink);font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 10px;border-radius:999px}
+.pc .amt{font-family:'Clash Display',serif;font-weight:600;font-size:42px;letter-spacing:-.03em;line-height:.9;color:var(--paper)}
+.pc .per{font-family:'Cabinet Grotesk',sans-serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:rgba(244,242,236,.4);margin:10px 0 16px}
+.pc .desc{font-size:13px;color:rgba(244,242,236,.6);line-height:1.55;margin-bottom:20px;min-height:62px}
+.pc.hot .desc{color:rgba(255,255,255,.85)}
+.pc ul{list-style:none;margin-bottom:24px;display:flex;flex-direction:column}
+.pc li{font-size:13.5px;color:rgba(244,242,236,.78);display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid rgba(244,242,236,.1)}
+.pc.hot li{color:rgba(255,255,255,.92);border-bottom-color:rgba(255,255,255,.16)}
+.pc li svg{flex-shrink:0;color:var(--gold)}
+.pc .pcta{display:block;text-align:center;padding:14px;border-radius:6px;font-size:14px;font-weight:700;margin-top:auto;transition:all .2s;background:rgba(244,242,236,.1);color:var(--paper)}
+.pc .pcta:hover{background:var(--paper);color:var(--ink)}
+.pc.hot .pcta{background:var(--gold);color:var(--ink)}.pc.hot .pcta:hover{background:#fff}
+.pricing-note{text-align:center;margin-top:30px;font-family:'Clash Display',serif;font-style:italic;font-size:16px;color:rgba(244,242,236,.45)}
+.pricing-note b{color:var(--gold);font-style:normal;font-weight:600}
 
-/* FOOTER */
-footer{background:var(--moss);color:var(--paper);padding:56px 20px 26px}
-.ft{max-width:1400px;margin:0 auto;display:grid;grid-template-columns:1.8fr 1fr 1fr 1fr;gap:40px;padding-bottom:36px;border-bottom:1px solid rgba(245,244,240,.1)}
-.ft-logo{background:#fff;border-radius:7px;padding:5px 9px;display:inline-block;margin-bottom:14px}
-.ft-logo img{height:24px;width:auto;object-fit:contain}
-.ft-desc{font-family:'Fraunces',serif;font-style:italic;font-size:15px;line-height:1.45;color:rgba(245,244,240,.48);max-width:250px}
-.ft-h{font-family:'Geist Mono';font-size:10px;font-weight:500;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);margin-bottom:16px}
-.ft-a{display:block;font-size:13px;color:rgba(245,244,240,.52);margin-bottom:9px;transition:color .2s}
-.ft-a:hover{color:var(--paper)}
-.ft-bottom{max-width:1400px;margin:20px auto 0;display:flex;justify-content:space-between;font-family:'Geist Mono';font-size:10px;letter-spacing:.06em;color:rgba(245,244,240,.28);text-transform:uppercase}
+/* Contact CTA */
+.contact{padding:90px 0}
+.contact-card{background:var(--green-deep);border-radius:16px;padding:64px 48px;color:var(--paper);position:relative;overflow:hidden}
+.contact-card .shard{position:absolute;top:0;bottom:0;right:-4%;width:30%;background:var(--green);opacity:.4;clip-path:polygon(40% 0,100% 0,100% 100%,8% 100%)}
+.contact-inner{position:relative;z-index:1;display:grid;grid-template-columns:1.3fr 1fr;gap:48px;align-items:center}
+.contact h2{font-size:clamp(30px,4vw,48px);color:var(--paper);margin-bottom:14px;max-width:16ch}
+.contact h2 em{font-style:italic;font-weight:400;color:var(--gold)}
+.contact p{color:rgba(244,242,236,.7);font-size:15px;margin-bottom:28px;max-width:44ch}
+.contact-actions{display:flex;gap:14px;flex-wrap:wrap}
+.contact-methods{display:flex;flex-direction:column;gap:18px}
+.cm{display:flex;gap:14px;align-items:center}
+.cm .ic{width:46px;height:46px;flex-shrink:0;border-radius:10px;background:rgba(244,242,236,.1);color:var(--gold);display:flex;align-items:center;justify-content:center}
+.cm .t{font-size:11px;font-family:'Cabinet Grotesk',sans-serif;letter-spacing:.12em;text-transform:uppercase;color:rgba(244,242,236,.5)}
+.cm .v{font-family:'Clash Display',serif;font-weight:600;font-size:18px}
 
-/* DEMO MODAL */
-.demo-modal{display:none;position:fixed;inset:0;background:rgba(17,17,16,.85);z-index:200;align-items:center;justify-content:center;padding:20px}
-.demo-modal.open{display:flex}
-.demo-box{background:var(--ink);border-radius:20px;width:100%;max-width:800px;overflow:hidden;position:relative}
-.demo-close{position:absolute;top:14px;right:14px;background:rgba(245,244,240,.1);border:none;color:var(--paper);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;z-index:1;font-family:inherit}
-.demo-placeholder{aspect-ratio:16/9;background:var(--moss);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
-.demo-placeholder .play{width:60px;height:60px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--moss)}
-.demo-placeholder p{font-family:'Fraunces',serif;font-style:italic;font-size:17px;color:rgba(245,244,240,.45)}
+/* Footer */
+.foot{background:var(--ink);color:var(--paper);padding:64px 0 28px}
+.foot-grid{display:grid;grid-template-columns:1.8fr 1fr 1fr 1.2fr;gap:40px;padding-bottom:40px;border-bottom:1px solid rgba(244,242,236,.12)}
+.foot-logo{background:#fff;border-radius:6px;padding:6px 10px;display:inline-block;margin-bottom:16px}
+.foot-logo img{height:26px;width:auto}
+.foot-desc{font-family:'Clash Display',serif;font-weight:400;font-size:17px;line-height:1.4;color:rgba(244,242,236,.5);max-width:260px}
+.foot-h{font-family:'Cabinet Grotesk',sans-serif;font-weight:700;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:18px}
+.foot-a{display:block;font-size:14px;color:rgba(244,242,236,.6);margin-bottom:11px;transition:color .2s,padding .2s}
+.foot-a:hover{color:var(--paper);padding-left:4px}
+.foot-bottom{max-width:1280px;margin:22px auto 0;padding:0 24px;display:flex;justify-content:space-between;font-size:12px;letter-spacing:.04em;color:rgba(244,242,236,.32)}
 
-/* ANIMATIONS */
-.fade{opacity:0;transform:translateY(18px);transition:opacity .7s,transform .7s}
-.fade.in{opacity:1;transform:none}
+/* Reveal + modal */
+.rv{opacity:0;transform:translateY(22px);transition:opacity .8s cubic-bezier(.2,.7,.2,1),transform .8s cubic-bezier(.2,.7,.2,1)}
+.rv.in{opacity:1;transform:none}
+.demo{display:none;position:fixed;inset:0;background:rgba(14,11,9,.86);z-index:200;align-items:center;justify-content:center;padding:20px}
+.demo.open{display:flex}
+.demo-box{background:var(--ink);border-radius:10px;width:100%;max-width:840px;overflow:hidden;position:relative}
+.demo-x{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;background:rgba(244,242,236,.12);border:none;color:var(--paper);font-size:18px;cursor:pointer;z-index:2}
+.demo-ph{aspect-ratio:16/9;background:var(--green-deep);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.demo-ph .play{width:64px;height:64px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--ink)}
+.demo-ph p{font-family:'Clash Display',serif;font-size:18px;color:rgba(244,242,236,.5)}
 
-/* RESPONSIVE */
-@media(max-width:1100px){
-  .bento{
-    grid-template-columns:1fr 1fr 1fr;
-    grid-template-rows:auto;
-  }
-  .b1{grid-column:1/3;grid-row:auto}
-  .b2{grid-column:3/4;grid-row:auto}
-  .b3,.b4,.b5{grid-column:span 1;grid-row:auto}
-  .b7{grid-column:1/3;grid-row:auto}
-  .b6{grid-column:3/4;grid-row:auto}
-  .price-grid{grid-template-columns:1fr 1fr}
-}
-@media(max-width:820px){
-  nav{padding:9px 14px;left:12px;right:12px;top:10px}
-  .nav-links{display:none}
-  .hero{grid-template-columns:1fr;padding:90px 14px 20px;min-height:auto}
-  .hero-right{min-height:300px}
-  .feat,.price{padding:60px 14px}
-  .feat-head,.price-head{grid-template-columns:1fr;gap:16px}
-  .feat-head p,.price-head p{justify-self:start}
-  .bento{grid-template-columns:1fr 1fr;grid-template-rows:auto}
-  .b1,.b7{grid-column:1/3}
-  .b2{grid-column:1/3}
-  .b3,.b4,.b5{grid-column:span 1}
-  .b6{grid-column:1/3}
-  .price-grid{grid-template-columns:1fr}
-  .ft{grid-template-columns:1fr 1fr;gap:26px}
-  .ft-bottom{flex-direction:column;gap:6px;text-align:center}
-}
-@media(max-width:500px){
-  .ft{grid-template-columns:1fr}
-}
+@media(max-width:1040px){.fcards{grid-template-columns:repeat(3,1fr)}.svc-grid{grid-template-columns:repeat(2,1fr)}.pricing-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:980px){.foot-grid{grid-template-columns:1fr 1fr;gap:30px}.util-left .it.hide-sm{display:none}.contact-inner{grid-template-columns:1fr;gap:36px}}
+@media(max-width:860px){.about-grid{grid-template-columns:1fr;gap:44px}.about-visual{max-width:460px}}
+@media(max-width:760px){.nav-links,.nav-cta .btn-light{display:none}.nav-burger{display:flex}.util-right{display:none}.foot-grid{grid-template-columns:1fr 1fr}.foot-bottom{flex-direction:column;gap:6px;text-align:center}}
+@media(max-width:680px){.fcards-band{margin-top:-60px}.fcards{grid-template-columns:1fr 1fr}.tstat{padding:6px 20px}.about-points{grid-template-columns:1fr}.svc-grid{grid-template-columns:1fr}.pricing-grid{grid-template-columns:1fr}.contact-card{padding:40px 26px}}
+@media(max-width:480px){.foot-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 
-<!-- NAV -->
-<nav>
-  <a href="/" class="nav-logo">
-    <img src="/images/logo.png" alt="Nyumba">
-  </a>
-  <div class="nav-links">
-    <a href="#features">Features</a>
-    <a href="#pricing">Pricing</a>
-  </div>
-  <div class="nav-cta">
-    <a href="/login" class="btn btn-ghost-light">Sign in</a>
-    <a href="/register/step1" class="btn btn-green">Start free <span class="ic">→</span></a>
+
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo"><img src="/images/logo.png" alt="Nyumba"></a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#about">Why Nyumba</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#contact">Contact</a>
+    </div>
+    <div class="nav-cta">
+      <a href="/login" class="btn btn-gold">Sign in</a>
+      <a href="/register/step1" class="btn btn-green">Start free <span class="arr">&rarr;</span></a>
+    </div>
+    <button class="nav-burger" onclick="document.querySelector('.nav-links').classList.toggle('open')" aria-label="Menu"><span></span><span></span><span></span></button>
   </div>
 </nav>
 
 <!-- HERO -->
 <section class="hero">
-  <div class="hero-left fade">
-    <div>
-      <h1 class="hero-h">Collect rent,<br>not <em>excuses</em>.</h1>
-      <p class="hero-sub">
-        Nyumba handles invoices, M-Pesa reconciliation, utility billing and SMS reminders for your rental portfolio.
-        <b>Your job is ownership, not administration.</b>
-      </p>
-      <div class="hero-actions">
-        <a href="/register/step1" class="btn btn-green">Start free trial <span class="ic">→</span></a>
-        <button class="btn btn-outline" onclick="document.getElementById('demo-modal').classList.add('open')">
-          <span class="ic" style="background:var(--green);color:#fff">▶</span> Watch demo
-        </button>
-      </div>
-    </div>
-    <div class="hero-stats">
-      <div class="hs"><div class="hs-n">500+</div><div class="hs-l">Landlords</div></div>
-      <div class="hs"><div class="hs-n">12k+</div><div class="hs-l">Units live</div></div>
-      <div class="hs"><div class="hs-n">7 days</div><div class="hs-l">Free trial</div></div>
-    </div>
+  <div class="hero-photo">
+    <img src="/images/hero.jpg" alt="Apartment block in Nairobi">
   </div>
-
-  <div class="hero-right fade">
-    <img src="https://i.pinimg.com/1200x/51/2c/b1/512cb183d68c0fc6c3dd8ad876092c12.jpg" alt="Residential apartment block in Nairobi">
-    <div class="veil"></div>
-    <div class="caption">
-      <div class="caption-tag">Nairobi, Kenya</div>
-      <div class="caption-title">The operating system<br>for Kenyan landlords.</div>
+  <div class="shard a"></div><div class="shard b"></div><div class="shard c"></div>
+  <div class="hero-inner rv">
+    <h1 class="display">Collect rent,<br>not <em>excuses</em>.</h1>
+    <p class="hero-sub">Invoicing, M-Pesa reconciliation, utility billing and SMS reminders — running automatically for every unit in the portfolio.</p>
+    <div class="hero-actions">
+      <a href="/register/step1" class="btn btn-gold">Start free trial <span class="arr" style="background:rgba(20,17,15,.15)">&rarr;</span></a>
+      <button class="btn btn-light" onclick="document.getElementById('demo').classList.add('open')"><span class="arr" style="background:var(--green)">&#9654;</span> Watch demo</button>
     </div>
   </div>
 </section>
 
-<!-- FEATURES -->
-<section id="features" class="feat">
-  <div class="feat-head fade">
-    <div>
-      <div class="mono">What it does</div>
-      <h2>One platform.<br>Zero <em>spreadsheets</em>.</h2>
-    </div>
-    <p>Six things Nyumba runs in the background while you get on with your life.</p>
+<!-- FEATURE CARDS -->
+<div class="fcards-band" id="features">
+  <div class="fcards">
+    @foreach([
+      ['Automated invoicing','PDF invoices built and sent on schedule.','M3 7h14M5 3h10l2 4v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z'],
+      ['M-Pesa reconciliation','Payments matched to invoices instantly.','M12 1v22M5 6h10a3 3 0 010 6H7a3 3 0 000 6h10'],
+      ['SMS reminders','Arrears chased before they grow.','M4 4h16v12H8l-4 4V4z'],
+      ['Utility billing','Meter readings to billed amounts.','M4 20V10M10 20V4M16 20v-7M22 20H2'],
+      ['Audit trail','Every action timestamped and traceable.','M9 11l3 3 8-8M21 12a9 9 0 11-6.2-8.5'],
+    ] as [$t,$d,$path])
+      <div class="fcard rv">
+        <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ $path }}"/></svg></div>
+        <h4>{{ $t }}</h4><p>{{ $d }}</p>
+      </div>
+    @endforeach
   </div>
+</div>
 
-  <div class="bento fade">
+<!-- TRUST -->
+<section class="trust">
+  <div class="wrap">
+    <div class="trust-inner rv">
+      <div class="trust-lead">Trusted across Kenyan rental <span>portfolios</span> of every size.</div>
+      <div class="trust-stats">
+        <div class="tstat"><div class="n">500+</div><div class="l">Landlords</div></div>
+        <div class="tstat"><div class="n">12k+</div><div class="l">Units live</div></div>
+        <div class="tstat"><div class="n">47</div><div class="l">Counties</div></div>
+        <div class="tstat"><div class="n">30 day</div><div class="l">Free trial</div></div>
+      </div>
+    </div>
+  </div>
+</section>
 
-    <!-- b1: Large image — Invoicing (cols 1-3, rows 1-2) -->
-    <div class="b b1 img-card">
-      <img src="https://i.pinimg.com/1200x/48/05/05/480505da4577c3030a7c90fed197332c.jpg" alt="Apartment block">
-      <div class="ov">
-        <div>
-          <span class="tag">01 · Invoicing</span>
-          <h3>Invoices that send themselves.</h3>
-          <p>On the 1st of every month Nyumba builds a PDF for every tenant covering rent, water, electricity and extras, then pushes it by SMS. No manual work.</p>
+<!-- ABOUT -->
+<section class="about" id="about">
+  <div class="wrap">
+    <div class="about-grid">
+      <div class="about-visual rv">
+        <div class="deco">@for($i=0;$i<9;$i++)<i></i>@endfor</div>
+        <div class="about-photo"><img src="/images/about.jpg" alt="Reviewing a rental portfolio"></div>
+        <button class="about-play" onclick="document.getElementById('demo').classList.add('open')">&#9654;</button>
+      </div>
+      <div class="rv">
+        <div class="eyebrow">Why Nyumba</div>
+        <h2 class="display">Built for the realities of <em>Kenyan property</em>.</h2>
+        <p class="about-body">Rent rarely arrives on time, and never in one format. Nyumba reconciles M-Pesa, Till and bank payments against every invoice, then chases arrears by SMS — without manual follow-up.</p>
+        <div class="about-points">
+          <div class="apoint">
+            <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M5 6h10a3 3 0 010 6H7a3 3 0 000 6h10"/></svg></div>
+            <div><h5>Payment matching</h5><p>M-Pesa and bank inflows reconciled to invoices.</p></div>
+          </div>
+          <div class="apoint">
+            <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6"/></svg></div>
+            <div><h5>Caretaker ready</h5><p>Meter readings entered from any phone.</p></div>
+          </div>
         </div>
-      </div>
-    </div>
-
-    <!-- b2: SMS reminders (cols 4-6, row 1) -->
-    <div class="b b2 green">
-      <span class="tag">02 · SMS reminders</span>
-      <div>
-        <h3>Three touches per tenant.<br>Zero effort from you.</h3>
-        <p>Due in 3 days. Due today. Three days in arrears. Nyumba sends all three automatically and logs every delivery receipt.</p>
-      </div>
-    </div>
-
-    <!-- b3: M-Pesa (col 4, row 2) -->
-    <div class="b b3 dark">
-      <span class="tag">03 · M-Pesa</span>
-      <div>
-        <div class="b-big-num">0</div>
-        <p style="color:rgba(245,244,240,.5);font-size:12px;margin-top:6px">manual entries</p>
-      </div>
-    </div>
-
-    <!-- b4: Utilities (col 5, row 2) -->
-    <div class="b b4 olive">
-      <span class="tag">04 · Utilities</span>
-      <div>
-        <h3 style="font-size:18px">Meter to bill.<br>No argument.</h3>
-        <p>Caretaker enters the reading. Nyumba computes and bills the right tenant with proof attached.</p>
-      </div>
-    </div>
-
-    <!-- b5: Reports (col 6, row 2) -->
-    <div class="b b5 light">
-      <span class="tag">05 · Reports</span>
-      <div>
-        <h3 style="font-size:18px">Know your numbers every Monday.</h3>
-        <p>Collection rate, occupancy and net income in one SMS. Full PDF for the bank on demand.</p>
-      </div>
-    </div>
-
-    <!-- b7: Stats card (cols 1-3, rows 3-4) — fills the empty left space -->
-    <div class="b b7 moss" style="justify-content:space-between">
-      <span class="tag">The numbers</span>
-      <div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:18px">
-          <div style="background:rgba(245,244,240,.06);border-radius:10px;padding:18px">
-            <div style="font-family:'Fraunces',serif;font-size:42px;font-weight:500;letter-spacing:-.03em;color:var(--gold);line-height:1">500+</div>
-            <div style="font-family:'Geist Mono';font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(245,244,240,.45);margin-top:5px">Landlords</div>
-          </div>
-          <div style="background:rgba(245,244,240,.06);border-radius:10px;padding:18px">
-            <div style="font-family:'Fraunces',serif;font-size:42px;font-weight:500;letter-spacing:-.03em;color:var(--gold);line-height:1">12k+</div>
-            <div style="font-family:'Geist Mono';font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(245,244,240,.45);margin-top:5px">Units live</div>
-          </div>
-          <div style="background:rgba(245,244,240,.06);border-radius:10px;padding:18px">
-            <div style="font-family:'Fraunces',serif;font-size:42px;font-weight:500;letter-spacing:-.03em;color:var(--gold);line-height:1">7</div>
-            <div style="font-family:'Geist Mono';font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(245,244,240,.45);margin-top:5px">Day free trial</div>
-          </div>
-          <div style="background:rgba(26,107,82,.35);border-radius:10px;padding:18px;display:flex;flex-direction:column;justify-content:space-between">
-            <div style="font-family:'Fraunces',serif;font-size:16px;font-style:italic;color:rgba(245,244,240,.75);line-height:1.3">Ready in under an hour.</div>
-            <a href="/register/step1" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--gold);font-weight:500;margin-top:10px">Start free <span style="font-size:10px">→</span></a>
+        <div class="about-cta">
+          <a href="/register/step1" class="btn btn-green">Start free trial <span class="arr">&rarr;</span></a>
+          <div class="about-phone">
+            <div class="pic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3 19.5 19.5 0 01-6-6 19.8 19.8 0 01-3-8.6A2 2 0 014.1 2h3a2 2 0 012 1.7c.1.9.4 1.8.7 2.7a2 2 0 01-.5 2.1L8.1 9.9a16 16 0 006 6l1.4-1.2a2 2 0 012.1-.4c.9.3 1.8.6 2.7.7a2 2 0 011.7 2z"/></svg></div>
+            <div><div class="lbl">Talk to support</div><div class="num">0705 056 343</div></div>
           </div>
         </div>
       </div>
     </div>
+  </div>
+</section>
 
-    <!-- b6: Large image — Audit (cols 4-6, rows 3-4) -->
-    <div class="b b6 img-card">
-      <img src="https://i.pinimg.com/736x/41/8d/53/418d53277a6707f79d69e75f9cf429d0.jpg" alt="Property manager reviewing portfolio">
-      <div class="ov">
-        <div>
-          <span class="tag">06 · Audit trail</span>
-          <h3>Every action, timestamped.</h3>
-          <p>Know exactly who edited what, when, from which device. Disputes become a 30 second lookup instead of a two week argument.</p>
-        </div>
-      </div>
+<!-- SERVICES -->
+<section class="svc">
+  <div class="wrap">
+    <div class="svc-head rv">
+      <div class="svc-eyebrow"><span class="dash"></span><span class="eyebrow">What it handles</span><span class="dash"></span></div>
+      <h2 class="display">Everything a rental portfolio <em>needs</em>.</h2>
     </div>
-
+    <div class="svc-grid">
+      @foreach([
+        ['Residential & commercial','Bedsitters to godowns, billed on their own terms.','M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6'],
+        ['Tenant & lease tracking','Deposits, lease terms and balances in one ledger.','M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8'],
+        ['Financial reporting','Collection rate, occupancy and net income on demand.','M3 3v18h18M7 14l4-4 4 4 4-6'],
+        ['Maintenance requests','Issues logged, assigned and closed with a record.','M14.7 6.3a4 4 0 01-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 015.4-5.4l-3 3-2-2 3-3z'],
+      ] as [$t,$d,$path])
+        <div class="scard rv">
+          <div class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ $path }}"/></svg></div>
+          <h4>{{ $t }}</h4><div class="uline"></div><p>{{ $d }}</p>
+        </div>
+      @endforeach
+    </div>
   </div>
 </section>
 
 <!-- PRICING -->
-<section id="pricing" class="price">
-  <div class="price-head fade">
-    <div>
-      <div class="mono">Pricing</div>
-      <h2>Start free. Pay when<br>it <em>pays for itself</em>.</h2>
+<section class="pricing" id="pricing">
+  <div class="wrap">
+    <div class="pricing-head rv">
+      <div class="eyebrow light">Pricing</div>
+      <h2 class="display">Pricing that <em>pays for itself</em>.</h2>
     </div>
-    <p>All plans get a 7 day free trial. No card required. The price you see is the price you pay.</p>
+    <div class="pricing-grid">
+      @php
+        $plans = [
+          ['Starter','KES 2,000','per month','For the new landlord moving off notebooks and onto schedule.',['Up to 20 units','50 SMS credits monthly','PDF invoices','Utility tracking'],false],
+          ['Growth','KES 4,500','per month','For the growing portfolio that should run without daily oversight.',['Up to 50 units','100 SMS credits monthly','Bulk invoicing','Advanced reports'],true],
+          ['Pro','KES 7,000','per month','For multiple buildings, caretaker teams and co-owners.',['Up to 100 units','200 SMS credits monthly','Multi-user access','Full audit trail'],false],
+          ['Enterprise','Custom','tailored to portfolio','For managers running 100+ units across many owners.',['Unlimited units','Custom SMS bundle','Dedicated support','API access'],false],
+        ];
+      @endphp
+      @foreach($plans as [$name,$amt,$per,$desc,$feats,$hot])
+        <div class="pc {{ $hot ? 'hot' : '' }} rv">
+          <div class="pname">{{ $name }} @if($hot)<span class="badge">Popular</span>@endif</div>
+          <div class="amt" @if($name==='Enterprise') style="font-size:32px;padding-top:8px" @endif>{{ $amt }}</div>
+          <div class="per">{{ $per }}</div>
+          <p class="desc">{{ $desc }}</p>
+          <ul>
+            @foreach($feats as $f)
+              <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>{{ $f }}</li>
+            @endforeach
+          </ul>
+          <a href="{{ $name==='Enterprise' ? 'mailto:hello@nyumba.co.ke' : '/register/step1' }}" class="pcta">{{ $name==='Enterprise' ? 'Talk to support' : 'Start free trial' }}</a>
+        </div>
+      @endforeach
+    </div>
+    <p class="pricing-note">Pay 6 months, get 1 free. <b>Pay 12 months, get 2 free.</b> Extra SMS at KES 1 per credit.</p>
   </div>
+</section>
 
-  <div class="price-grid fade">
-    <div class="pc">
-      <div class="plan-name">Starter</div>
-      <div class="amount">KES 2,000</div>
-      <div class="period">per month</div>
-      <p class="desc">For the new landlord who is done with notebooks and wants the basics running automatically.</p>
-      <ul>
-        <li>Up to 20 units</li>
-        <li>50 SMS credits a month</li>
-        <li>PDF invoices</li>
-        <li>Utility tracking</li>
-        <li>Basic reports</li>
-      </ul>
-      <a href="/register/step1" class="cta-btn">Get started</a>
-    </div>
-
-    <div class="pc hot">
-      <div class="plan-name">Growth <span class="badge">Popular</span></div>
-      <div class="amount">KES 4,500</div>
-      <div class="period">per month</div>
-      <p class="desc">For the growing landlord who wants the whole system running itself without daily oversight.</p>
-      <ul>
-        <li>Up to 50 units</li>
-        <li>100 SMS credits a month</li>
-        <li>Bulk invoicing</li>
-        <li>Auto invoice schedule</li>
-        <li>Advanced reports</li>
-      </ul>
-      <a href="/register/step1" class="cta-btn">Start free trial</a>
-    </div>
-
-    <div class="pc">
-      <div class="plan-name">Pro</div>
-      <div class="amount">KES 7,000</div>
-      <div class="period">per month</div>
-      <p class="desc">For the serious operator running multiple buildings with a caretaker team and co-owners.</p>
-      <ul>
-        <li>Up to 100 units</li>
-        <li>200 SMS credits a month</li>
-        <li>Multi-user access</li>
-        <li>Full audit trail</li>
-        <li>Priority support</li>
-      </ul>
-      <a href="/register/step1" class="cta-btn">Get started</a>
-    </div>
-
-    <div class="pc">
-      <div class="plan-name">Enterprise</div>
-      <div class="amount" style="font-size:34px;padding-top:8px">Custom</div>
-      <div class="period">tailored to your portfolio</div>
-      <p class="desc">For property managers running 100 plus units across multiple owners and buildings.</p>
-      <ul>
-        <li>Unlimited units</li>
-        <li>Custom SMS bundle</li>
-        <li>Dedicated support</li>
-        <li>API access</li>
-        <li>99.9% uptime SLA</li>
-      </ul>
-      <a href="mailto:hello@nyumba.co.ke" class="cta-btn">Talk to us</a>
+<!-- CONTACT CTA -->
+<section class="contact" id="contact">
+  <div class="wrap">
+    <div class="contact-card rv">
+      <div class="shard"></div>
+      <div class="contact-inner">
+        <div>
+          <h2 class="display">Start the <em>free trial</em> today.</h2>
+          <p>Thirty days, full features, no card. Properties, units and tenants import from a single CSV, with setup support included.</p>
+          <div class="contact-actions">
+            <a href="/register/step1" class="btn btn-gold">Create an account <span class="arr" style="background:rgba(20,17,15,.15)">&rarr;</span></a>
+            <a href="https://wa.me/254705056343" class="btn btn-light">WhatsApp support</a>
+          </div>
+        </div>
+        <div class="contact-methods">
+          <div class="cm">
+            <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.7-.9-2-1-.3-.1-.5-.1-.7.2l-.9 1.1c-.2.2-.3.2-.6.1-.3-.2-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6l.5-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.2-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.7-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.1-.3-.2-.6-.3M12 2a10 10 0 00-8.5 15.3L2 22l4.8-1.3A10 10 0 1012 2z"/></svg></div>
+            <div><div class="t">WhatsApp</div><div class="v">0705 056 343</div></div>
+          </div>
+          <div class="cm">
+            <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></div>
+            <div><div class="t">Email</div><div class="v">hello@nyumba.co.ke</div></div>
+          </div>
+          <div class="cm">
+            <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+            <div><div class="t">Office</div><div class="v">Nairobi, Kenya</div></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-
-  <p class="price-note">Pay 6 months, get 1 free. <b>Pay 12 months, get 2 free.</b> Extra SMS at KES 1 per credit.</p>
 </section>
 
 <!-- FOOTER -->
-<footer>
-  <div class="ft">
-    <div>
-      <a href="/" class="ft-logo"><img src="/images/logo.png" alt="Nyumba"></a>
-      <p class="ft-desc">Kenya's most complete rental management platform. Built for landlords who mean business.</p>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <a href="/" class="foot-logo"><img src="/images/logo.png" alt="Nyumba"></a>
+        <p class="foot-desc">The operating system for Kenyan landlords.</p>
+      </div>
+      <div>
+        <div class="foot-h">Product</div>
+        <a href="#features" class="foot-a">Features</a>
+        <a href="#pricing" class="foot-a">Pricing</a>
+        <a href="/register/step1" class="foot-a">Start free trial</a>
+        <a href="/login" class="foot-a">Sign in</a>
+      </div>
+      <div>
+        <div class="foot-h">Company</div>
+        <a href="#about" class="foot-a">Why Nyumba</a>
+        <a href="#" class="foot-a">Privacy policy</a>
+        <a href="#" class="foot-a">Terms of service</a>
+      </div>
+      <div>
+        <div class="foot-h">Talk to support</div>
+        <a href="https://wa.me/254705056343" class="foot-a">WhatsApp · 0705 056 343</a>
+        <a href="mailto:hello@nyumba.co.ke" class="foot-a">hello@nyumba.co.ke</a>
+        <span class="foot-a">Nairobi, Kenya</span>
+      </div>
     </div>
-    <div>
-      <div class="ft-h">Product</div>
-      <a href="#features" class="ft-a">Features</a>
-      <a href="#pricing" class="ft-a">Pricing</a>
-      <a href="/register/step1" class="ft-a">Sign up</a>
-      <a href="/login" class="ft-a">Sign in</a>
+    <div class="foot-bottom">
+      <span>© {{ date('Y') }} Nyumba. All rights reserved.</span>
+      <span>Built in Nairobi.</span>
     </div>
-    <div>
-      <div class="ft-h">Legal</div>
-      <a href="#" class="ft-a">Privacy policy</a>
-      <a href="#" class="ft-a">Terms of service</a>
-    </div>
-    <div>
-      <div class="ft-h">Talk to us</div>
-      <a href="mailto:hello@nyumba.co.ke" class="ft-a">hello@nyumba.co.ke</a>
-      <a href="tel:0700000000" class="ft-a">0700 000 000</a>
-      <span class="ft-a">Nairobi, Kenya</span>
-    </div>
-  </div>
-  <div class="ft-bottom">
-    <span>2026 Nyumba. All rights reserved.</span>
-    <span>Built in Nairobi, for landlords everywhere.</span>
   </div>
 </footer>
 
-<!-- DEMO MODAL -->
-<div class="demo-modal" id="demo-modal" onclick="if(event.target===this)this.classList.remove('open')">
+<!-- Demo modal -->
+<div class="demo" id="demo" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="demo-box">
-    <button class="demo-close" onclick="document.getElementById('demo-modal').classList.remove('open')">&times;</button>
-    <div class="demo-placeholder">
-      <div class="play">▶</div>
-      <p>Demo video coming soon.</p>
-    </div>
+    <button class="demo-x" onclick="document.getElementById('demo').classList.remove('open')">&times;</button>
+    <div class="demo-ph"><div class="play">&#9654;</div><p>Product walkthrough coming soon.</p></div>
   </div>
 </div>
 
 <script>
-const io = new IntersectionObserver(
-  es => es.forEach(e => e.isIntersecting && e.target.classList.add('in')),
-  {threshold:.1}
-);
-document.querySelectorAll('.fade').forEach(el => io.observe(el));
-document.addEventListener('keydown', e => {
-  if(e.key === 'Escape') document.getElementById('demo-modal').classList.remove('open');
-});
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
+  document.querySelectorAll('.rv').forEach((el,i)=>{el.style.transitionDelay=(i%4*70)+'ms';io.observe(el)});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('demo').classList.remove('open')});
 </script>
 </body>
 </html>

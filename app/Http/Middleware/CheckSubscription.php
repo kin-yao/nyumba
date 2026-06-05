@@ -8,17 +8,22 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CheckSubscription
 {
-    protected array $except = [
+    // Always accessible regardless of subscription status
+    protected array $always = [
         'dashboard',
-        'settings.*',
-        'notifications.*',
         'logout',
+        'notifications.index',
+        'notifications.read',
+        'notifications.read-all',
+        'filter.property',
         'subscription.expired',
         'admin.*',
         'verify.*',
         'verify-email',
         'collect.phone',
         'collect.phone.post',
+        'invoices.pdf.public',
+        'audit.index',
     ];
 
     public function handle(Request $request, Closure $next): Response
@@ -32,7 +37,6 @@ class CheckSubscription
             return $next($request);
         }
 
-        // Always allow admin routes
         if ($request->is('admin*')) {
             return $next($request);
         }
@@ -55,46 +59,22 @@ class CheckSubscription
             return $next($request);
         }
 
-        foreach ($this->except as $pattern) {
+        // Check always-allowed routes first
+        foreach ($this->always as $pattern) {
             if (fnmatch($pattern, $routeName)) {
                 return $next($request);
             }
         }
 
-        // Account fully expired and grace period over
+        // Expired — dashboard only, everything else comes back here
         if ($account->isExpired()) {
             if ($request->expectsJson()) {
-                return response()->json(['message' => 'Subscription expired.'], 402);
+                return response()->json(['message' => 'Subscription expired. Please upgrade to continue.'], 402);
             }
-            return redirect()->route('subscription.expired');
+            return redirect()->route('dashboard');
         }
 
-        // Grace period — allow read only, block write actions
-        if ($account->isInGracePeriod()) {
-            $writeRoutes = [
-                'invoices.store',
-                'invoices.bulk.store',
-                'invoices.bulk.preview',
-                'invoices.destroy',
-                'payments.store',
-                'tenants.store',
-                'properties.store',
-                'units.store',
-                'utilities.store',
-                'expenses.store',
-                'maintenance.store',
-                'communications.send',
-            ];
-
-            if (in_array($routeName, $writeRoutes)) {
-                return redirect()->back()
-                    ->with('error', 'Your subscription is in the grace period. You have '
-                        . $account->graceDaysRemaining()
-                        . ' days to renew before your account is locked.');
-            }
-        }
-
-        // Explore plan feature restrictions
+        // Explore plan feature restrictions (active trial only)
         if ($account->plan === 'explore') {
             $blockedRoutes = [
                 'invoices.bulk',
@@ -106,7 +86,7 @@ class CheckSubscription
 
             if (in_array($routeName, $blockedRoutes)) {
                 return redirect()->route('dashboard')
-                    ->with('error', 'This feature is not available on the Explore plan. Upgrade to access bulk invoicing and PDF downloads.');
+                    ->with('error', 'Bulk invoicing and PDF downloads are not available on the free trial. Upgrade to access these features.');
             }
         }
 

@@ -1,7 +1,6 @@
 <x-layouts.app>
 <style>
 .pshow-wrap { padding: clamp(16px,4vw,34px); padding-bottom: 48px; }
-
 .pshow-header {
     display: flex;
     align-items: flex-start;
@@ -10,14 +9,12 @@
     margin-bottom: 24px;
     flex-wrap: wrap;
 }
-
 .pshow-kpi {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 12px;
     margin-bottom: 24px;
 }
-
 .tbl-scroll {
     background: #fff;
     border-radius: 10px;
@@ -25,14 +22,11 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
 }
-
 .tbl-scroll table {
     width: 100%;
     border-collapse: collapse;
     min-width: 520px;
 }
-
-/* Mobile unit cards */
 .unit-cards { display: none; }
 .unit-card {
     background: #fff;
@@ -55,8 +49,6 @@
     align-items: center;
     margin-bottom: 10px;
 }
-
-/* Modal */
 .modal-inner {
     background: #fff;
     border-radius: 14px;
@@ -69,24 +61,15 @@
     grid-template-columns: 1fr 1fr;
     gap: 14px;
 }
-
 @media (max-width: 700px) {
-    .pshow-kpi {
-        grid-template-columns: repeat(2, 1fr);
-    }
+    .pshow-kpi { grid-template-columns: repeat(2, 1fr); }
 }
-
 @media (max-width: 640px) {
     .tbl-scroll  { display: none; }
     .unit-cards  { display: block; }
-    .modal-inner {
-        width: calc(100vw - 24px);
-        padding: 20px;
-        border-radius: 12px;
-    }
-    .modal-grid { grid-template-columns: 1fr; }
+    .modal-inner { width: calc(100vw - 24px); padding: 20px; border-radius: 12px; }
+    .modal-grid  { grid-template-columns: 1fr; }
 }
-
 @media (max-width: 400px) {
     .pshow-kpi { grid-template-columns: repeat(2, 1fr); }
 }
@@ -94,6 +77,7 @@
 
 <div class="pshow-wrap">
 
+    {{-- Header --}}
     <div class="pshow-header">
         <div>
             <div style="font-size:12px;color:#8a8880;margin-bottom:4px">
@@ -112,14 +96,9 @@
                 @endif
             </div>
         </div>
-        <button onclick="document.getElementById('add-unit-modal').style.display='flex'"
-                style="display:inline-flex;align-items:center;gap:6px;padding:7px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;flex-shrink:0">
-            + Add unit
-        </button>
-
         <div style="display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0">
             <a href="{{ route('properties.import.sample', $property) }}"
-            style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;text-decoration:none;white-space:nowrap">
+               style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;text-decoration:none;white-space:nowrap">
                 ↓ Sample CSV
             </a>
             <button onclick="document.getElementById('import-modal').style.display='flex'"
@@ -131,16 +110,37 @@
                 + Add unit
             </button>
         </div>
-
     </div>
+
+    {{-- Flash messages --}}
+    @if(session('success'))
+        <div style="background:#dcfce7;border:1px solid #86efac;border-radius:10px;padding:11px 15px;margin-bottom:16px;font-size:13px;color:#166534">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:11px 15px;margin-bottom:16px;font-size:13px;color:#991b1b;display:flex;align-items:flex-start;gap:10px">
+            <span style="flex-shrink:0">⚠</span>
+            <span>{{ session('error') }}</span>
+        </div>
+    @endif
+
+    @if($errors->any())
+        <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:11px 15px;margin-bottom:16px;font-size:13px;color:#991b1b">
+            @foreach($errors->all() as $error)
+                <div>{{ $error }}</div>
+            @endforeach
+        </div>
+    @endif
 
     {{-- KPI strip --}}
     <div class="pshow-kpi">
         @foreach([
-            ['Total units',  $totalUnits,    null],
-            ['Occupied',     $occupiedCount, '#15803d'],
-            ['Vacant',       $vacantCount,   $vacantCount > 0 ? '#b91c1c' : null],
-            ['Occupancy',    $occupancyRate.'%', $occupancyRate >= 80 ? '#15803d' : '#b91c1c'],
+            ['Total units',  $totalUnits,          null],
+            ['Occupied',     $occupiedCount,        '#15803d'],
+            ['Vacant',       $vacantCount,          $vacantCount > 0 ? '#b91c1c' : null],
+            ['Occupancy',    $occupancyRate . '%',  $occupancyRate >= 80 ? '#15803d' : '#b91c1c'],
         ] as [$label, $value, $color])
             <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:16px 20px">
                 <div style="font-size:10px;color:#8a8880;letter-spacing:.05em;text-transform:uppercase;margin-bottom:7px">{{ $label }}</div>
@@ -156,12 +156,11 @@
             No units added yet. Add your first unit to get started.
         </div>
     @else
-
         @php
             $statusColors = [
-                'occupied'    => ['bg'=>'#dcfce7','text'=>'#166534'],
-                'vacant'      => ['bg'=>'#f3f4f6','text'=>'#4b5563'],
-                'maintenance' => ['bg'=>'#fee2e2','text'=>'#991b1b'],
+                'occupied'    => ['bg' => '#dcfce7', 'text' => '#166534'],
+                'vacant'      => ['bg' => '#f3f4f6', 'text' => '#4b5563'],
+                'maintenance' => ['bg' => '#fee2e2', 'text' => '#991b1b'],
             ];
         @endphp
 
@@ -314,7 +313,8 @@
                 </div>
             </div>
             <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap">
-                <button type="submit" style="padding:7px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                <button type="submit"
+                        style="padding:7px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
                     Save unit
                 </button>
                 <button type="button" onclick="document.getElementById('add-unit-modal').style.display='none'"
@@ -330,7 +330,6 @@
 <div id="import-modal"
      style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:50;align-items:center;justify-content:center;padding:16px">
     <div style="background:#fff;border-radius:14px;padding:28px;width:100%;max-width:480px">
-
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.07)">
             <div>
                 <div style="font-size:15px;font-weight:500">Import units &amp; tenants</div>
@@ -339,7 +338,6 @@
             <button onclick="document.getElementById('import-modal').style.display='none'"
                     style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;line-height:1">&times;</button>
         </div>
-
         <div style="background:#f5f4f0;border-radius:8px;padding:14px;margin-bottom:18px;font-size:13px;color:#8a8880;line-height:1.6">
             Upload a CSV file with your unit and tenant data. Existing units will be skipped.
             <br><br>
@@ -349,7 +347,6 @@
             </a>
             to see the required format.
         </div>
-
         <form method="POST" action="{{ route('properties.import.preview', $property) }}" enctype="multipart/form-data">
             @csrf
             <div style="margin-bottom:18px">
@@ -374,5 +371,4 @@
         </form>
     </div>
 </div>
-
 </x-layouts.app>

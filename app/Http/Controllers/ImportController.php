@@ -221,12 +221,34 @@ class ImportController extends Controller
                 ->with('error', 'Import session expired. Please upload the CSV again.');
         }
 
+        // Count how many new units would be created
+        $newUnitsCount = collect($rows)->filter(
+            fn($r) => !in_array($r['status'], ['error', 'skip'])
+        )->count();
+
+        // Unit limit check
+        $account      = auth()->user()->account;
+        $currentCount = Unit::whereIn('property_id',
+            Property::where('account_id', $account->id)->pluck('id')
+        )->count();
+
+        if (($currentCount + $newUnitsCount) > $account->unit_limit) {
+            $available = max(0, $account->unit_limit - $currentCount);
+            session()->forget(['import_rows', 'import_property_id']);
+            return redirect()->route('properties.show', $property)
+                ->with('error',
+                    'This import would create ' . $newUnitsCount . ' units but you only have '
+                    . $available . ' unit slot(s) remaining on your plan. '
+                    . 'Upgrade your plan or reduce the number of units in your CSV. '
+                    . 'Contact us on WhatsApp: +254705056343'
+                );
+        }
+
         $unitsCreated   = 0;
         $tenantsCreated = 0;
         $skipped        = 0;
         $failed         = 0;
 
-        // Re-check existing units in case something was added between preview and confirm
         $existingUnits = Unit::where('property_id', $property->id)
             ->pluck('name')
             ->map(fn($n) => strtolower(trim($n)))
@@ -338,7 +360,7 @@ class ImportController extends Controller
             . ' and ' . $tenantsCreated . ' ' . Str::plural('tenant', $tenantsCreated)
             . ' imported successfully into ' . $property->name . '.';
         if ($skipped > 0) $msg .= ' ' . $skipped . ' skipped.';
-        if ($failed  > 0) $msg .= ' ' . $failed  . ' failed — check the system log.';
+        if ($failed  > 0) $msg .= ' ' . $failed  . ' failed.';
 
         return redirect()->route('properties.show', $property)
             ->with('success', $msg);

@@ -18,6 +18,21 @@ class UnitController extends Controller
             'deposit_amount' => ['required', 'numeric', 'min:0'],
         ]);
 
+        // Unit limit check
+        $account      = auth()->user()->account;
+        $currentCount = Unit::whereIn('property_id',
+            Property::where('account_id', $account->id)->pluck('id')
+        )->count();
+
+        if ($currentCount >= $account->unit_limit) {
+            return redirect()->back()
+                ->with('error',
+                    'You have reached your unit limit of ' . $account->unit_limit . ' units. '
+                    . 'Upgrade your plan to add more units. '
+                    . 'Contact us on WhatsApp: +254705056343'
+                );
+        }
+
         $unit = $property->units()->create($validated);
 
         AuditService::log(
