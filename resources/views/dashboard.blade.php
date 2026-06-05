@@ -1,0 +1,422 @@
+<x-layouts.app>
+<style>
+.dash-wrap { padding: clamp(16px, 4vw, 34px); padding-bottom: 48px; }
+
+/* Row 1: collection chart + 2 stat cards */
+.dash-row1 {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+/* Row 2: 4 KPI cards */
+.dash-kpi {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+/* Row 3: recent payments + balances */
+.dash-row3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+/* Row 4: property cards */
+.dash-props {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+}
+
+/* Row 5: chart summary */
+.dash-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(0,0,0,0.07);
+}
+
+/* Collection card inner layout */
+.collection-inner {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+@media (max-width: 900px) {
+    .dash-row1 {
+        grid-template-columns: 1fr 1fr;
+    }
+    .dash-row1 .collection-card {
+        grid-column: 1 / -1;
+    }
+    .dash-kpi {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .dash-props {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .dash-row1 {
+        grid-template-columns: 1fr;
+    }
+    .dash-row1 .collection-card {
+        grid-column: auto;
+    }
+    .collection-inner {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+    .collection-inner svg {
+        align-self: center;
+    }
+    .dash-kpi {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .dash-row3 {
+        grid-template-columns: 1fr;
+    }
+    .dash-props {
+        grid-template-columns: 1fr;
+    }
+    .dash-summary {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+}
+</style>
+
+<div class="dash-wrap">
+
+    {{-- Header --}}
+    <div style="margin-bottom:20px">
+        <div style="font-family:'DM Serif Display',serif;font-size:clamp(20px,5vw,25px);line-height:1.2">
+            Hello {{ explode(' ', auth()->user()->name)[0] }}, Karibu nyumbani!
+        </div>
+        <div style="font-size:13px;color:#8a8880;margin-top:3px">
+            {{ now()->format('l, d F Y') }}
+            &middot; {{ \Carbon\Carbon::createFromDate($year, $month, 1)->format('F Y') }} overview
+        </div>
+    </div>
+
+    {{-- Alerts --}}
+    @if($urgentMaintenance > 0)
+        <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:11px 15px;margin-bottom:12px;font-size:13px;color:#991b1b;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <span>⚠ {{ $urgentMaintenance }} urgent maintenance {{ Str::plural('request', $urgentMaintenance) }} need attention</span>
+            <a href="{{ route('maintenance.index') }}" style="color:#991b1b;font-weight:500;text-decoration:none;white-space:nowrap">View →</a>
+        </div>
+    @endif
+
+    @if($overdueCount > 0)
+        <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:11px 15px;margin-bottom:12px;font-size:13px;color:#92400e;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <span>{{ $overdueCount }} overdue {{ Str::plural('invoice', $overdueCount) }} require follow up</span>
+            <a href="{{ route('invoices.index') }}" style="color:#92400e;font-weight:500;text-decoration:none;white-space:nowrap">View →</a>
+        </div>
+    @endif
+
+    {{-- Row 1: Collection + Net Profit + Occupancy --}}
+    @php
+        $totalExpected  = $expectedThisMonth > 0 ? $expectedThisMonth : 1;
+        $collectedPct   = min(100, ($collectedThisMonth / $totalExpected) * 100);
+        $outstandingPct = 100 - $collectedPct;
+        $radius         = 60;
+        $cx = $cy       = 80;
+        $circumference  = 2 * M_PI * $radius;
+        $collectedDash  = ($collectedPct / 100) * $circumference;
+    @endphp
+
+    <div class="dash-row1">
+
+        {{-- Collection card --}}
+        <div class="collection-card" style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:20px">
+            <div class="collection-inner">
+                <div style="flex-shrink:0">
+                    <svg width="140" height="140" viewBox="0 0 160 160">
+                        <circle cx="{{ $cx }}" cy="{{ $cy }}" r="{{ $radius }}" fill="none" stroke="#fee2e2" stroke-width="22"/>
+                        @if($collectedPct > 0)
+                            <circle cx="{{ $cx }}" cy="{{ $cy }}" r="{{ $radius }}" fill="none" stroke="#1a6b52" stroke-width="22"
+                                    stroke-dasharray="{{ $collectedDash }} {{ $circumference - $collectedDash }}"
+                                    transform="rotate(-90 {{ $cx }} {{ $cy }})"/>
+                        @endif
+                        <text x="{{ $cx }}" y="{{ $cy - 8 }}" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="20" font-weight="bold" fill="#111110">{{ $collectionRate }}%</text>
+                        <text x="{{ $cx }}" y="{{ $cy + 10 }}" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="10" fill="#8a8880">collected</text>
+                    </svg>
+                </div>
+                <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;font-weight:500;margin-bottom:12px">
+                        Collection status
+                        <span style="font-size:11px;color:#8a8880;font-weight:400;margin-left:4px">{{ \Carbon\Carbon::createFromDate($year, $month, 1)->format('F Y') }}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#e6f2ed;border-radius:8px;margin-bottom:6px">
+                        <div style="display:flex;align-items:center;gap:7px">
+                            <div style="width:8px;height:8px;border-radius:50%;background:#1a6b52;flex-shrink:0"></div>
+                            <div>
+                                <div style="font-size:12px;font-weight:500;color:#166534">Collected</div>
+                                <div style="font-size:10px;color:#166534">{{ number_format($collectedPct,1) }}% of expected</div>
+                            </div>
+                        </div>
+                        <div style="font-family:'DM Serif Display',serif;font-size:18px;color:#166534">{{ currency($collectedThisMonth) }}</div>
+                    </div>
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#fee2e2;border-radius:8px;margin-bottom:6px">
+                        <div style="display:flex;align-items:center;gap:7px">
+                            <div style="width:8px;height:8px;border-radius:50%;background:#b91c1c;flex-shrink:0"></div>
+                            <div>
+                                <div style="font-size:12px;font-weight:500;color:#991b1b">Outstanding</div>
+                                <div style="font-size:10px;color:#991b1b">{{ number_format($outstandingPct,1) }}% of expected</div>
+                            </div>
+                        </div>
+                        <div style="font-family:'DM Serif Display',serif;font-size:18px;color:#991b1b">{{ currency($outstandingThisMonth) }}</div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding:6px 4px;font-size:12px">
+                        <span style="color:#8a8880">Total expected</span>
+                        <span style="font-weight:500">{{ currency($expectedThisMonth) }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Net profit --}}
+        <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:18px 20px">
+            <div style="font-size:10px;color:#8a8880;letter-spacing:.05em;text-transform:uppercase;margin-bottom:7px">Net profit this month</div>
+            <div style="font-family:'DM Serif Display',serif;font-size:clamp(20px,3vw,27px);color:{{ $netProfitThisMonth >= 0 ? '#15803d' : '#b91c1c' }}">
+                {{ $netProfitThisMonth < 0 ? '-' : '' }}{{ currency(abs($netProfitThisMonth)) }}
+            </div>
+            <div style="font-size:12px;color:#8a8880;margin-top:6px;line-height:1.6">
+                <div>Income: {{ currency($paymentsThisMonth) }}</div>
+                <div>Expenses: {{ currency($expensesThisMonth) }}</div>
+            </div>
+            <div style="margin-top:8px;font-size:11px;color:{{ $netProfitThisMonth >= 0 ? '#15803d' : '#b91c1c' }}">
+                {{ $netProfitThisMonth >= 0 ? 'Profitable month ↑' : 'Net loss this month ↓' }}
+            </div>
+        </div>
+
+        {{-- Occupancy --}}
+        <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:18px 20px">
+            <div style="font-size:10px;color:#8a8880;letter-spacing:.05em;text-transform:uppercase;margin-bottom:7px">Occupancy</div>
+            <div style="font-family:'DM Serif Display',serif;font-size:clamp(20px,3vw,27px);color:{{ $occupancyRate >= 80 ? '#15803d' : '#b91c1c' }}">
+                {{ $occupancyRate }}%
+            </div>
+            <div style="font-size:12px;color:#8a8880;margin-top:6px;line-height:1.6">
+                <div>{{ $occupiedUnits }} occupied</div>
+                <div>{{ $vacantUnits }} vacant</div>
+            </div>
+            <div style="margin-top:10px;height:4px;background:#ece9e2;border-radius:2px;overflow:hidden">
+                <div style="height:100%;background:{{ $occupancyRate >= 80 ? '#1a6b52' : '#b91c1c' }};border-radius:2px;width:{{ $occupancyRate }}%"></div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Row 2: KPIs --}}
+    <div class="dash-kpi">
+        @foreach([
+            ['Properties',      $totalProperties,  null,                                  route('properties.index')],
+            ['Active tenants',  $totalTenants,      null,                                  route('tenants.index')],
+            ['Open maintenance',$openMaintenance,   $openMaintenance > 0 ? '#d97706':null, route('maintenance.index')],
+            ['Overdue invoices',$overdueCount,      $overdueCount > 0    ? '#b91c1c':null, route('invoices.index')],
+        ] as [$label, $value, $color, $href])
+            <a href="{{ $href }}" style="text-decoration:none;background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:16px 20px;display:block">
+                <div style="font-size:10px;color:#8a8880;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px">{{ $label }}</div>
+                <div style="font-family:'DM Serif Display',serif;font-size:clamp(20px,3vw,24px);color:{{ $color ?? '#111110' }}">{{ $value }}</div>
+            </a>
+        @endforeach
+    </div>
+
+    {{-- Row 3: Recent payments + Highest balances --}}
+    <div class="dash-row3">
+
+        {{-- Recent payments --}}
+        <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);overflow:hidden">
+            <div style="padding:14px 18px;border-bottom:1px solid rgba(0,0,0,0.07);display:flex;justify-content:space-between;align-items:center">
+                <div style="font-size:13px;font-weight:500">Recent payments</div>
+                <a href="{{ route('payments.index') }}" style="font-size:12px;color:#1a6b52;text-decoration:none">View all</a>
+            </div>
+            @if($recentPayments->isEmpty())
+                <div style="padding:32px;text-align:center;color:#8a8880;font-size:13px">No payments recorded yet</div>
+            @else
+                @foreach($recentPayments as $payment)
+                    <div style="padding:11px 18px;border-bottom:1px solid rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:space-between;gap:8px">
+                        <div style="display:flex;align-items:center;gap:9px;min-width:0">
+                            <div style="width:28px;height:28px;border-radius:50%;background:#e6f2ed;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#1a6b52;flex-shrink:0">
+                                {{ $payment->tenant ? strtoupper(substr($payment->tenant->first_name,0,1).substr($payment->tenant->last_name,0,1)) : '?' }}
+                            </div>
+                            <div style="min-width:0">
+                                <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ $payment->tenant?->full_name ?? 'Unknown' }}</div>
+                                <div style="font-size:11px;color:#8a8880">{{ $payment->payment_date->format('d M Y') }} &middot; {{ strtoupper($payment->method) }}</div>
+                            </div>
+                        </div>
+                        <div style="font-size:13px;font-weight:500;color:#15803d;flex-shrink:0">{{ currency($payment->amount) }}</div>
+                    </div>
+                @endforeach
+            @endif
+        </div>
+
+        {{-- Highest balances --}}
+        <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);overflow:hidden">
+            <div style="padding:14px 18px;border-bottom:1px solid rgba(0,0,0,0.07);display:flex;justify-content:space-between;align-items:center">
+                <div style="font-size:13px;font-weight:500">Highest balances</div>
+                <a href="{{ route('reports.outstanding') }}" style="font-size:12px;color:#1a6b52;text-decoration:none">Full report</a>
+            </div>
+            @if($tenantsWithBalance->isEmpty())
+                <div style="padding:32px;text-align:center;color:#8a8880;font-size:13px">All tenants are up to date ✓</div>
+            @else
+                @foreach($tenantsWithBalance as $item)
+                    <div style="padding:11px 18px;border-bottom:1px solid rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:space-between;gap:8px">
+                        <div style="display:flex;align-items:center;gap:9px;flex:1;min-width:0">
+                            <div style="width:28px;height:28px;border-radius:50%;background:#fee2e2;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#b91c1c;flex-shrink:0">
+                                {{ strtoupper(substr($item['tenant']->first_name,0,1).substr($item['tenant']->last_name,0,1)) }}
+                            </div>
+                            <div style="min-width:0">
+                                <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ $item['tenant']->full_name }}</div>
+                                <div style="font-size:11px;color:#8a8880">Unit {{ $item['unit']->name }} &middot; {{ $item['property']->name }}</div>
+                            </div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+                            <div style="font-size:13px;font-weight:600;color:#b91c1c">{{ currency($item['balance']) }}</div>
+                            <form method="POST" action="{{ route('communications.send') }}">
+                                @csrf
+                                <input type="hidden" name="recipient_type" value="individual">
+                                <input type="hidden" name="tenant_id" value="{{ $item['tenant']->id }}">
+                                <input type="hidden" name="message" value="Dear {{ $item['tenant']->first_name }}, your outstanding balance is {{ currency($item['balance']) }}. Please make payment at your earliest convenience. Thank you.">
+                                <button type="submit" style="font-size:11px;padding:4px 9px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
+                                    Remind
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                @endforeach
+            @endif
+        </div>
+    </div>
+
+    {{-- Row 4: Property overview --}}
+    <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);overflow:hidden;margin-bottom:14px">
+        <div style="padding:14px 18px;border-bottom:1px solid rgba(0,0,0,0.07);display:flex;justify-content:space-between;align-items:center">
+            <div style="font-size:13px;font-weight:500">Property overview</div>
+            <a href="{{ route('properties.index') }}" style="font-size:12px;color:#1a6b52;text-decoration:none">Manage</a>
+        </div>
+        @if($propertiesOverview->isEmpty())
+            <div style="padding:32px;text-align:center;color:#8a8880;font-size:13px">No properties added yet</div>
+        @else
+            <div class="dash-props">
+                @foreach($propertiesOverview as $property)
+                    @php
+                        $rate = $property->units_count > 0
+                            ? round(($property->occupied_count / $property->units_count) * 100)
+                            : 0;
+                    @endphp
+                    <a href="{{ route('properties.show', $property) }}"
+                       style="padding:16px 18px;border-right:1px solid rgba(0,0,0,0.06);border-bottom:1px solid rgba(0,0,0,0.06);text-decoration:none;color:inherit;display:block">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+                            <div>
+                                <div style="font-size:13px;font-weight:500">{{ $property->name }}</div>
+                                <div style="font-size:11px;color:#8a8880;margin-top:1px">
+                                    {{ $property->area ?? $property->county ?? '' }} &middot; {{ ucfirst($property->type) }}
+                                </div>
+                            </div>
+                            <span style="font-size:12px;font-weight:600;color:{{ $rate >= 80 ? '#15803d' : '#b91c1c' }}">{{ $rate }}%</span>
+                        </div>
+                        <div style="display:flex;gap:12px;font-size:12px;color:#8a8880;margin-bottom:8px;flex-wrap:wrap">
+                            <span>{{ $property->units_count }} units</span>
+                            <span style="color:#15803d">{{ $property->occupied_count }} occupied</span>
+                            <span style="color:{{ ($property->units_count-$property->occupied_count)>0?'#b91c1c':'#8a8880' }}">{{ $property->units_count - $property->occupied_count }} vacant</span>
+                        </div>
+                        <div style="height:4px;background:#ece9e2;border-radius:2px;overflow:hidden">
+                            <div style="height:100%;background:{{ $rate >= 80 ? '#1a6b52' : '#b91c1c' }};border-radius:2px;width:{{ $rate }}%"></div>
+                        </div>
+                    </a>
+                @endforeach
+            </div>
+        @endif
+    </div>
+
+    {{-- Row 5: Income vs Expenses chart --}}
+    <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+            <div>
+                <div style="font-size:13px;font-weight:500">Income vs Expenses</div>
+                <div style="font-size:12px;color:#8a8880;margin-top:2px">Last 6 months</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:16px;font-size:12px">
+                <div style="display:flex;align-items:center;gap:6px">
+                    <div style="width:10px;height:10px;border-radius:2px;background:#1a6b52"></div>
+                    <span style="color:#8a8880">Income</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px">
+                    <div style="width:10px;height:10px;border-radius:2px;background:#fee2e2;border:1px solid #fca5a5"></div>
+                    <span style="color:#8a8880">Expenses</span>
+                </div>
+            </div>
+        </div>
+
+        @php
+            $maxValue   = collect($chartData)->max(fn($d) => max($d['income'], $d['expenses']));
+            $maxValue   = $maxValue > 0 ? $maxValue * 1.15 : 1;
+            $currSymbol = currency_symbol();
+        @endphp
+
+        <div style="overflow-x:auto">
+            <div style="min-width:300px">
+                <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:8px;height:180px;padding-bottom:28px;position:relative">
+                    @foreach([0,25,50,75,100] as $pct)
+                        <div style="position:absolute;left:0;right:0;bottom:{{ $pct*1.52+28 }}px;border-top:1px dashed rgba(0,0,0,0.06);z-index:0">
+                            <span style="font-size:10px;color:#c4c2be;position:absolute;left:0;top:-8px">
+                                {{ $pct > 0 ? $currSymbol.' '.number_format($maxValue*$pct/100/1000,0).'k' : '0' }}
+                            </span>
+                        </div>
+                    @endforeach
+                    @foreach($chartData as $data)
+                        @php
+                            $incomeH   = $maxValue > 0 ? ($data['income']   / $maxValue) * 152 : 0;
+                            $expensesH = $maxValue > 0 ? ($data['expenses'] / $maxValue) * 152 : 0;
+                        @endphp
+                        <div style="flex:1;display:flex;flex-direction:column;align-items:center;position:relative;z-index:1">
+                            <div style="display:flex;gap:3px;align-items:flex-end;width:100%;justify-content:center;margin-bottom:6px">
+                                <div style="flex:1;max-width:22px">
+                                    <div style="width:100%;background:#1a6b52;border-radius:3px 3px 0 0;height:{{ $incomeH }}px;min-height:{{ $data['income']>0?2:0 }}px" title="Income: {{ currency($data['income']) }}"></div>
+                                </div>
+                                <div style="flex:1;max-width:22px">
+                                    <div style="width:100%;background:#fca5a5;border-radius:3px 3px 0 0;height:{{ $expensesH }}px;min-height:{{ $data['expenses']>0?2:0 }}px" title="Expenses: {{ currency($data['expenses']) }}"></div>
+                                </div>
+                            </div>
+                            <div style="font-size:10px;color:#8a8880;white-space:nowrap;text-align:center">{{ $data['label'] }}</div>
+                            <div style="font-size:10px;font-weight:500;margin-top:2px;color:{{ $data['profit']>=0?'#15803d':'#b91c1c' }}">
+                                {{ $data['profit']>=0?'+':'' }}{{ number_format($data['profit']/1000,0) }}k
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+
+        @php
+            $totalIncome   = collect($chartData)->sum('income');
+            $totalExpenses = collect($chartData)->sum('expenses');
+            $totalProfit   = collect($chartData)->sum('profit');
+        @endphp
+        <div class="dash-summary">
+            <div>
+                <div style="font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">6 month income</div>
+                <div style="font-family:'DM Serif Display',serif;font-size:clamp(16px,2.5vw,20px);color:#15803d">{{ currency($totalIncome) }}</div>
+            </div>
+            <div>
+                <div style="font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">6 month expenses</div>
+                <div style="font-family:'DM Serif Display',serif;font-size:clamp(16px,2.5vw,20px);color:#b91c1c">{{ currency($totalExpenses) }}</div>
+            </div>
+            <div>
+                <div style="font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">6 month net profit</div>
+                <div style="font-family:'DM Serif Display',serif;font-size:clamp(16px,2.5vw,20px);color:{{ $totalProfit>=0?'#15803d':'#b91c1c' }}">{{ currency(abs($totalProfit)) }}</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+</x-layouts.app>

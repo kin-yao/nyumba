@@ -1,0 +1,218 @@
+# ═══════════════════════════════════════════════
+#  NYUMBA — .gitignore
+# ═══════════════════════════════════════════════
+
+# ─── Environment & secrets ───────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ─── Firebase credentials (NEVER commit) ─────
+storage/app/private/*.json
+storage/app/private/
+*-firebase-adminsdk-*.json
+firebase-adminsdk*.json
+service-account*.json
+google-services.json
+GoogleService-Info.plist
+
+# ─── Laravel specific ────────────────────────
+/vendor/
+/node_modules/
+/public/hot
+/public/storage
+/storage/*.key
+/storage/logs/*
+!/storage/logs/.gitkeep
+/storage/framework/cache/*
+!/storage/framework/cache/.gitkeep
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitkeep
+/storage/framework/testing/*
+!/storage/framework/testing/.gitkeep
+/storage/framework/views/*
+!/storage/framework/views/.gitkeep
+/storage/app/public/*
+!/storage/app/public/.gitkeep
+/bootstrap/cache/*
+!/bootstrap/cache/.gitkeep
+
+# ─── Composer ────────────────────────────────
+composer.phar
+/vendor/
+
+# ─── NPM / Node ──────────────────────────────
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+/.yarn/cache
+/.yarn/unplugged
+/.yarn/build-state.yml
+/.yarn/install-state.gz
+
+# ─── Build output ─────────────────────────────
+/public/build/
+/public/css/
+/public/js/
+/public/mix-manifest.json
+mix-manifest.json
+
+# ─── Testing ──────────────────────────────────
+.phpunit.result.cache
+.phpunit.cache/
+/coverage/
+coverage.xml
+*.coverage
+
+# ─── Logs ─────────────────────────────────────
+*.log
+*.log.*
+/storage/logs/
+laravel.log
+
+# ─── Cache & temp ─────────────────────────────
+.cache/
+.tmp/
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# ─── Database ─────────────────────────────────
+*.sqlite
+*.sqlite3
+*.db
+database/*.sqlite
+/database/database.sqlite
+
+# ─── IDE — VS Code ────────────────────────────
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.code-workspace
+
+# ─── IDE — PhpStorm / JetBrains ──────────────
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea_modules/
+atlassian-ide-plugin.xml
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
+fabric.properties
+
+# ─── IDE — Sublime Text ──────────────────────
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+*.sublime-workspace
+*.sublime-project
+
+# ─── IDE — Vim / Neovim ──────────────────────
+*~
+*.swp
+*.swo
+.netrwhist
+Session.vim
+.vim/
+
+# ─── IDE — Emacs ─────────────────────────────
+*~
+\#*\#
+.\#*
+*.elc
+auto-save-list
+
+# ─── OS — macOS ──────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+Icon?
+ehthumbs.db
+Thumbs.db
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# ─── OS — Windows ────────────────────────────
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+*.stackdump
+
+# ─── OS — Linux ──────────────────────────────
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ─── XAMPP / local dev ───────────────────────
+.htaccess.local
+php.ini.local
+httpd.conf.local
+*.local.php
+
+# ─── Deployment ──────────────────────────────
+.deploy/
+deploy.sh
+.deployment
+.github/workflows/deploy*.yml.bak
+Dockerfile.local
+docker-compose.override.yml
+
+# ─── Laravel Telescope ───────────────────────
+/public/vendor/
+
+# ─── Laravel Debugbar ────────────────────────
+storage/debugbar/
+
+# ─── Uploaded files (user content) ───────────
+/public/uploads/
+/storage/app/uploads/
+/storage/app/logos/
+
+# ─── SSL certificates ─────────────────────────
+*.crt
+*.cer
+*.ca-bundle
+*.p7b
+*.p7s
+*.srl
+
+# ─── Misc ─────────────────────────────────────
+.sass-cache/
+*.css.map
+*.js.map
+Homestead.yaml
+Homestead.json
+auth.json
+.phpactor.json
+_ide_helper.php
+_ide_helper_models.php
+.phpstorm.meta.php

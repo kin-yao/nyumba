@@ -1,0 +1,176 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+/* ============================================================
+   NYUMBA — Global Responsive Styles
+   ============================================================ */
+
+/* ── Tables ── */
+.tbl-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 10px;
+}
+
+table {
+    min-width: 600px;
+}
+
+/* ── Page padding ── */
+.page-wrap {
+    padding: 28px 34px 48px;
+}
+
+@media (max-width: 768px) {
+    .page-wrap {
+        padding: 16px 16px 40px;
+    }
+
+    /* Tables scroll horizontally */
+    .tbl-wrap table {
+        min-width: 540px;
+    }
+
+    /* Stat grids collapse */
+    .stat-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 10px !important;
+    }
+
+    /* Single column on mobile */
+    .card-grid,
+    .form-grid-2,
+    .form-grid-3,
+    .settings-grid {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+
+    /* Stack flex rows */
+    .flex-mobile-col {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 8px !important;
+    }
+
+    /* Full width buttons and inputs on mobile */
+    .full-mobile {
+        width: 100% !important;
+    }
+
+    /* Hide less important columns on mobile */
+    .hide-mobile {
+        display: none !important;
+    }
+
+    /* Modals go full width */
+    .modal-box {
+        width: calc(100vw - 32px) !important;
+        max-width: 100% !important;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    /* Reduce heading sizes */
+    .page-title {
+        font-size: 20px !important;
+    }
+
+    /* Banners stack */
+    .banner-row {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* Settings two-column → single */
+    .settings-layout {
+        grid-template-columns: 1fr !important;
+    }
+
+    .settings-nav {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .settings-nav .sni {
+        padding: 6px 12px !important;
+        font-size: 12px !important;
+        border-radius: 20px !important;
+        border: 1px solid rgba(0,0,0,0.1);
+    }
+
+    /* Forms */
+    .form-row-2 {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Cards */
+    .summary-card {
+        padding: 14px !important;
+    }
+
+    /* Reduce table font */
+    td, th {
+        font-size: 12px !important;
+        padding: 9px 10px !important;
+    }
+
+    /* Action buttons in table rows */
+    .tbl-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Stat grid single column on very small screens */
+    .stat-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .page-wrap {
+        padding: 12px 12px 32px;
+    }
+
+    td, th {
+        font-size: 11px !important;
+        padding: 7px 8px !important;
+    }
+}
+
+/* ── Smooth transitions ── */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+input, select, textarea, button {
+    font-family: 'DM Sans', sans-serif;
+}
+
+/* ── Scrollbar styling ── */
+::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.15);
+    border-radius: 4px;
+}
+/* ── Dashboard ── */
+@media (max-width: 768px) {
+    .dash-row1 {
+        grid-template-columns: 1fr !important;
+    }
+    .dash-row1 > div:first-child {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+    }
+}
