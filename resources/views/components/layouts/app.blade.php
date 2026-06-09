@@ -36,14 +36,7 @@
                 top: 0;
                 z-index: 30;
             }
-            .nyumba-main {
-                margin-left: 220px;
-                background: #f5f4f0;
-                min-height: 100vh;
-                min-width: 0;
-                transform: translateZ(0);
-                backface-visibility: hidden;
-            }
+            .nyumba-main { margin-left: 0; }
         }
 
         /* ── Global responsive helpers ── */
