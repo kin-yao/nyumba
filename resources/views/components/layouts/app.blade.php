@@ -406,6 +406,14 @@
             </div>
         @endif
 
+        {{-- Subscription / plan notices (expired, trial-gated features, etc.) --}}
+        @if(session('subscription_notice'))
+            <div style="background:#fef3c7;border-bottom:1px solid #fcd34d;color:#92400e;padding:11px 20px;font-size:13px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+                <span>{{ session('subscription_notice') }}</span>
+                <a href="{{ route('settings.index') }}" style="color:#92400e;font-weight:500;font-size:12px;background:rgba(0,0,0,0.08);padding:4px 12px;border-radius:6px;text-decoration:none;white-space:nowrap">View plans</a>
+            </div>
+        @endif
+
         {{ $slot }}
     </main>
 </div>

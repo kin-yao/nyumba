@@ -66,15 +66,16 @@ class CheckSubscription
             }
         }
 
-        // Expired — dashboard only, everything else comes back here
+        // Expired — dashboard only, with a clear notice
         if ($account->isExpired()) {
+            $msg = 'Your subscription has expired. Upgrade to restore access to this feature.';
             if ($request->expectsJson()) {
-                return response()->json(['message' => 'Subscription expired. Please upgrade to continue.'], 402);
+                return response()->json(['message' => $msg], 402);
             }
-            return redirect()->route('dashboard');
+            return redirect()->route('dashboard')->with('subscription_notice', $msg);
         }
 
-        // Explore plan feature restrictions (active trial only)
+        // Explore (free trial) feature restrictions
         if ($account->plan === 'explore') {
             $blockedRoutes = [
                 'invoices.bulk',
@@ -85,8 +86,15 @@ class CheckSubscription
             ];
 
             if (in_array($routeName, $blockedRoutes)) {
-                return redirect()->route('dashboard')
-                    ->with('error', 'Bulk invoicing and PDF downloads are not available on the free trial. Upgrade to access these features.');
+                $msg = $routeName === 'invoices.pdf'
+                    ? 'Downloading invoice PDFs isn’t available on the free trial. Upgrade to download and share PDF invoices.'
+                    : 'Bulk invoicing isn’t available on the free trial. Upgrade to generate invoices in bulk.';
+
+                if ($request->expectsJson()) {
+                    return response()->json(['message' => $msg], 402);
+                }
+
+                return back()->with('subscription_notice', $msg);
             }
         }
 
