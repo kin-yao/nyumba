@@ -95,16 +95,56 @@ const gp    = new GoogleAuthProvider();
 let fbUser  = null;
 
 const ERR = {
-    'auth/user-not-found':      'No account found with this email address.',
-    'auth/wrong-password':      'Incorrect password.',
-    'auth/invalid-credential':  'Incorrect email or password.',
-    'auth/invalid-email':       'Please enter a valid email address.',
-    'auth/too-many-requests':   'Too many attempts. Please try again later.',
-    'auth/network-request-failed': 'Network error. Please check your connection.',
-    'auth/popup-closed-by-user':   'Sign in cancelled.',
-    'auth/popup-blocked':          'Please allow popups for this site.',
+    // Email / password
+    'auth/email-already-in-use':   'An account with this email already exists. Please sign in instead.',
+    'auth/invalid-email':          'Please enter a valid email address.',
+    'auth/missing-email':          'Please enter your email address.',
+    'auth/missing-password':       'Please enter your password.',
+    'auth/weak-password':          'Password must be at least 8 characters.',
+    'auth/password-does-not-meet-requirements': 'Password is too weak. Use at least 8 characters with letters and numbers.',
+    'auth/wrong-password':         'Incorrect password.',
+    'auth/invalid-credential':     'Incorrect email or password.',
+    'auth/invalid-login-credentials': 'Incorrect email or password.',
+    'auth/user-not-found':         'No account found with this email address.',
+    'auth/user-disabled':          'This account has been disabled. Please contact support.',
+    'auth/operation-not-allowed':  'This sign-in method is currently unavailable. Please try Google or contact support.',
+
+    // Rate limit / network
+    'auth/too-many-requests':      'Too many attempts. Please wait a few minutes and try again.',
+    'auth/network-request-failed': 'Network error. Please check your connection and try again.',
+    'auth/timeout':                'The request timed out. Please try again.',
+    'auth/quota-exceeded':         'Service is busy right now. Please try again shortly.',
+
+    // Google / popup
+    'auth/popup-closed-by-user':   'Sign-in was cancelled.',
+    'auth/cancelled-popup-request':'Sign-in was cancelled.',
+    'auth/popup-blocked':          'Your browser blocked the popup. Please allow popups for this site and try again.',
+    'auth/unauthorized-domain':    'This domain isn’t authorized for sign-in. Please contact support.',
+    'auth/account-exists-with-different-credential': 'An account already exists with this email using a different sign-in method.',
+    'auth/credential-already-in-use': 'These credentials are already linked to another account.',
+    'auth/operation-not-supported-in-this-environment': 'Sign-in isn’t supported in this browser. Please try another browser.',
+    'auth/web-storage-unsupported':'Your browser has cookies/storage disabled. Please enable them and try again.',
+
+    // Session / tokens
+    'auth/requires-recent-login':  'Please sign in again to continue.',
+    'auth/user-token-expired':     'Your session has expired. Please sign in again.',
+    'auth/invalid-user-token':     'Your session is invalid. Please sign in again.',
+
+    // Email links
+    'auth/expired-action-code':    'This link has expired. Please request a new one.',
+    'auth/invalid-action-code':    'This link is invalid or has already been used.',
+
+    // Config / internal
+    'auth/invalid-api-key':        'Configuration error. Please contact support.',
+    'auth/api-key-not-valid':      'Configuration error. Please contact support.',
+    'auth/app-deleted':            'Configuration error. Please contact support.',
+    'auth/internal-error':         'Something went wrong on our end. Please try again.',
 };
-function fe(c){ return ERR[c] || 'Something went wrong. Please try again.'; }
+function fe(code){
+    if (code && ERR[code]) return ERR[code];
+    if (code) console.warn('Unhandled auth error code:', code);
+    return 'Something went wrong. Please try again, or contact support if it continues.';
+}
 function csrf(){ return document.querySelector('meta[name="csrf-token"]').content; }
 
 function showErr(m){
@@ -117,13 +157,25 @@ function clearMsg(){
     document.getElementById('warn-box').style.display='none';
 }
 
-async function callVerify(token, provider, intent){
-    const r = await fetch('/auth/verify', {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json', 'X-CSRF-TOKEN':csrf() },
-        body: JSON.stringify({ id_token:token, provider, intent }),
-    });
-    return r.json();
+async function callVerify(token, provider, intent, extra={}){
+    let r;
+    try {
+        r = await fetch('/auth/verify', {
+            method: 'POST',
+            headers: { 'Content-Type':'application/json', 'X-CSRF-TOKEN':csrf() },
+            body: JSON.stringify({ id_token:token, provider, intent, ...extra }),
+        });
+    } catch {
+        return { error: 'Network error contacting the server. Please try again.' };
+    }
+    let data = {};
+    try { data = await r.json(); } catch {}
+    if (!r.ok && !data.error) {
+        data.error = r.status === 419
+            ? 'Your session expired. Please refresh the page and try again.'
+            : 'Server error (' + r.status + '). Please try again.';
+    }
+    return data;
 }
 
 window.signInEmail = async function() {
