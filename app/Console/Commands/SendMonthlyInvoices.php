@@ -6,7 +6,6 @@ use App\Models\Account;
 use App\Models\Invoice;
 use App\Models\InvoiceLineItem;
 use App\Models\Lease;
-use App\Models\Message;
 use App\Models\UtilityReading;
 use AfricasTalking\SDK\AfricasTalking;
 use Illuminate\Console\Command;
@@ -21,15 +20,13 @@ class SendMonthlyInvoices extends Command
 
     public function handle()
     {
-        $today = now()->day;
-        $month = now()->month;
-        $year  = now()->year;
-
+        $today     = now()->day;
+        $month     = now()->month;
+        $year      = now()->year;
         $monthName = \Carbon\Carbon::createFromDate($year, $month, 1)->format('F Y');
 
         $this->info('Running monthly invoice command for ' . $monthName);
 
-        // Get all accounts with auto invoicing enabled
         $accounts = Account::where('auto_invoice_enabled', true)->get();
 
         if ($accounts->isEmpty()) {
@@ -39,7 +36,6 @@ class SendMonthlyInvoices extends Command
 
         foreach ($accounts as $account) {
 
-            // Check if today matches this account's send day
             if (!$this->option('force') && $account->invoice_send_day != $today) {
                 $this->info('Account ' . $account->name . ': send day is ' . $account->invoice_send_day . ', today is ' . $today . '. Skipping.');
                 continue;
@@ -48,14 +44,12 @@ class SendMonthlyInvoices extends Command
             $this->info('Processing account: ' . $account->name);
 
             $generated = 0;
-            $skipped   = [];
+            // Invoices billed but with some utility charges missing (flagged, not skipped)
+            $omitted   = [];
 
-            // Get all active leases for this account
             $leases = Lease::with(['unit.property.utilityRates', 'tenant'])
                 ->where('status', 'active')
-                ->whereHas('unit.property', fn($q) =>
-                    $q->where('account_id', $account->id)
-                )
+                ->whereHas('unit.property', fn($q) => $q->where('account_id', $account->id))
                 ->get();
 
             foreach ($leases as $lease) {
@@ -74,40 +68,19 @@ class SendMonthlyInvoices extends Command
                     continue;
                 }
 
-                // Check meter readings for meter-based rates
-                $meterRates = $property->utilityRates
-                    ->whereIn('billing_type', ['per_unit', 'per_meter_reading']);
+                // FIX #2 + #3: only active, auto-billable rates participate
+                $autoRates  = $property->utilityRates
+                    ->where('active', true)
+                    ->where('auto_bill', true);
 
-                $missingReadings = [];
+                $meterRates = $autoRates->whereIn('billing_type', ['per_unit', 'per_meter_reading']);
+                $flatRates  = $autoRates->where('billing_type', 'flat_fee');
 
-                foreach ($meterRates as $rate) {
-                    $reading = UtilityReading::where('unit_id', $unit->id)
-                        ->where('utility_type', $rate->type)
-                        ->where('reading_month', $month)
-                        ->where('reading_year', $year)
-                        ->first();
-
-                    if (!$reading) {
-                        $missingReadings[] = $rate->name;
-                    }
-                }
-
-                // Option A: skip tenant if any readings are missing
-                if (!empty($missingReadings)) {
-                    $skipped[] = [
-                        'tenant' => $tenant->full_name,
-                        'unit'   => $unit->name,
-                        'reason' => implode(', ', $missingReadings) . ' reading(s) missing',
-                    ];
-                    $this->warn('  Skipping ' . $tenant->full_name . ' (Unit ' . $unit->name . '): missing ' . implode(', ', $missingReadings));
-                    continue;
-                }
-
-                // Build line items
                 $lineItems   = [];
                 $totalAmount = 0;
+                $missing     = [];
 
-                // Rent
+                // FIX #4: rent is ALWAYS billed regardless of missing readings
                 $lineItems[] = [
                     'description' => $monthName . ' rent',
                     'amount'      => floatval($lease->monthly_rent),
@@ -115,7 +88,7 @@ class SendMonthlyInvoices extends Command
                 ];
                 $totalAmount += floatval($lease->monthly_rent);
 
-                // Meter readings
+                // Metered charges: bill where reading exists, FLAG where missing (never skip)
                 foreach ($meterRates as $rate) {
                     $reading = UtilityReading::where('unit_id', $unit->id)
                         ->where('utility_type', $rate->type)
@@ -130,11 +103,14 @@ class SendMonthlyInvoices extends Command
                             'type'        => $rate->type,
                         ];
                         $totalAmount += floatval($reading->charge_amount);
+                    } else {
+                        // Reading missing — note it for landlord, do not skip invoice
+                        $missing[] = $rate->name;
                     }
                 }
 
                 // Flat fees
-                foreach ($property->utilityRates->where('billing_type', 'flat_fee')->where('active', true) as $rate) {
+                foreach ($flatRates as $rate) {
                     $lineItems[] = [
                         'description' => $rate->name,
                         'amount'      => floatval($rate->amount),
@@ -172,16 +148,26 @@ class SendMonthlyInvoices extends Command
                 }
 
                 $generated++;
-                $this->info('  Generated ' . $invoice->reference . ' for ' . $tenant->full_name);
 
-                // Send SMS with PDF link
+                if (!empty($missing)) {
+                    $omitted[] = [
+                        'tenant'  => $tenant->full_name,
+                        'unit'    => $unit->name,
+                        'missing' => implode(', ', $missing),
+                    ];
+                    $this->warn('  ' . $invoice->reference . ' for ' . $tenant->full_name
+                        . ' — billed WITHOUT: ' . implode(', ', $missing) . ' (no reading entered)');
+                } else {
+                    $this->info('  Generated ' . $invoice->reference . ' for ' . $tenant->full_name);
+                }
+
                 $this->sendInvoiceSms($invoice, $tenant, $account);
             }
 
-            // Send summary to landlord
-            $this->sendLandlordSummary($account, $generated, $skipped, $monthName);
+            $this->sendLandlordSummary($account, $generated, $omitted, $monthName);
 
-            $this->info('Account ' . $account->name . ': ' . $generated . ' invoices generated, ' . count($skipped) . ' skipped.');
+            $this->info('Account ' . $account->name . ': ' . $generated . ' invoices generated, '
+                . count($omitted) . ' with omitted charges.');
         }
 
         $this->info('Monthly invoice command completed.');
@@ -198,7 +184,8 @@ class SendMonthlyInvoices extends Command
                 'account_id' => $account->id,
                 'type'       => 'sms_credits_empty',
                 'title'      => 'SMS not sent - no credits',
-                'body'       => 'Invoice ' . $invoice->reference . ' was generated but SMS could not be sent to ' . $tenant->full_name . ' because you have no SMS credits. Please top up.',
+                'body'       => 'Invoice ' . $invoice->reference . ' was generated but SMS could not be sent to '
+                    . $tenant->full_name . ' because you have no SMS credits. Please top up.',
             ]);
             $this->warn('    No SMS credits for ' . $tenant->full_name);
             return;
@@ -221,17 +208,19 @@ class SendMonthlyInvoices extends Command
         $this->info('    SMS ' . ($result['success'] ? 'sent' : 'failed') . ' to ' . $tenant->full_name);
     }
 
-    private function sendLandlordSummary(Account $account, int $generated, array $skipped, string $monthName): void
+    private function sendLandlordSummary(Account $account, int $generated, array $omitted, string $monthName): void
     {
-        // Build notification body
         $body = $generated . ' ' . Str::plural('invoice', $generated) . ' generated and sent for ' . $monthName . '.';
 
-        if (!empty($skipped)) {
-            $body .= ' ' . count($skipped) . ' ' . Str::plural('tenant', count($skipped)) . ' skipped due to missing readings: ';
-            $body .= implode(', ', array_map(fn($s) => 'Unit ' . $s['unit'] . ' (' . $s['reason'] . ')', $skipped)) . '.';
+        if (!empty($omitted)) {
+            $body .= ' ' . count($omitted) . ' ' . Str::plural('invoice', count($omitted))
+                . ' were billed without some utility charges due to missing readings: ';
+            $body .= implode('; ', array_map(
+                fn($o) => 'Unit ' . $o['unit'] . ' — missing: ' . $o['missing'],
+                $omitted
+            )) . '. Please enter the readings and add these charges manually if needed.';
         }
 
-        // Write in-app notification
         \App\Models\Notification::create([
             'account_id' => $account->id,
             'type'       => 'invoice_generated',
@@ -239,23 +228,22 @@ class SendMonthlyInvoices extends Command
             'body'       => $body,
             'data'       => [
                 'generated' => $generated,
-                'skipped'   => $skipped,
+                'omitted'   => $omitted,
                 'month'     => $monthName,
             ],
         ]);
 
-        // Also send SMS to landlord
         $owner = \App\Models\User::where('account_id', $account->id)
             ->where('role', 'owner')
             ->first();
 
         if (!$owner || !$owner->phone) return;
 
-        $smsBody = $account->name . ': ' . $generated . ' invoices generated and sent for ' . $monthName . '.';
+        $smsBody = $account->name . ': ' . $generated . ' invoices generated for ' . $monthName . '.';
 
-        if (!empty($skipped)) {
-            $smsBody .= ' ' . count($skipped) . ' skipped (missing readings): ';
-            $smsBody .= implode(', ', array_map(fn($s) => 'Unit ' . $s['unit'], $skipped)) . '.';
+        if (!empty($omitted)) {
+            $smsBody .= ' ' . count($omitted) . ' billed without some charges (missing readings): ';
+            $smsBody .= implode(', ', array_map(fn($o) => 'Unit ' . $o['unit'], $omitted)) . '.';
         }
 
         try {
@@ -269,9 +257,7 @@ class SendMonthlyInvoices extends Command
                 'message' => $smsBody,
                 'from'    => config('services.africastalking.from', ''),
             ]);
-
             $this->info('  Summary SMS sent to landlord.');
-
         } catch (\Exception $e) {
             Log::error('Landlord summary SMS failed: ' . $e->getMessage());
         }
@@ -280,15 +266,8 @@ class SendMonthlyInvoices extends Command
     private function formatPhone(string $phone): string
     {
         $phone = preg_replace('/\s+/', '', $phone);
-
-        if (str_starts_with($phone, '0')) {
-            return '+254' . substr($phone, 1);
-        }
-
-        if (str_starts_with($phone, '254') && !str_starts_with($phone, '+')) {
-            return '+' . $phone;
-        }
-
+        if (str_starts_with($phone, '0'))   return '+254' . substr($phone, 1);
+        if (str_starts_with($phone, '254') && !str_starts_with($phone, '+')) return '+' . $phone;
         return $phone;
     }
 }
