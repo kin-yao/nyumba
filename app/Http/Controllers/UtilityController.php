@@ -14,8 +14,12 @@ class UtilityController extends Controller
 {
     public function index(Request $request)
     {
-        $month = $request->input('month', now()->month);
-        $year  = $request->input('year', now()->year);
+        $month = (int) $request->input('month', now()->month);
+        $year  = (int) $request->input('year', now()->year);
+
+        // Last month for previous-reading auto-fill
+        $lastMonth = $month === 1 ? 12 : $month - 1;
+        $lastYear  = $month === 1 ? $year - 1 : $year;
 
         $propertyIds = $this->filteredPropertyIds();
 
@@ -27,6 +31,7 @@ class UtilityController extends Controller
 
         $unitIds = Unit::whereIn('property_id', $propertyIds)->pluck('id')->toArray();
 
+        // This month's readings
         $readings = UtilityReading::with('unit')
             ->whereIn('unit_id', $unitIds)
             ->where('reading_month', $month)
@@ -34,8 +39,15 @@ class UtilityController extends Controller
             ->get()
             ->groupBy(fn($r) => $r->unit_id . '_' . $r->utility_type);
 
+        // Last month's readings — used to lock the previous reading field
+        $lastReadings = UtilityReading::whereIn('unit_id', $unitIds)
+            ->where('reading_month', $lastMonth)
+            ->where('reading_year', $lastYear)
+            ->get()
+            ->groupBy(fn($r) => $r->unit_id . '_' . $r->utility_type);
+
         return view('utilities.index', compact(
-            'properties', 'readings', 'month', 'year'
+            'properties', 'readings', 'lastReadings', 'month', 'year'
         ));
     }
 
@@ -52,7 +64,7 @@ class UtilityController extends Controller
 
         $unit = Unit::with('property.utilityRates')->find($validated['unit_id']);
 
-        // #5: use the configured property rate, not a typed value
+        // Use the configured property rate, not a typed value
         $configuredRate = $unit->property->utilityRates
             ->where('type', $validated['utility_type'])
             ->where('active', true)
@@ -79,7 +91,9 @@ class UtilityController extends Controller
             ]
         );
 
-        $period = \Carbon\Carbon::createFromDate($validated['reading_year'], $validated['reading_month'], 1)->format('M Y');
+        $period = \Carbon\Carbon::createFromDate(
+            $validated['reading_year'], $validated['reading_month'], 1
+        )->format('M Y');
 
         AuditService::log(
             'utility.reading_entered',

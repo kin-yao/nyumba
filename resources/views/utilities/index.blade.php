@@ -162,8 +162,11 @@
                                 <div style="display:grid;gap:8px">
                                     @foreach($meterRates as $rate)
                                         @php
-                                            $key     = $unit->id.'_'.$rate->type;
-                                            $reading = $readings->get($key)?->first();
+                                            $key         = $unit->id.'_'.$rate->type;
+                                            $reading     = $readings->get($key)?->first();
+                                            $lastReading = $lastReadings->get($key)?->first();
+                                            $prevValue   = $lastReading ? $lastReading->current_reading : 0;
+                                            $hasPrev     = $lastReading !== null;
                                         @endphp
                                         <div class="reading-row">
                                             <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
@@ -181,7 +184,7 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            <button onclick="openModal({{ $unit->id }},'{{ $unit->name }}','{{ addslashes($tenant->full_name) }}','{{ $rate->type }}','{{ addslashes($rate->name) }}',{{ $rate->amount }},{{ $reading?$reading->current_reading:0 }})"
+                                            <button onclick="openModal({{ $unit->id }},'{{ $unit->name }}','{{ addslashes($tenant->full_name) }}','{{ $rate->type }}','{{ addslashes($rate->name) }}',{{ $rate->amount }},{{ $prevValue }},{{ $hasPrev ? 'true' : 'false' }},{{ $reading ? $reading->current_reading : 'null' }})"
                                                     style="flex-shrink:0;font-size:12px;padding:5px 12px;background:{{ $reading?'transparent':'#1a6b52' }};color:{{ $reading?'#8a8880':'#fff' }};border:1px solid {{ $reading?'rgba(0,0,0,0.1)':'#1a6b52' }};border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
                                                 {{ $reading ? 'Update' : 'Enter reading' }}
                                             </button>
@@ -230,27 +233,42 @@
             <button onclick="document.getElementById('reading-modal').style.display='none'"
                     style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;margin-left:12px;line-height:1">&times;</button>
         </div>
+
         <form method="POST" action="{{ route('utilities.store') }}">
             @csrf
-            <input type="hidden" name="unit_id"       id="modal-unit-id">
-            <input type="hidden" name="utility_type"  id="modal-utility-type">
-            <input type="hidden" name="reading_month" value="{{ $month }}">
-            <input type="hidden" name="reading_year"  value="{{ $year }}">
+            <input type="hidden" name="unit_id"         id="modal-unit-id">
+            <input type="hidden" name="utility_type"    id="modal-utility-type">
+            <input type="hidden" name="previous_reading" id="modal-prev-hidden">
+            <input type="hidden" name="reading_month"   value="{{ $month }}">
+            <input type="hidden" name="reading_year"    value="{{ $year }}">
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
-                <div>
-                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Previous reading</label>
-                    <input name="previous_reading" type="number" step="0.1" required id="modal-prev"
-                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+            {{-- Previous reading --}}
+            <div style="margin-bottom:16px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                    <label style="font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase">Previous reading</label>
+                    <span id="modal-prev-source" style="font-size:10px;color:#8a8880;font-style:italic"></span>
                 </div>
-                <div>
-                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Current reading</label>
-                    <input name="current_reading" type="number" step="0.1" required id="modal-curr"
-                           oninput="calcCharge()"
-                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                {{-- Locked: shown when last month's reading exists --}}
+                <div id="modal-prev-locked"
+                     style="display:none;width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.08);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;background:#f5f4f0;color:#4b5563;align-items:center">
+                    <span id="modal-prev-display">0</span>
                 </div>
+                {{-- Editable: shown only for first-ever reading --}}
+                <input id="modal-prev-editable" type="number" step="0.01" min="0"
+                       oninput="syncPrev(this.value)"
+                       placeholder="Enter opening meter reading"
+                       style="display:none;width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
             </div>
 
+            {{-- Current reading --}}
+            <div style="margin-bottom:16px">
+                <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Current reading</label>
+                <input name="current_reading" type="number" step="0.01" required id="modal-curr"
+                       oninput="calcCharge()"
+                       style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+            </div>
+
+            {{-- Summary --}}
             <div style="background:#f5f4f0;border-radius:8px;padding:14px 16px;margin-bottom:16px">
                 <div style="display:flex;justify-content:space-between;margin-bottom:7px">
                     <span style="font-size:12px;color:#8a8880">Units consumed</span>
@@ -271,7 +289,8 @@
             </div>
 
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <button type="submit" style="flex:1;padding:8px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                <button type="submit"
+                        style="flex:1;padding:8px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
                     Save reading
                 </button>
                 <button type="button" onclick="document.getElementById('reading-modal').style.display='none'"
@@ -285,24 +304,56 @@
 
 <script>
 var currentRate = 0;
+var lockedPrev  = 0;
 
-function openModal(unitId, unitName, tenantName, type, rateName, rate, prevReading) {
+function openModal(unitId, unitName, tenantName, type, rateName, rate, prevValue, hasPrev, currentReading) {
     currentRate = parseFloat(rate) || 0;
-    document.getElementById('reading-modal').style.display = 'flex';
-    document.getElementById('modal-unit-id').value        = unitId;
-    document.getElementById('modal-utility-type').value   = type;
-    document.getElementById('modal-title').textContent    = rateName + ' — Unit ' + unitName;
-    document.getElementById('modal-subtitle').textContent = tenantName;
-    document.getElementById('modal-prev').value           = prevReading || 0;
-    document.getElementById('modal-curr').value           = '';
+    lockedPrev  = parseFloat(prevValue) || 0;
+
+    document.getElementById('reading-modal').style.display  = 'flex';
+    document.getElementById('modal-unit-id').value          = unitId;
+    document.getElementById('modal-utility-type').value     = type;
+    document.getElementById('modal-title').textContent      = rateName + ' — Unit ' + unitName;
+    document.getElementById('modal-subtitle').textContent   = tenantName;
     document.getElementById('modal-rate-display').textContent = '{{ currency_symbol() }} ' + currentRate.toLocaleString();
-    document.getElementById('modal-units').textContent    = '0';
-    document.getElementById('modal-charge').textContent   = '{{ currency_symbol() }} 0';
-    setTimeout(() => document.getElementById('modal-curr').focus(), 100);
+
+    var locked   = document.getElementById('modal-prev-locked');
+    var editable = document.getElementById('modal-prev-editable');
+    var source   = document.getElementById('modal-prev-source');
+    var hidden   = document.getElementById('modal-prev-hidden');
+    var curr     = document.getElementById('modal-curr');
+
+    if (hasPrev) {
+        // Last month's reading exists — lock previous reading
+        locked.style.display   = 'flex';
+        editable.style.display = 'none';
+        document.getElementById('modal-prev-display').textContent = lockedPrev.toLocaleString();
+        source.textContent = 'Carried from last month';
+        hidden.value       = lockedPrev;
+    } else {
+        // No prior reading — first entry, allow manual baseline
+        locked.style.display   = 'none';
+        editable.style.display = 'block';
+        editable.value         = '';
+        source.textContent     = 'First reading — enter opening value';
+        hidden.value           = 0;
+    }
+
+    // If updating an existing reading, pre-fill current reading
+    curr.value = (currentReading !== null && currentReading !== undefined) ? currentReading : '';
+
+    calcCharge();
+    setTimeout(() => curr.focus(), 100);
+}
+
+function syncPrev(val) {
+    lockedPrev = parseFloat(val) || 0;
+    document.getElementById('modal-prev-hidden').value = lockedPrev;
+    calcCharge();
 }
 
 function calcCharge() {
-    var prev   = parseFloat(document.getElementById('modal-prev').value) || 0;
+    var prev   = parseFloat(document.getElementById('modal-prev-hidden').value) || 0;
     var curr   = parseFloat(document.getElementById('modal-curr').value) || 0;
     var units  = Math.max(0, curr - prev);
     var charge = units * currentRate;
@@ -312,7 +363,7 @@ function calcCharge() {
 
 function filterByUnit(query) {
     query = query.toLowerCase().trim();
-    var cards = document.querySelectorAll('.unit-card');
+    var cards      = document.querySelectorAll('.unit-card');
     var anyVisible = false;
     cards.forEach(card => {
         var show = query === '' || (card.getAttribute('data-unit') || '').includes(query);
