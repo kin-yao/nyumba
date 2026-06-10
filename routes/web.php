@@ -135,6 +135,7 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
     Route::post('/invoices/bulk', [InvoiceController::class, 'bulkStore'])->name('invoices.bulk.store');
     Route::get('/invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('invoices.pdf');
     Route::resource('invoices', InvoiceController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
+    Route::post('/invoices/{invoice}/send', [InvoiceController::class, 'send'])->name('invoices.send');
 
     // Payments
     Route::resource('payments', PaymentController::class)->only(['index', 'create', 'store']);

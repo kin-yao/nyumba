@@ -9,11 +9,30 @@ use App\Models\Property;
 use App\Models\Unit;
 use App\Models\UtilityReading;
 use App\Services\AuditService;
+use App\Services\SmsService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
 class InvoiceController extends Controller
 {
+    // ── Helpers ───────────────────────────────────────────────────────────
+
+    /**
+     * Generate a per-account sequential invoice reference.
+     * Each account's invoices are numbered independently: INV-0001, INV-0002 …
+     */
+    private function nextReference(int $accountId): string
+    {
+        $count = Invoice::where('account_id', $accountId)
+            ->whereNotLike('reference', 'TEMP-%')
+            ->count();
+
+        return 'INV-' . str_pad($count + 1, 4, '0', STR_PAD_LEFT);
+    }
+
+    // ── Index / Create ────────────────────────────────────────────────────
+
     public function index()
     {
         $unitIds  = $this->filteredUnitIds();
@@ -40,6 +59,8 @@ class InvoiceController extends Controller
 
         return view('invoices.create', compact('leases'));
     }
+
+    // ── Store (manual) ────────────────────────────────────────────────────
 
     public function store(Request $request)
     {
@@ -69,14 +90,15 @@ class InvoiceController extends Controller
 
             return back()->withInput()->withErrors([
                 'period_month' => 'An invoice for ' . $monthName .
-                    ' already exists for this tenant. Reference: ' . $exists->reference
+                    ' already exists for this tenant. Reference: ' . $exists->reference,
             ]);
         }
 
+        $accountId   = auth()->user()->account_id;
         $totalAmount = array_sum($validated['amounts']);
 
         $invoice = Invoice::create([
-            'account_id'   => auth()->user()->account_id,
+            'account_id'   => $accountId,
             'lease_id'     => $validated['lease_id'],
             'reference'    => 'TEMP-' . uniqid(),
             'period_month' => $validated['period_month'],
@@ -84,11 +106,11 @@ class InvoiceController extends Controller
             'invoice_date' => $validated['invoice_date'],
             'due_date'     => $validated['due_date'],
             'total_amount' => $totalAmount,
-            'status'       => 'sent',
+            'status'       => 'draft',                      // #6: starts as draft
         ]);
 
         $invoice->update([
-            'reference' => 'INV-' . str_pad($invoice->id, 4, '0', STR_PAD_LEFT)
+            'reference' => $this->nextReference($accountId), // #7: per-account sequence
         ]);
 
         foreach ($validated['descriptions'] as $index => $description) {
@@ -106,14 +128,69 @@ class InvoiceController extends Controller
 
         AuditService::log(
             'invoice.created',
-            'Invoice ' . $invoice->reference . ' created for ' . $invoice->lease->tenant->full_name,
+            'Invoice ' . $invoice->reference . ' created (draft) for ' . $invoice->lease->tenant->full_name,
             $invoice,
             ['amount' => $totalAmount, 'period' => $validated['period_month'] . '/' . $validated['period_year']]
         );
 
         return redirect()->route('invoices.show', $invoice)
-            ->with('success', 'Invoice ' . $invoice->reference . ' created successfully.');
+            ->with('success', 'Invoice ' . $invoice->reference . ' created as draft. Send it when ready.');
     }
+
+    // ── Send invoice to tenant ────────────────────────────────────────────
+
+    public function send(Invoice $invoice)
+    {
+        $invoice->load(['lease.tenant', 'lease.unit.property']);
+
+        $tenant   = $invoice->lease->tenant;
+        $account  = auth()->user()->account;
+
+        if (!$tenant->phone) {
+            return back()->with('error', 'This tenant has no phone number on file. Add one before sending.');
+        }
+
+        $sms = new SmsService($account);
+
+        if (!$sms->hasCredits()) {
+            return back()->with('error', 'No SMS credits remaining. Top up to send invoices.');
+        }
+
+        $pdfUrl = URL::signedRoute(
+            'invoices.pdf.public',
+            ['invoice' => $invoice->id],
+            now()->addDays(30)
+        );
+
+        $period  = \Carbon\Carbon::createFromDate($invoice->period_year, $invoice->period_month, 1)->format('F Y');
+        $message = 'Dear ' . $tenant->first_name . ', your invoice ' . $invoice->reference
+            . ' for ' . $period
+            . ' is ready. Amount due: KES ' . number_format($invoice->total_amount)
+            . '. Due: ' . $invoice->due_date->format('d M Y')
+            . '. Download: ' . $pdfUrl;
+
+        $result = $sms->send($tenant->phone, $message, $tenant->id);
+
+        if (!$result['success']) {
+            return back()->with('error', 'SMS failed to send. Please try again.');
+        }
+
+        $invoice->update([
+            'status'  => 'sent',
+            'sent_at' => now(),
+        ]);
+
+        AuditService::log(
+            'invoice.sent',
+            'Invoice ' . $invoice->reference . ' sent to ' . $tenant->full_name . ' via SMS',
+            $invoice,
+            ['phone' => $tenant->phone, 'period' => $period]
+        );
+
+        return back()->with('success', 'Invoice sent to ' . $tenant->full_name . ' via SMS.');
+    }
+
+    // ── Show / Destroy ────────────────────────────────────────────────────
 
     public function show(Invoice $invoice)
     {
@@ -121,7 +198,7 @@ class InvoiceController extends Controller
             'lease.tenant',
             'lease.unit.property',
             'lineItems',
-            'allocations.payment'
+            'allocations.payment',
         ]);
 
         return view('invoices.show', compact('invoice'));
@@ -151,6 +228,8 @@ class InvoiceController extends Controller
             ->with('success', 'Invoice ' . $reference . ' deleted.');
     }
 
+    // ── Bulk ──────────────────────────────────────────────────────────────
+
     public function bulkCreate()
     {
         session()->forget('bulk_previews');
@@ -177,36 +256,25 @@ class InvoiceController extends Controller
                 'utilityRates' => fn($q) => $q->where('active', true),
             ])->get();
 
-        // ── Pre-load to eliminate N+1 inside the loop ─────────────────────────
-
-        // Collect all active lease IDs and unit IDs up front
         $allLeaseIds = $properties->flatMap(fn($p) =>
-            $p->units
-                ->filter(fn($u) => $u->activeLease)
-                ->map(fn($u) => $u->activeLease->id)
+            $p->units->filter(fn($u) => $u->activeLease)->map(fn($u) => $u->activeLease->id)
         );
 
         $allUnitIds = $properties->flatMap(fn($p) =>
-            $p->units
-                ->filter(fn($u) => $u->activeLease)
-                ->map(fn($u) => $u->id)
+            $p->units->filter(fn($u) => $u->activeLease)->map(fn($u) => $u->id)
         );
 
-        // 1 query: all existing invoices for this period
         $existingInvoices = Invoice::whereIn('lease_id', $allLeaseIds)
             ->where('period_month', $month)
             ->where('period_year', $year)
             ->get()
             ->keyBy('lease_id');
 
-        // 1 query: all utility readings for this period
         $allReadings = UtilityReading::whereIn('unit_id', $allUnitIds)
             ->where('reading_month', $month)
             ->where('reading_year', $year)
             ->get()
             ->groupBy('unit_id');
-
-        // ─────────────────────────────────────────────────────────────────────
 
         $previews = [];
 
@@ -217,32 +285,22 @@ class InvoiceController extends Controller
             foreach ($property->units as $unit) {
                 if (!$unit->activeLease) continue;
 
-                $lease  = $unit->activeLease;
-                $tenant = $lease->tenant;
-
-                // From pre-loaded collections — no extra queries
-                $existingInvoice = $existingInvoices->get($lease->id);
-                $readings        = $allReadings->get($unit->id, collect())->keyBy('utility_type');
+                $lease    = $unit->activeLease;
+                $tenant   = $lease->tenant;
+                $existing = $existingInvoices->get($lease->id);
+                $readings = $allReadings->get($unit->id, collect())->keyBy('utility_type');
 
                 $lineItems = [];
                 $warnings  = [];
                 $total     = 0;
 
-                $lineItems[] = [
-                    'description' => $monthName . ' rent',
-                    'amount'      => floatval($lease->monthly_rent),
-                    'type'        => 'rent',
-                ];
+                $lineItems[] = ['description' => $monthName . ' rent', 'amount' => floatval($lease->monthly_rent), 'type' => 'rent'];
                 $total += floatval($lease->monthly_rent);
 
                 foreach ($meterRates as $rate) {
                     $reading = $readings->get($rate->type);
                     if ($reading) {
-                        $lineItems[] = [
-                            'description' => $rate->name . ' charges',
-                            'amount'      => floatval($reading->charge_amount),
-                            'type'        => $rate->type,
-                        ];
+                        $lineItems[] = ['description' => $rate->name . ' charges', 'amount' => floatval($reading->charge_amount), 'type' => $rate->type];
                         $total += floatval($reading->charge_amount);
                     } else {
                         $warnings[] = $rate->name . ' reading not entered for ' . $monthName;
@@ -250,29 +308,22 @@ class InvoiceController extends Controller
                 }
 
                 foreach ($flatRates as $rate) {
-                    $lineItems[] = [
-                        'description' => $rate->name,
-                        'amount'      => floatval($rate->amount),
-                        'type'        => $rate->type,
-                    ];
+                    $lineItems[] = ['description' => $rate->name, 'amount' => floatval($rate->amount), 'type' => $rate->type];
                     $total += floatval($rate->amount);
                 }
 
                 $previews[] = [
                     'lease_id'         => $lease->id,
                     'tenant_name'      => $tenant->full_name,
-                    'tenant_initials'  => strtoupper(
-                        substr($tenant->first_name, 0, 1) .
-                        substr($tenant->last_name,  0, 1)
-                    ),
+                    'tenant_initials'  => strtoupper(substr($tenant->first_name, 0, 1) . substr($tenant->last_name, 0, 1)),
                     'unit_name'        => $unit->name,
                     'property_name'    => $property->name,
                     'line_items'       => $lineItems,
                     'warnings'         => $warnings,
                     'total'            => $total,
-                    'existing_ref'     => $existingInvoice?->reference,
-                    'existing_status'  => $existingInvoice?->status,
-                    'already_invoiced' => $existingInvoice !== null,
+                    'existing_ref'     => $existing?->reference,
+                    'existing_status'  => $existing?->status,
+                    'already_invoiced' => $existing !== null,
                 ];
             }
         }
@@ -319,6 +370,7 @@ class InvoiceController extends Controller
         $month     = (int) $validated['period_month'];
         $year      = (int) $validated['period_year'];
         $monthName = \Carbon\Carbon::createFromDate($year, $month, 1)->format('F Y');
+        $accountId = auth()->user()->account_id;
         $count     = 0;
         $skipped   = 0;
 
@@ -343,7 +395,7 @@ class InvoiceController extends Controller
             $totalAmount = array_sum(array_column($lineItems, 'amount'));
 
             $invoice = Invoice::create([
-                'account_id'   => auth()->user()->account_id,
+                'account_id'   => $accountId,
                 'lease_id'     => $leaseId,
                 'reference'    => 'TEMP-' . uniqid(),
                 'period_month' => $month,
@@ -351,10 +403,12 @@ class InvoiceController extends Controller
                 'invoice_date' => $validated['invoice_date'],
                 'due_date'     => $validated['due_date'],
                 'total_amount' => $totalAmount,
-                'status'       => 'sent',
+                'status'       => 'draft',                      // #6: starts as draft
             ]);
 
-            $invoice->update(['reference' => 'INV-' . str_pad($invoice->id, 4, '0', STR_PAD_LEFT)]);
+            $invoice->update([
+                'reference' => $this->nextReference($accountId), // #7: per-account sequence
+            ]);
 
             foreach ($lineItems as $item) {
                 InvoiceLineItem::create([
@@ -377,13 +431,15 @@ class InvoiceController extends Controller
             ['count' => $count, 'skipped' => $skipped, 'period' => $monthName]
         );
 
-        $message = $count . ' ' . Str::plural('invoice', $count) . ' generated successfully.';
+        $message = $count . ' ' . Str::plural('invoice', $count) . ' created as drafts.';
         if ($skipped > 0) {
             $message .= ' ' . $skipped . ' skipped (already invoiced).';
         }
 
         return redirect()->route('invoices.index')->with('success', $message);
     }
+
+    // ── PDF ───────────────────────────────────────────────────────────────
 
     public function pdf(Invoice $invoice)
     {

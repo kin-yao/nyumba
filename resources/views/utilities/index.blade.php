@@ -171,7 +171,7 @@
                                                 <div style="min-width:0">
                                                     <div style="font-size:13px;font-weight:500">{{ $rate->name }}</div>
                                                     <div style="font-size:11px;color:#8a8880;flex-wrap:wrap">
-                                                        {{ currency($rate->amount, 2) }} per unit
+                                                        {{ currency($rate->amount, 2) }} per unit (configured)
                                                         @if($reading)
                                                             &middot; {{ number_format($reading->units_consumed,1) }} units
                                                             &middot; <span style="color:#1a6b52;font-weight:500">{{ currency($reading->charge_amount) }}</span>
@@ -234,7 +234,6 @@
             @csrf
             <input type="hidden" name="unit_id"       id="modal-unit-id">
             <input type="hidden" name="utility_type"  id="modal-utility-type">
-            <input type="hidden" name="rate_per_unit" id="modal-rate">
             <input type="hidden" name="reading_month" value="{{ $month }}">
             <input type="hidden" name="reading_year"  value="{{ $year }}">
 
@@ -258,13 +257,17 @@
                     <span style="font-size:13px;font-weight:500" id="modal-units">0</span>
                 </div>
                 <div style="display:flex;justify-content:space-between;margin-bottom:7px">
-                    <span style="font-size:12px;color:#8a8880">Rate per unit</span>
+                    <span style="font-size:12px;color:#8a8880">Rate per unit (configured)</span>
                     <span style="font-size:13px;font-weight:500" id="modal-rate-display">{{ currency_symbol() }} 0</span>
                 </div>
                 <div style="border-top:1px solid rgba(0,0,0,0.08);padding-top:8px;display:flex;justify-content:space-between">
-                    <span style="font-size:12px;color:#8a8880">Total charge</span>
+                    <span style="font-size:12px;color:#8a8880">Estimated charge</span>
                     <span style="font-family:'DM Serif Display',serif;font-size:20px;color:#1a6b52" id="modal-charge">{{ currency_symbol() }} 0</span>
                 </div>
+            </div>
+
+            <div style="font-size:11px;color:#8a8880;margin-bottom:14px">
+                Actual charge uses the configured property rate.
             </div>
 
             <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -286,16 +289,15 @@ var currentRate = 0;
 function openModal(unitId, unitName, tenantName, type, rateName, rate, prevReading) {
     currentRate = parseFloat(rate) || 0;
     document.getElementById('reading-modal').style.display = 'flex';
-    document.getElementById('modal-unit-id').value       = unitId;
-    document.getElementById('modal-utility-type').value  = type;
-    document.getElementById('modal-rate').value          = rate;
-    document.getElementById('modal-title').textContent   = rateName + ' — Unit ' + unitName;
+    document.getElementById('modal-unit-id').value        = unitId;
+    document.getElementById('modal-utility-type').value   = type;
+    document.getElementById('modal-title').textContent    = rateName + ' — Unit ' + unitName;
     document.getElementById('modal-subtitle').textContent = tenantName;
-    document.getElementById('modal-prev').value          = prevReading || 0;
-    document.getElementById('modal-curr').value          = '';
+    document.getElementById('modal-prev').value           = prevReading || 0;
+    document.getElementById('modal-curr').value           = '';
     document.getElementById('modal-rate-display').textContent = '{{ currency_symbol() }} ' + currentRate.toLocaleString();
-    document.getElementById('modal-units').textContent   = '0';
-    document.getElementById('modal-charge').textContent  = '{{ currency_symbol() }} 0';
+    document.getElementById('modal-units').textContent    = '0';
+    document.getElementById('modal-charge').textContent   = '{{ currency_symbol() }} 0';
     setTimeout(() => document.getElementById('modal-curr').focus(), 100);
 }
 

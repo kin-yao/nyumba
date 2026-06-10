@@ -48,11 +48,19 @@ class UtilityController extends Controller
             'reading_year'     => ['required', 'integer'],
             'previous_reading' => ['required', 'numeric', 'min:0'],
             'current_reading'  => ['required', 'numeric', 'min:0', 'gte:previous_reading'],
-            'rate_per_unit'    => ['required', 'numeric', 'min:0'],
         ]);
 
+        $unit = Unit::with('property.utilityRates')->find($validated['unit_id']);
+
+        // #5: use the configured property rate, not a typed value
+        $configuredRate = $unit->property->utilityRates
+            ->where('type', $validated['utility_type'])
+            ->where('active', true)
+            ->first();
+
+        $ratePerUnit   = $configuredRate ? floatval($configuredRate->amount) : 0;
         $unitsConsumed = $validated['current_reading'] - $validated['previous_reading'];
-        $chargeAmount  = $unitsConsumed * $validated['rate_per_unit'];
+        $chargeAmount  = $unitsConsumed * $ratePerUnit;
 
         $reading = UtilityReading::updateOrCreate(
             [
@@ -66,25 +74,25 @@ class UtilityController extends Controller
                 'previous_reading' => $validated['previous_reading'],
                 'current_reading'  => $validated['current_reading'],
                 'units_consumed'   => $unitsConsumed,
-                'rate_per_unit'    => $validated['rate_per_unit'],
+                'rate_per_unit'    => $ratePerUnit,
                 'charge_amount'    => $chargeAmount,
             ]
         );
 
-        $unit     = Unit::find($validated['unit_id']);
-        $period   = \Carbon\Carbon::createFromDate($validated['reading_year'], $validated['reading_month'], 1)->format('M Y');
+        $period = \Carbon\Carbon::createFromDate($validated['reading_year'], $validated['reading_month'], 1)->format('M Y');
 
         AuditService::log(
             'utility.reading_entered',
             ucfirst($validated['utility_type']) . ' reading entered for Unit ' . $unit->name
-                . ' — ' . $unitsConsumed . ' units — ' . currency($chargeAmount) . ' (' . $period . ')',
+                . ' — ' . $unitsConsumed . ' units @ KES ' . $ratePerUnit . ' = ' . currency($chargeAmount) . ' (' . $period . ')',
             $reading,
             [
-                'unit'             => $unit->name,
-                'utility_type'     => $validated['utility_type'],
-                'units_consumed'   => $unitsConsumed,
-                'charge_amount'    => $chargeAmount,
-                'period'           => $period,
+                'unit'           => $unit->name,
+                'utility_type'   => $validated['utility_type'],
+                'units_consumed' => $unitsConsumed,
+                'rate_per_unit'  => $ratePerUnit,
+                'charge_amount'  => $chargeAmount,
+                'period'         => $period,
             ]
         );
 

@@ -44,7 +44,6 @@ class SendMonthlyInvoices extends Command
             $this->info('Processing account: ' . $account->name);
 
             $generated = 0;
-            // Invoices billed but with some utility charges missing (flagged, not skipped)
             $omitted   = [];
 
             $leases = Lease::with(['unit.property.utilityRates', 'tenant'])
@@ -57,7 +56,6 @@ class SendMonthlyInvoices extends Command
                 $property = $unit->property;
                 $tenant   = $lease->tenant;
 
-                // Skip if already invoiced this period
                 $exists = Invoice::where('lease_id', $lease->id)
                     ->where('period_month', $month)
                     ->where('period_year', $year)
@@ -68,7 +66,6 @@ class SendMonthlyInvoices extends Command
                     continue;
                 }
 
-                // FIX #2 + #3: only active, auto-billable rates participate
                 $autoRates  = $property->utilityRates
                     ->where('active', true)
                     ->where('auto_bill', true);
@@ -80,7 +77,6 @@ class SendMonthlyInvoices extends Command
                 $totalAmount = 0;
                 $missing     = [];
 
-                // FIX #4: rent is ALWAYS billed regardless of missing readings
                 $lineItems[] = [
                     'description' => $monthName . ' rent',
                     'amount'      => floatval($lease->monthly_rent),
@@ -88,7 +84,6 @@ class SendMonthlyInvoices extends Command
                 ];
                 $totalAmount += floatval($lease->monthly_rent);
 
-                // Metered charges: bill where reading exists, FLAG where missing (never skip)
                 foreach ($meterRates as $rate) {
                     $reading = UtilityReading::where('unit_id', $unit->id)
                         ->where('utility_type', $rate->type)
@@ -104,12 +99,10 @@ class SendMonthlyInvoices extends Command
                         ];
                         $totalAmount += floatval($reading->charge_amount);
                     } else {
-                        // Reading missing — note it for landlord, do not skip invoice
                         $missing[] = $rate->name;
                     }
                 }
 
-                // Flat fees
                 foreach ($flatRates as $rate) {
                     $lineItems[] = [
                         'description' => $rate->name,
@@ -119,7 +112,7 @@ class SendMonthlyInvoices extends Command
                     $totalAmount += floatval($rate->amount);
                 }
 
-                // Create invoice
+                // Create invoice with TEMP reference first
                 $invoice = Invoice::create([
                     'account_id'   => $account->id,
                     'lease_id'     => $lease->id,
@@ -132,8 +125,12 @@ class SendMonthlyInvoices extends Command
                     'status'       => 'sent',
                 ]);
 
+                // #7: per-account sequential reference
+                $count = Invoice::where('account_id', $account->id)
+                    ->whereNot('reference', 'like', 'TEMP-%')
+                    ->count();
                 $invoice->update([
-                    'reference' => 'INV-' . str_pad($invoice->id, 4, '0', STR_PAD_LEFT)
+                    'reference' => 'INV-' . str_pad($count, 4, '0', STR_PAD_LEFT),
                 ]);
 
                 foreach ($lineItems as $item) {

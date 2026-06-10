@@ -18,9 +18,7 @@
 }
 
 @media (max-width: 800px) {
-    .invshow-layout {
-        grid-template-columns: 1fr;
-    }
+    .invshow-layout { grid-template-columns: 1fr; }
 }
 </style>
 
@@ -100,16 +98,30 @@
                 Period: {{ \Carbon\Carbon::createFromDate($invoice->period_year, $invoice->period_month, 1)->format('F Y') }}
             </div>
 
+            {{-- Actions --}}
             <div style="padding:12px 20px;border-top:1px solid rgba(0,0,0,0.07);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+
+                @if($invoice->status === 'draft')
+                    <form method="POST" action="{{ route('invoices.send', $invoice) }}">
+                        @csrf
+                        <button type="submit"
+                                style="display:inline-flex;padding:6px 13px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
+                            Send to tenant
+                        </button>
+                    </form>
+                @endif
+
                 <a href="{{ route('payments.create') }}"
-                   style="display:inline-flex;padding:6px 13px;background:#1a6b52;color:#fff;border-radius:7px;font-size:12px;text-decoration:none;font-weight:500;white-space:nowrap">
+                   style="display:inline-flex;padding:6px 13px;background:{{ $invoice->status === 'draft' ? 'transparent' : '#1a6b52' }};color:{{ $invoice->status === 'draft' ? '#1a6b52' : '#fff' }};border:1px solid #1a6b52;border-radius:7px;font-size:12px;text-decoration:none;font-weight:500;white-space:nowrap">
                     Record payment
                 </a>
+
                 @if($invoice->allocations->isEmpty())
                     <form method="POST" action="{{ route('invoices.destroy', $invoice) }}"
                           onsubmit="return confirm('Delete invoice {{ $invoice->reference }}?')">
                         @csrf @method('DELETE')
-                        <button type="submit" style="display:inline-flex;padding:6px 13px;background:transparent;color:#b91c1c;border:1px solid rgba(185,28,28,0.3);border-radius:7px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
+                        <button type="submit"
+                                style="display:inline-flex;padding:6px 13px;background:transparent;color:#b91c1c;border:1px solid rgba(185,28,28,0.3);border-radius:7px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
                             Delete invoice
                         </button>
                     </form>
@@ -140,6 +152,7 @@
                 @endforeach
             @endif
         </div>
+
     </div>
 </div>
 </x-layouts.app>
