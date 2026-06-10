@@ -59,6 +59,8 @@
                                     data-unit="{{ $tenant->activeLease?->unit?->name }}"
                                     data-property="{{ $tenant->activeLease?->unit?->property?->name }}"
                                     data-rent="{{ $tenant->activeLease?->monthly_rent }}"
+                                    data-deposit-required="{{ $tenant->activeLease?->deposit_required ?? 0 }}"
+                                    data-deposit-paid="{{ $tenant->activeLease?->deposit_paid ?? 0 }}"
                                     {{ old('tenant_id')==$tenant->id?'selected':'' }}>
                                 {{ $tenant->full_name }} &ndash; {{ $tenant->activeLease?->unit?->name }}, {{ $tenant->activeLease?->unit?->property?->name }}
                             </option>
@@ -66,10 +68,27 @@
                     </select>
                 </div>
 
+                {{-- Payment type --}}
+                <div style="margin-bottom:13px">
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Payment type</label>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        @foreach(['rent' => 'Rent / Utilities', 'deposit' => 'Security deposit', 'other' => 'Other'] as $val => $label)
+                            <label style="display:flex;align-items:center;gap:6px;padding:6px 13px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;cursor:pointer;font-size:13px;font-family:'DM Sans',sans-serif"
+                                   id="type-label-{{ $val }}">
+                                <input type="radio" name="payment_type" value="{{ $val }}"
+                                       onchange="onTypeChange('{{ $val }}')"
+                                       {{ old('payment_type', 'rent') === $val ? 'checked' : '' }}
+                                       style="accent-color:#1a6b52">
+                                {{ $label }}
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+
                 <div class="form-2col" style="margin-bottom:13px">
                     <div>
                         <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Amount ({{ currency_symbol() }})</label>
-                        <input name="amount" type="number" required min="1" id="payment-amount"
+                        <input name="amount" type="number" step="0.01" required min="1" id="payment-amount"
                                value="{{ old('amount') }}" placeholder="e.g. 9500"
                                style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
                     </div>
@@ -137,8 +156,16 @@
                         <span style="color:#8a8880">Outstanding balance</span>
                         <span id="panel-balance" style="font-weight:500;color:#b91c1c"></span>
                     </div>
+                    <div id="panel-deposit-row" style="display:flex;justify-content:space-between">
+                        <span style="color:#8a8880">Deposit required</span>
+                        <span id="panel-deposit" style="font-weight:500"></span>
+                    </div>
+                    <div id="panel-deposit-paid-row" style="display:flex;justify-content:space-between">
+                        <span style="color:#8a8880">Deposit paid</span>
+                        <span id="panel-deposit-paid" style="font-weight:500;color:#1a6b52"></span>
+                    </div>
                 </div>
-                <div style="padding-top:12px;border-top:1px solid rgba(0,0,0,0.07);font-size:11px;color:#8a8880">
+                <div id="panel-note" style="padding-top:12px;border-top:1px solid rgba(0,0,0,0.07);font-size:11px;color:#8a8880">
                     Payment will be automatically allocated to the oldest unpaid invoice first.
                 </div>
             </div>
@@ -147,6 +174,8 @@
 </div>
 
 <script>
+var currentTenantData = {};
+
 function loadTenantInfo(select) {
     var option   = select.options[select.selectedIndex];
     var name     = option.text.split(' – ')[0];
@@ -154,16 +183,44 @@ function loadTenantInfo(select) {
     var property = option.getAttribute('data-property');
     var balance  = parseFloat(option.getAttribute('data-balance') || 0);
     var rent     = parseFloat(option.getAttribute('data-rent') || 0);
+    var depReq   = parseFloat(option.getAttribute('data-deposit-required') || 0);
+    var depPaid  = parseFloat(option.getAttribute('data-deposit-paid') || 0);
+
+    currentTenantData = { balance: balance, rent: rent, depReq: depReq, depPaid: depPaid };
 
     document.getElementById('tenant-panel').style.display = 'block';
-    document.getElementById('panel-avatar').textContent = name.split(' ').map(function(n){return n[0];}).join('').substring(0,2).toUpperCase();
-    document.getElementById('panel-name').textContent  = name;
-    document.getElementById('panel-unit').textContent  = 'Unit ' + unit + ' · ' + property;
-    document.getElementById('panel-rent').textContent    = '{{ currency_symbol() }} ' + rent.toLocaleString();
-    document.getElementById('panel-balance').textContent = '{{ currency_symbol() }} ' + balance.toLocaleString();
+    document.getElementById('panel-avatar').textContent   = name.split(' ').map(function(n){return n[0];}).join('').substring(0,2).toUpperCase();
+    document.getElementById('panel-name').textContent     = name;
+    document.getElementById('panel-unit').textContent     = 'Unit ' + unit + ' · ' + property;
+    document.getElementById('panel-rent').textContent     = '{{ currency_symbol() }} ' + rent.toLocaleString();
+    document.getElementById('panel-balance').textContent  = '{{ currency_symbol() }} ' + balance.toLocaleString();
+    document.getElementById('panel-deposit').textContent  = '{{ currency_symbol() }} ' + depReq.toLocaleString();
+    document.getElementById('panel-deposit-paid').textContent = '{{ currency_symbol() }} ' + depPaid.toLocaleString();
 
+    onTypeChange(document.querySelector('input[name="payment_type"]:checked')?.value || 'rent');
+}
+
+function onTypeChange(type) {
+    var note        = document.getElementById('panel-note');
     var amountInput = document.getElementById('payment-amount');
-    if (!amountInput.value && balance > 0) amountInput.value = balance;
+    var depRows     = [document.getElementById('panel-deposit-row'), document.getElementById('panel-deposit-paid-row')];
+
+    if (type === 'deposit') {
+        note.textContent = 'Deposit payments are held securely and are not allocated to invoices.';
+        depRows.forEach(r => r.style.display = 'flex');
+        if (currentTenantData.depReq && !amountInput.value) {
+            amountInput.value = Math.max(0, currentTenantData.depReq - currentTenantData.depPaid);
+        }
+    } else if (type === 'rent') {
+        note.textContent = 'Payment will be automatically allocated to the oldest unpaid invoice first.';
+        depRows.forEach(r => r.style.display = 'none');
+        if (currentTenantData.balance && !amountInput.value) {
+            amountInput.value = currentTenantData.balance;
+        }
+    } else {
+        note.textContent = 'Payment will be recorded but not automatically allocated.';
+        depRows.forEach(r => r.style.display = 'none');
+    }
 }
 </script>
 </x-layouts.app>

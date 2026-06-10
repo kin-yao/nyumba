@@ -50,6 +50,7 @@ class PaymentController extends Controller
     {
         $validated = $request->validate([
             'tenant_id'    => ['required', 'exists:tenants,id'],
+            'payment_type' => ['required', 'in:rent,deposit,other'],
             'amount'       => ['required', 'numeric', 'min:1'],
             'payment_date' => ['required', 'date'],
             'method'       => ['required', 'in:mpesa,cash,bank,cheque'],
@@ -59,30 +60,30 @@ class PaymentController extends Controller
 
         $tenant      = Tenant::with('activeLease.unit.property')->find($validated['tenant_id']);
         $activeLease = $tenant->activeLease;
+        $isDeposit   = $validated['payment_type'] === 'deposit';
 
         $fullyPaidInvoices = collect();
         $newBalance        = 0;
 
-        // ── Wrap everything in a transaction ─────────────────────────────
         $payment = DB::transaction(function () use (
-            $validated, $tenant, $activeLease,
+            $validated, $tenant, $activeLease, $isDeposit,
             &$fullyPaidInvoices, &$newBalance
         ) {
-            // Create the payment record
             $payment = Payment::create([
                 'account_id'   => auth()->user()->account_id,
                 'tenant_id'    => $validated['tenant_id'],
                 'lease_id'     => $activeLease?->id,
                 'amount'       => $validated['amount'],
+                'payment_type' => $validated['payment_type'],
                 'payment_date' => $validated['payment_date'],
                 'method'       => $validated['method'],
                 'reference'    => $validated['reference'] ?? null,
                 'notes'        => $validated['notes'] ?? null,
-                'is_allocated' => false,
+                'is_allocated' => $isDeposit ? false : false,
             ]);
 
-            // Allocate to oldest unpaid invoices first
-            if ($activeLease) {
+            // Deposits are never allocated to invoices — they are held security
+            if (!$isDeposit && $activeLease) {
                 $outstanding = $activeLease->invoices()
                     ->whereIn('status', ['sent', 'partial', 'overdue'])
                     ->orderBy('invoice_date')
@@ -125,36 +126,65 @@ class PaymentController extends Controller
 
                 $payment->update(['is_allocated' => true]);
 
-                // Compute fresh balance inside the transaction
+                // Compute fresh balance — rent payments only
                 $activeLease->load(['invoices', 'payments']);
                 $newBalance = floatval($activeLease->invoices->sum('total_amount'))
-                            - floatval($activeLease->payments->sum('amount'));
+                            - floatval($activeLease->payments->where('payment_type', '!=', 'deposit')->sum('amount'));
             }
 
             return $payment;
         });
-        // ─────────────────────────────────────────────────────────────────
 
         AuditService::log(
             'payment.recorded',
-            'Payment of ' . currency($validated['amount']) . ' recorded for ' . $tenant->full_name,
+            ucfirst($validated['payment_type']) . ' payment of ' . currency($validated['amount']) . ' recorded for ' . $tenant->full_name,
             $payment,
             [
-                'amount'    => $validated['amount'],
-                'method'    => $validated['method'],
-                'reference' => $validated['reference'] ?? null,
-                'balance'   => $newBalance,
+                'amount'       => $validated['amount'],
+                'payment_type' => $validated['payment_type'],
+                'method'       => $validated['method'],
+                'reference'    => $validated['reference'] ?? null,
+                'balance'      => $newBalance,
             ]
         );
 
-        // SMS confirmation — runs outside the transaction intentionally
-        $this->sendPaymentConfirmationSms(
-            $tenant, $payment, $fullyPaidInvoices, $newBalance,
-            auth()->user()->account
-        );
+        if (!$isDeposit) {
+            $this->sendPaymentConfirmationSms(
+                $tenant, $payment, $fullyPaidInvoices, $newBalance,
+                auth()->user()->account
+            );
+        } else {
+            $this->sendDepositConfirmationSms($tenant, $payment, auth()->user()->account);
+        }
+
+        $label = $isDeposit ? 'Deposit' : 'Payment';
 
         return redirect()->route('payments.index')
-            ->with('success', 'Payment of ' . currency($validated['amount']) . ' recorded successfully.');
+            ->with('success', $label . ' of ' . currency($validated['amount']) . ' recorded successfully.');
+    }
+
+    private function sendDepositConfirmationSms(Tenant $tenant, Payment $payment, $account): void
+    {
+        if (!$tenant->phone) return;
+
+        $sms = new SmsService($account);
+        if (!$sms->hasCredits()) return;
+
+        $activeLease = $tenant->activeLease;
+        $unit        = $activeLease?->unit;
+        $property    = $unit?->property;
+
+        $message =
+            'DEPOSIT RECEIVED - ' . strtoupper($property?->name ?? '') . "\n" .
+            'Tenant: ' . $tenant->full_name . "\n" .
+            'Unit: ' . ($unit?->name ?? '') . "\n" .
+            'Amount: KES ' . number_format($payment->amount) . ' (' . strtoupper($payment->method) . ')' . "\n" .
+            ($payment->reference ? 'Ref: ' . $payment->reference . "\n" : '') .
+            'Date: ' . \Carbon\Carbon::parse($payment->payment_date)->format('d M Y') . "\n" .
+            'Your deposit has been received and is held securely.' . "\n" .
+            'Powered by Nyumba.';
+
+        $sms->send($tenant->phone, $message, $tenant->id);
     }
 
     private function sendPaymentConfirmationSms(

@@ -24,7 +24,6 @@ class ReportController extends Controller
         $year        = (int) $request->input('year', now()->year);
         $propertyIds = $this->filteredPropertyIds();
 
-        // Eager-load invoices filtered to the selected period only
         $properties = Property::whereIn('id', $propertyIds)
             ->with([
                 'units.activeLease.tenant',
@@ -43,11 +42,9 @@ class ReportController extends Controller
                 $invoice = $unit->activeLease->invoices->first();
 
                 if ($invoice) {
-                    // Use actual invoice total (rent + utilities) as expected
                     $totalExpected  += floatval($invoice->total_amount);
                     $totalCollected += floatval($invoice->amount_paid);
                 } else {
-                    // No invoice issued yet this period — use monthly rent as expected
                     $totalExpected += floatval($unit->activeLease->monthly_rent);
                 }
             }
@@ -75,9 +72,15 @@ class ReportController extends Controller
             ->get()
             ->map(function ($lease) {
                 $totalCharged = floatval($lease->invoices->sum('total_amount'));
-                $totalPaid    = floatval($lease->payments->sum('amount'));
-                $balance      = $totalCharged - $totalPaid;
-                $lastPayment  = $lease->payments->sortByDesc('payment_date')->first();
+                // Exclude deposits from balance calculation
+                $totalPaid    = floatval(
+                    $lease->payments->where('payment_type', '!=', 'deposit')->sum('amount')
+                );
+                $balance     = $totalCharged - $totalPaid;
+                $lastPayment = $lease->payments
+                    ->where('payment_type', '!=', 'deposit')
+                    ->sortByDesc('payment_date')
+                    ->first();
 
                 return [
                     'tenant'       => $lease->tenant,
@@ -103,10 +106,12 @@ class ReportController extends Controller
     {
         $month    = (int) $request->input('month', now()->month);
         $year     = (int) $request->input('year', now()->year);
-        $leaseIds = $this->filteredLeaseIds(); // uses base Controller method
+        $leaseIds = $this->filteredLeaseIds();
 
+        // Exclude deposits — collections report is rent income only
         $payments = Payment::with(['tenant', 'lease.unit.property'])
             ->whereIn('lease_id', $leaseIds)
+            ->where('payment_type', '!=', 'deposit')
             ->whereMonth('payment_date', $month)
             ->whereYear('payment_date', $year)
             ->get();
@@ -129,10 +134,12 @@ class ReportController extends Controller
         $month       = (int) $request->input('month', now()->month);
         $year        = (int) $request->input('year', now()->year);
         $propertyIds = $this->filteredPropertyIds();
-        $leaseIds    = $this->filteredLeaseIds(); // uses base Controller method
+        $leaseIds    = $this->filteredLeaseIds();
 
+        // Exclude deposits — income is rent/utilities only
         $totalIncome = floatval(
             Payment::whereIn('lease_id', $leaseIds)
+                ->where('payment_type', '!=', 'deposit')
                 ->whereMonth('payment_date', $month)
                 ->whereYear('payment_date', $year)
                 ->sum('amount')
@@ -150,7 +157,6 @@ class ReportController extends Controller
             ->map(fn($g) => floatval($g->sum('amount')))
             ->sortByDesc(fn($v) => $v);
 
-        // $payments variable holds the income total for view compatibility
         $payments = $totalIncome;
 
         return view('reports.income-expenses', compact(
@@ -191,6 +197,7 @@ class ReportController extends Controller
                                 'reference'   => $invoice->reference,
                                 'charged'     => floatval($item->amount),
                                 'paid'        => null,
+                                'type'        => 'charge',
                             ]);
                         }
                     }
@@ -198,17 +205,25 @@ class ReportController extends Controller
                     foreach ($activeLease->payments as $payment) {
                         $ledger->push([
                             'date'        => $payment->payment_date,
-                            'description' => 'Payment received',
+                            'description' => $payment->payment_type === 'deposit'
+                                ? 'Deposit received'
+                                : 'Payment received',
                             'reference'   => $payment->reference ?? strtoupper($payment->method),
                             'charged'     => null,
                             'paid'        => floatval($payment->amount),
+                            'type'        => $payment->payment_type,
                         ]);
                     }
 
                     $ledger = $ledger->sortBy('date')->values();
 
-                    $balance = floatval($activeLease->invoices->sum('total_amount'))
-                             - floatval($activeLease->payments->sum('amount'));
+                    // Balance only counts rent payments, not deposits
+                    $rentPaid = floatval(
+                        $activeLease->payments
+                            ->where('payment_type', '!=', 'deposit')
+                            ->sum('amount')
+                    );
+                    $balance = floatval($activeLease->invoices->sum('total_amount')) - $rentPaid;
                 }
             }
         }
@@ -251,6 +266,73 @@ class ReportController extends Controller
         return view('reports.occupancy', compact(
             'summary', 'totalUnits', 'totalOccupied',
             'totalVacant', 'overallRate'
+        ));
+    }
+
+    public function deposits(Request $request)
+    {
+        $propertyId  = $request->input('property_id');
+        $propertyIds = $this->filteredPropertyIds();
+        $unitIds     = $this->filteredUnitIds();
+
+        $properties = Property::whereIn('id', $propertyIds)->get();
+
+        // All deposit payments for this account's leases
+        $leaseIds = Lease::whereIn('unit_id', $unitIds)->pluck('id');
+
+        $depositPayments = Payment::with(['tenant', 'lease.unit.property'])
+            ->whereIn('lease_id', $leaseIds)
+            ->where('payment_type', 'deposit')
+            ->when($propertyId, fn($q) =>
+                $q->whereHas('lease.unit', fn($q2) =>
+                    $q2->where('property_id', $propertyId)
+                )
+            )
+            ->latest('payment_date')
+            ->get();
+
+        // Leases with deposit info from the lease record
+        $leases = Lease::with(['tenant', 'unit.property'])
+            ->whereIn('unit_id', $unitIds)
+            ->where('status', 'active')
+            ->when($propertyId, fn($q) =>
+                $q->whereHas('unit', fn($q2) =>
+                    $q2->where('property_id', $propertyId)
+                )
+            )
+            ->get()
+            ->map(function ($lease) use ($leaseIds) {
+                $paidViaPayments = floatval(
+                    Payment::where('lease_id', $lease->id)
+                        ->where('payment_type', 'deposit')
+                        ->sum('amount')
+                );
+
+                return [
+                    'lease'            => $lease,
+                    'tenant'           => $lease->tenant,
+                    'unit'             => $lease->unit,
+                    'property'         => $lease->unit->property,
+                    'required'         => floatval($lease->deposit_required ?? 0),
+                    'paid_on_lease'    => floatval($lease->deposit_paid ?? 0),
+                    'paid_via_payments'=> $paidViaPayments,
+                    'outstanding'      => max(0, floatval($lease->deposit_required ?? 0) - floatval($lease->deposit_paid ?? 0)),
+                    'status'           => floatval($lease->deposit_paid ?? 0) <= 0
+                        ? 'unpaid'
+                        : (floatval($lease->deposit_paid ?? 0) >= floatval($lease->deposit_required ?? 0)
+                            ? 'paid'
+                            : 'partial'),
+                ];
+            });
+
+        $totalRequired   = $leases->sum('required');
+        $totalHeld       = $leases->sum('paid_on_lease');
+        $totalOutstanding = $leases->sum('outstanding');
+
+        return view('reports.deposits', compact(
+            'leases', 'depositPayments', 'properties',
+            'totalRequired', 'totalHeld', 'totalOutstanding',
+            'propertyId'
         ));
     }
 }

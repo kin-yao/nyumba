@@ -167,6 +167,7 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
     Route::get('/reports/income-expenses', [ReportController::class, 'incomeExpenses'])->name('reports.income-expenses');
     Route::get('/reports/tenant-statement', [ReportController::class, 'tenantStatement'])->name('reports.tenant-statement');
     Route::get('/reports/occupancy', [ReportController::class, 'occupancy'])->name('reports.occupancy');
+    Route::get('/reports/deposits', [ReportController::class, 'deposits'])->name('reports.deposits');
 
     // Communications
     Route::get('/communications', [CommunicationController::class, 'index'])->name('communications.index');

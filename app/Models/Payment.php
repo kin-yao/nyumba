@@ -16,6 +16,7 @@ class Payment extends Model
         'tenant_id',
         'amount',
         'payment_date',
+        'payment_type',
         'method',
         'reference',
         'mpesa_transaction_id',

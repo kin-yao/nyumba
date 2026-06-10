@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Models\Lease;
@@ -27,11 +26,8 @@ class ImportController extends Controller
                 'first_name','last_name','phone','alt_phone','id_number','email',
                 'move_in_date','lease_end_date','deposit_paid','deposit_method','notes'
             ],
-            // Occupied unit example
-            ['A1','1 bedroom','15000','30000','John','Doe','0712345678','','12345678','john@example.com','2024-01-01','','30000','mpesa',''],
-            // Occupied with lease end date
-            ['A2','2 bedroom','20000','40000','Jane','Smith','0787654321','0711111111','','jane@example.com','2024-03-01','2025-02-28','40000','cash','Fixed term'],
-            // Vacant unit — leave tenant columns blank
+            ['A1','1 bedroom','15000','30000','John','Doe','0712345678','0722345678','12345678','john@example.com','01/01/2024','31/12/2025','30000','mpesa',''],
+            ['A2','2 bedroom','20000','40000','Jane','Smith','0787654321','','','jane@example.com','01/03/2024','','40000','cash','Fixed term'],
             ['B1','Bedsitter','8000','16000','','','','','','','','','','','Vacant'],
         ];
 
@@ -44,6 +40,60 @@ class ImportController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    // ── Parse date — handles dd/mm/yyyy, d/m/yyyy, yyyy-mm-dd ────────────
+    private function parseDate(string $value): ?\Carbon\Carbon
+    {
+        $value = trim($value);
+        if (empty($value)) return null;
+
+        if (preg_match('#^\d{1,2}/\d{1,2}/\d{4}$#', $value)) {
+            [$d, $m, $y] = explode('/', $value);
+            return \Carbon\Carbon::createFromDate((int)$y, (int)$m, (int)$d);
+        }
+
+        try {
+            return \Carbon\Carbon::parse($value);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    // ── Normalize any phone format to 07XXXXXXXX ──────────────────────────
+    private function normalizePhone(string $phone): string
+    {
+        $phone = trim($phone);
+
+        // Handle Excel scientific notation e.g. 2.54722E+11 → 254722345678
+        if (preg_match('/^[\d.]+[eE][+\-]?\d+$/', $phone)) {
+            $phone = number_format((float)$phone, 0, '.', '');
+        }
+
+        // +254XXXXXXXXX → 07XXXXXXXX
+        if (str_starts_with($phone, '+254') && strlen($phone) === 13) {
+            return '0' . substr($phone, 4);
+        }
+
+        // 254XXXXXXXXX → 07XXXXXXXX
+        if (str_starts_with($phone, '254') && strlen($phone) === 12) {
+            return '0' . substr($phone, 3);
+        }
+
+        // 7XXXXXXXXX (9 digits, Excel stripped leading 0) → 07XXXXXXXX
+        if (preg_match('/^7[0-9]{8}$/', $phone)) {
+            return '0' . $phone;
+        }
+
+        // Already 07XXXXXXXX
+        return $phone;
+    }
+
+    // ── Validate phone — only 07XXXXXXXX accepted ─────────────────────────
+    private function isValidPhone(string $phone): bool
+    {
+        $normalized = $this->normalizePhone(trim($phone));
+        return (bool) preg_match('/^07[0-9]{8}$/', $normalized);
     }
 
     // ── Parse CSV and show preview ────────────────────────────────────────
@@ -63,13 +113,11 @@ class ImportController extends Controller
             return back()->with('error', 'Could not read the CSV file. Make sure it is a valid CSV.');
         }
 
-        // Normalize header keys
         $header = array_map(
             fn($h) => strtolower(trim(str_replace([' ', '-'], '_', $h))),
             $header
         );
 
-        // Check required columns exist
         $required = ['unit_name', 'unit_type', 'rent_amount', 'deposit_amount'];
         $missing  = array_diff($required, $header);
 
@@ -80,7 +128,6 @@ class ImportController extends Controller
             );
         }
 
-        // Existing unit names for this property (for duplicate detection)
         $existingUnits = Unit::where('property_id', $property->id)
             ->pluck('name')
             ->map(fn($n) => strtolower(trim($n)))
@@ -92,10 +139,8 @@ class ImportController extends Controller
         while (($data = fgetcsv($handle)) !== false) {
             $rowNumber++;
 
-            // Skip blank rows
             if (count(array_filter($data, fn($v) => trim($v) !== '')) === 0) continue;
 
-            // Map columns to keys
             $row = [];
             foreach ($header as $i => $key) {
                 $row[$key] = trim($data[$i] ?? '');
@@ -125,7 +170,7 @@ class ImportController extends Controller
                 $warnings[] = 'Unit "' . $row['unit_name'] . '" already exists in this property — will be skipped';
             }
 
-            // ── Tenant validation (only if name provided) ────────────────
+            // ── Tenant validation ────────────────────────────────────────
             $hasTenant = !empty($row['first_name']) || !empty($row['last_name']);
 
             if ($hasTenant) {
@@ -135,17 +180,32 @@ class ImportController extends Controller
                 if (empty($row['last_name'])) {
                     $errors[] = 'Last name is required when adding a tenant';
                 }
+
                 if (empty($row['phone'])) {
                     $errors[] = 'Tenant phone number is required';
+                } elseif (!$this->isValidPhone($row['phone'])) {
+                    $errors[] = 'Phone "' . $row['phone'] . '" must be a valid Kenyan number starting with 07 (e.g. 0712345678)';
                 }
+
+                if (!empty($row['alt_phone']) && !$this->isValidPhone($row['alt_phone'])) {
+                    $warnings[] = 'Alt phone "' . $row['alt_phone'] . '" is not a valid format — it will be skipped';
+                    if ($status === 'ready') $status = 'warning';
+                }
+
                 if (empty($row['move_in_date'])) {
                     $warnings[] = 'Move-in date missing — today\'s date will be used';
                     if ($status === 'ready') $status = 'warning';
                 } else {
-                    try {
-                        \Carbon\Carbon::parse($row['move_in_date']);
-                    } catch (\Exception $e) {
-                        $errors[] = 'Move-in date "' . $row['move_in_date'] . '" is not a valid date (use YYYY-MM-DD)';
+                    $parsed = $this->parseDate($row['move_in_date']);
+                    if (!$parsed) {
+                        $errors[] = 'Move-in date "' . $row['move_in_date'] . '" is not valid. Use dd/mm/yyyy (e.g. 01/03/2024)';
+                    }
+                }
+
+                if (!empty($row['lease_end_date'])) {
+                    $parsed = $this->parseDate($row['lease_end_date']);
+                    if (!$parsed) {
+                        $errors[] = 'Lease end date "' . $row['lease_end_date'] . '" is not valid. Use dd/mm/yyyy (e.g. 31/12/2025)';
                     }
                 }
 
@@ -160,7 +220,6 @@ class ImportController extends Controller
                 }
             }
 
-            // Set final status
             if (!empty($errors) && $status !== 'skip') {
                 $status = 'error';
             }
@@ -173,8 +232,9 @@ class ImportController extends Controller
                 'deposit_amount' => $row['deposit_amount'] ?? '',
                 'first_name'     => $row['first_name']     ?? '',
                 'last_name'      => $row['last_name']      ?? '',
-                'phone'          => $row['phone']          ?? '',
-                'alt_phone'      => $row['alt_phone']      ?? '',
+                // Normalize phone at parse time so preview matches what gets saved
+                'phone'          => !empty($row['phone'])     ? $this->normalizePhone($row['phone'])     : '',
+                'alt_phone'      => !empty($row['alt_phone']) ? $this->normalizePhone($row['alt_phone']) : '',
                 'id_number'      => $row['id_number']      ?? '',
                 'email'          => $row['email']          ?? '',
                 'move_in_date'   => $row['move_in_date']   ?? '',
@@ -221,12 +281,10 @@ class ImportController extends Controller
                 ->with('error', 'Import session expired. Please upload the CSV again.');
         }
 
-        // Count how many new units would be created
         $newUnitsCount = collect($rows)->filter(
             fn($r) => !in_array($r['status'], ['error', 'skip'])
         )->count();
 
-        // Unit limit check
         $account      = auth()->user()->account;
         $currentCount = Unit::whereIn('property_id',
             Property::where('account_id', $account->id)->pluck('id')
@@ -278,25 +336,34 @@ class ImportController extends Controller
                         'deposit_amount' => floatval($row['deposit_amount']),
                         'status'         => $row['has_tenant'] ? 'occupied' : 'vacant',
                     ]);
+
                     $unitsCreated++;
 
                     if ($row['has_tenant']) {
+                        // Phones already normalized at preview time — stored in session
+                        $altPhone = !empty($row['alt_phone']) ? $row['alt_phone'] : null;
+
                         $tenant = Tenant::create([
                             'account_id' => auth()->user()->account_id,
                             'first_name' => $row['first_name'],
                             'last_name'  => $row['last_name'],
                             'phone'      => $row['phone'],
-                            'alt_phone'  => $row['alt_phone']  ?: null,
-                            'id_number'  => $row['id_number']  ?: null,
-                            'email'      => $row['email']      ?: null,
+                            'alt_phone'  => $altPhone,
+                            'id_number'  => $row['id_number'] ?: null,
+                            'email'      => $row['email']     ?: null,
                         ]);
 
                         $moveInDate = !empty($row['move_in_date'])
-                            ? \Carbon\Carbon::parse($row['move_in_date'])->toDateString()
+                            ? $this->parseDate($row['move_in_date'])->toDateString()
                             : now()->toDateString();
+
+                        $leaseEndDate = !empty($row['lease_end_date'])
+                            ? $this->parseDate($row['lease_end_date'])?->toDateString()
+                            : null;
 
                         $depositPaid   = floatval($row['deposit_paid'] ?? 0);
                         $depositMethod = strtolower($row['deposit_method'] ?? 'cash');
+
                         if (!in_array($depositMethod, ['mpesa','cash','bank','cheque'])) {
                             $depositMethod = 'cash';
                         }
@@ -305,9 +372,7 @@ class ImportController extends Controller
                             'unit_id'          => $unit->id,
                             'tenant_id'        => $tenant->id,
                             'move_in_date'     => $moveInDate,
-                            'lease_end_date'   => !empty($row['lease_end_date'])
-                                ? \Carbon\Carbon::parse($row['lease_end_date'])->toDateString()
-                                : null,
+                            'lease_end_date'   => $leaseEndDate,
                             'monthly_rent'     => floatval($row['rent_amount']),
                             'deposit_required' => floatval($row['deposit_amount']),
                             'deposit_paid'     => $depositPaid,
@@ -321,6 +386,7 @@ class ImportController extends Controller
                                 'tenant_id'    => $tenant->id,
                                 'lease_id'     => $lease->id,
                                 'amount'       => $depositPaid,
+                                'payment_type' => 'deposit',
                                 'payment_date' => $moveInDate,
                                 'method'       => $depositMethod,
                                 'reference'    => null,
@@ -359,6 +425,7 @@ class ImportController extends Controller
         $msg = $unitsCreated . ' ' . Str::plural('unit', $unitsCreated)
             . ' and ' . $tenantsCreated . ' ' . Str::plural('tenant', $tenantsCreated)
             . ' imported successfully into ' . $property->name . '.';
+
         if ($skipped > 0) $msg .= ' ' . $skipped . ' skipped.';
         if ($failed  > 0) $msg .= ' ' . $failed  . ' failed.';
 
