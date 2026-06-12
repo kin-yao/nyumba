@@ -16,6 +16,10 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\CheckSubscription::class,
         ]);
 
+        $middleware->validateCsrfTokens(except: [
+            'mpesa/stk/callback',
+        ]);
+
         $middleware->alias([
             'subscription'   => \App\Http\Middleware\CheckSubscription::class,
             'email.verified' => \App\Http\Middleware\RequireEmailVerification::class,
