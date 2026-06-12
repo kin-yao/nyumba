@@ -102,6 +102,44 @@
         border-radius: 12px;
     }
 }
+
+/* Billing cycle toggle */
+.cycle-toggle {
+    display: inline-flex;
+    background: #f5f4f0;
+    border-radius: 8px;
+    padding: 3px;
+    margin-bottom: 14px;
+}
+.cycle-toggle button {
+    padding: 6px 16px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    color: #8a8880;
+    transition: all .15s;
+}
+.cycle-toggle button.active {
+    background: #fff;
+    color: #1a6b52;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* STK push spinner */
+.stk-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgba(26,107,82,0.15);
+    border-top-color: #1a6b52;
+    border-radius: 50%;
+    animation: stkspin 0.8s linear infinite;
+    margin: 0 auto 14px;
+}
+@keyframes stkspin { to { transform: rotate(360deg); } }
 </style>
 
 <div class="set-wrap">
@@ -466,6 +504,12 @@
                     Subscription and Billing
                 </div>
 
+                @if(session('mpesa_message'))
+                    <div style="background:#e6f2ed;border:1px solid #a7d7c5;border-radius:10px;padding:11px 15px;margin-bottom:16px;font-size:13px;color:#166534">
+                        {{ session('mpesa_message') }}
+                    </div>
+                @endif
+
                 {{-- Current plan --}}
                 <div style="background:#fff;border-radius:10px;border:1px solid {{ $account->isExpired()?'#fca5a5':'#1a6b52' }};border-left-width:3px;padding:20px;max-width:560px;margin-bottom:20px">
                     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(0,0,0,0.07);flex-wrap:wrap;gap:8px">
@@ -502,26 +546,48 @@
                 </div>
 
                 {{-- Plans --}}
-                <div style="font-size:13px;font-weight:500;margin-bottom:12px">Available plans</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+                    <div style="font-size:13px;font-weight:500">Available plans</div>
+                    <div class="cycle-toggle">
+                        <button type="button" class="active" id="cycle-monthly" onclick="setCycle('monthly')">Monthly</button>
+                        <button type="button" id="cycle-yearly" onclick="setCycle('yearly')">Yearly</button>
+                    </div>
+                </div>
+
                 <div class="plans-grid">
-                    @foreach([
-                        'starter'=>['monthly'=>'KES 2,000','yearly'=>'KES 14,000','saving'=>'Save 2 months'],
-                        'growth' =>['monthly'=>'KES 4,500','yearly'=>'KES 31,500','saving'=>'Save 2 months'],
-                        'pro'    =>['monthly'=>'KES 7,000','yearly'=>'KES 49,000','saving'=>'Save 2 months'],
-                    ] as $planKey=>$prices)
-                        @php $plan = \App\Models\Account::PLANS[$planKey]; @endphp
-                        <div style="background:#fff;border-radius:10px;border:2px solid {{ $account->plan===$planKey?'#1a6b52':'rgba(0,0,0,0.07)' }};padding:16px;position:relative">
-                            @if($account->plan===$planKey)
+                    @foreach(['starter','growth','pro'] as $planKey)
+                        @php
+                            $plan       = \App\Models\Account::PLANS[$planKey];
+                            $isCurrent  = $account->plan === $planKey;
+                            $canUpgrade = !$account->isOnTrial() ? true : true; // always purchasable
+                        @endphp
+                        <div style="background:#fff;border-radius:10px;border:2px solid {{ $isCurrent?'#1a6b52':'rgba(0,0,0,0.07)' }};padding:16px;position:relative">
+                            @if($isCurrent)
                                 <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#1a6b52;color:#fff;font-size:10px;font-weight:600;padding:2px 10px;border-radius:10px;white-space:nowrap">CURRENT</div>
                             @endif
                             <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:#8a8880;margin-bottom:6px">{{ $plan['name'] }}</div>
-                            <div style="font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:2px">{{ $prices['monthly'] }}</div>
-                            <div style="font-size:11px;color:#8a8880;margin-bottom:6px">per month</div>
-                            <div style="font-size:11px;color:#1a6b52;font-weight:500;margin-bottom:10px">{{ $prices['yearly'] }}/yr &middot; {{ $prices['saving'] }}</div>
-                            <div style="border-top:1px solid rgba(0,0,0,0.06);padding-top:10px;font-size:12px;display:grid;gap:3px;color:#8a8880">
+
+                            <div class="price-monthly">
+                                <div style="font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:2px">{{ currency($plan['price_monthly']) }}</div>
+                                <div style="font-size:11px;color:#8a8880;margin-bottom:6px">per month</div>
+                            </div>
+                            <div class="price-yearly" style="display:none">
+                                <div style="font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:2px">{{ currency($plan['price_yearly']) }}</div>
+                                <div style="font-size:11px;color:#8a8880;margin-bottom:6px">per year</div>
+                            </div>
+
+                            <div style="font-size:11px;color:#1a6b52;font-weight:500;margin-bottom:10px">Save 2 months on yearly</div>
+
+                            <div style="border-top:1px solid rgba(0,0,0,0.06);padding-top:10px;font-size:12px;display:grid;gap:3px;color:#8a8880;margin-bottom:12px">
                                 <div>Up to {{ $plan['unit_limit'] }} units</div>
                                 <div>{{ $plan['sms_credits_monthly'] }} SMS/month</div>
                             </div>
+
+                            <button type="button"
+                                    onclick="openUpgradeModal('{{ $planKey }}', '{{ $plan['name'] }}')"
+                                    style="width:100%;padding:7px;background:{{ $isCurrent?'transparent':'#1a6b52' }};color:{{ $isCurrent?'#1a6b52':'#fff' }};border:1px solid #1a6b52;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                                {{ $isCurrent ? 'Renew / Extend' : 'Upgrade' }}
+                            </button>
                         </div>
                     @endforeach
                 </div>
@@ -546,8 +612,13 @@
                 </div>
 
                 <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:16px 18px;max-width:700px;font-size:13px">
-                    <div style="font-weight:500;margin-bottom:6px">How to upgrade or renew</div>
-                    <div style="color:#8a8880;line-height:1.7;margin-bottom:10px">Send your payment via M-Pesa and contact us. We activate accounts within minutes during business hours.</div>
+                    <div style="font-weight:500;margin-bottom:6px">Pay with M-Pesa</div>
+                    <div style="color:#8a8880;line-height:1.7;margin-bottom:10px">
+                        Click "Upgrade" on any plan above to pay instantly via M-Pesa STK push — your account is upgraded automatically the moment payment is confirmed.
+                    </div>
+                    <div style="color:#8a8880;line-height:1.7;margin-bottom:10px">
+                        Prefer to pay manually or need an Enterprise plan? Contact us:
+                    </div>
                     <div style="display:flex;gap:20px;flex-wrap:wrap">
                         <div>📞 <strong>{{ config('app.support_phone','0700 000 000') }}</strong></div>
                         <div>✉ <strong>{{ config('app.support_email','support@nyumba.co.ke') }}</strong></div>
@@ -641,6 +712,74 @@
     </div>
 </div>
 
+{{-- M-Pesa Upgrade Modal --}}
+<div id="upgrade-modal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:50;align-items:center;justify-content:center;padding:16px">
+    <div class="modal-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.07)">
+            <div style="font-size:15px;font-weight:500" id="upgrade-title">Upgrade plan</div>
+            <button onclick="closeUpgradeModal()"
+                    style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;line-height:1">&times;</button>
+        </div>
+
+        {{-- Step 1: phone entry --}}
+        <div id="upgrade-step-form">
+            <div style="background:#f5f4f0;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;display:flex;justify-content:space-between">
+                <span style="color:#8a8880">Amount to pay</span>
+                <span style="font-weight:500;font-family:'DM Serif Display',serif;font-size:16px" id="upgrade-amount">KES 0</span>
+            </div>
+
+            <div style="margin-bottom:16px">
+                <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">M-Pesa phone number</label>
+                <input type="text" id="upgrade-phone" placeholder="07XXXXXXXX"
+                       style="width:100%;height:40px;padding:0 12px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:14px;font-family:'DM Sans',sans-serif;outline:none">
+                <div id="upgrade-error" style="display:none;color:#b91c1c;font-size:12px;margin-top:6px"></div>
+            </div>
+
+            <button type="button" id="upgrade-pay-btn" onclick="initiateStkPush()"
+                    style="width:100%;padding:10px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                Pay with M-Pesa
+            </button>
+        </div>
+
+        {{-- Step 2: waiting for STK --}}
+        <div id="upgrade-step-waiting" style="display:none;text-align:center;padding:20px 0">
+            <div class="stk-spinner"></div>
+            <div style="font-size:14px;font-weight:500;margin-bottom:6px">Check your phone</div>
+            <div style="font-size:13px;color:#8a8880;line-height:1.6">
+                Enter your M-Pesa PIN on the prompt sent to <strong id="upgrade-phone-display"></strong> to complete payment.
+            </div>
+            <div style="font-size:12px;color:#8a8880;margin-top:14px" id="upgrade-waiting-status">Waiting for confirmation...</div>
+        </div>
+
+        {{-- Step 3: success --}}
+        <div id="upgrade-step-success" style="display:none;text-align:center;padding:20px 0">
+            <div style="font-size:36px;margin-bottom:10px">✅</div>
+            <div style="font-size:14px;font-weight:500;margin-bottom:6px">Payment successful</div>
+            <div style="font-size:13px;color:#8a8880;line-height:1.6;margin-bottom:18px">
+                Your plan has been upgraded. The page will refresh now.
+            </div>
+            <button type="button" onclick="window.location.reload()"
+                    style="padding:8px 20px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                Continue
+            </button>
+        </div>
+
+        {{-- Step 4: failed --}}
+        <div id="upgrade-step-failed" style="display:none;text-align:center;padding:20px 0">
+            <div style="font-size:36px;margin-bottom:10px">⚠️</div>
+            <div style="font-size:14px;font-weight:500;margin-bottom:6px">Payment not completed</div>
+            <div style="font-size:13px;color:#8a8880;line-height:1.6;margin-bottom:18px" id="upgrade-failed-desc">
+                The payment was cancelled or did not go through.
+            </div>
+            <button type="button" onclick="resetUpgradeModal()"
+                    style="padding:8px 20px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                Try again
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 function showPanel(id, el) {
     document.querySelectorAll('.sp').forEach(p => p.style.display = 'none');
@@ -679,6 +818,144 @@ function fixNavBorders() {
 }
 window.addEventListener('resize', fixNavBorders);
 fixNavBorders();
+
+// ── Billing cycle toggle ──────────────────────────────────────────────────
+var currentCycle = 'monthly';
+var planPrices = {
+    starter: { monthly: {{ \App\Models\Account::PLANS['starter']['price_monthly'] }}, yearly: {{ \App\Models\Account::PLANS['starter']['price_yearly'] }} },
+    growth:  { monthly: {{ \App\Models\Account::PLANS['growth']['price_monthly'] }},  yearly: {{ \App\Models\Account::PLANS['growth']['price_yearly'] }} },
+    pro:     { monthly: {{ \App\Models\Account::PLANS['pro']['price_monthly'] }},     yearly: {{ \App\Models\Account::PLANS['pro']['price_yearly'] }} },
+};
+var planNames = {
+    starter: '{{ \App\Models\Account::PLANS['starter']['name'] }}',
+    growth:  '{{ \App\Models\Account::PLANS['growth']['name'] }}',
+    pro:     '{{ \App\Models\Account::PLANS['pro']['name'] }}',
+};
+
+function setCycle(cycle) {
+    currentCycle = cycle;
+    document.getElementById('cycle-monthly').classList.toggle('active', cycle === 'monthly');
+    document.getElementById('cycle-yearly').classList.toggle('active', cycle === 'yearly');
+    document.querySelectorAll('.price-monthly').forEach(el => el.style.display = cycle === 'monthly' ? 'block' : 'none');
+    document.querySelectorAll('.price-yearly').forEach(el => el.style.display = cycle === 'yearly' ? 'block' : 'none');
+}
+
+// ── M-Pesa upgrade modal ─────────────────────────────────────────────────
+var selectedPlan = null;
+var pollTimer    = null;
+
+function openUpgradeModal(planKey, planName) {
+    selectedPlan = planKey;
+    document.getElementById('upgrade-title').textContent = 'Upgrade to ' + planName;
+    document.getElementById('upgrade-amount').textContent =
+        '{{ currency_symbol() }} ' + planPrices[planKey][currentCycle].toLocaleString() + ' / ' + (currentCycle === 'monthly' ? 'month' : 'year');
+    resetUpgradeModal();
+    document.getElementById('upgrade-modal').style.display = 'flex';
+}
+
+function closeUpgradeModal() {
+    document.getElementById('upgrade-modal').style.display = 'none';
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+function resetUpgradeModal() {
+    document.getElementById('upgrade-step-form').style.display     = 'block';
+    document.getElementById('upgrade-step-waiting').style.display  = 'none';
+    document.getElementById('upgrade-step-success').style.display  = 'none';
+    document.getElementById('upgrade-step-failed').style.display   = 'none';
+    document.getElementById('upgrade-error').style.display         = 'none';
+    document.getElementById('upgrade-pay-btn').disabled             = false;
+    document.getElementById('upgrade-pay-btn').textContent          = 'Pay with M-Pesa';
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+function initiateStkPush() {
+    var phone = document.getElementById('upgrade-phone').value.trim();
+    var errEl = document.getElementById('upgrade-error');
+
+    if (!/^(0[71][0-9]{8}|254[71][0-9]{8}|\+254[71][0-9]{8})$/.test(phone)) {
+        errEl.textContent = 'Enter a valid M-Pesa number, e.g. 0712345678';
+        errEl.style.display = 'block';
+        return;
+    }
+    errEl.style.display = 'none';
+
+    var btn = document.getElementById('upgrade-pay-btn');
+    btn.disabled = true;
+    btn.textContent = 'Sending request...';
+
+    fetch('{{ route('subscription.upgrade') }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+        },
+        body: JSON.stringify({
+            plan: selectedPlan,
+            billing_cycle: currentCycle,
+            phone: phone,
+        }),
+    })
+    .then(r => r.json().then(data => ({ ok: r.ok, data })))
+    .then(({ ok, data }) => {
+        if (!ok || !data.success) {
+            errEl.textContent = data.error || data.message || 'Could not start payment. Please try again.';
+            errEl.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Pay with M-Pesa';
+            return;
+        }
+
+        document.getElementById('upgrade-step-form').style.display = 'none';
+        document.getElementById('upgrade-step-waiting').style.display = 'block';
+        document.getElementById('upgrade-phone-display').textContent = phone;
+
+        pollStkStatus(data.checkout_request_id);
+    })
+    .catch(() => {
+        errEl.textContent = 'Network error. Please try again.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Pay with M-Pesa';
+    });
+}
+
+function pollStkStatus(checkoutRequestId) {
+    var attempts = 0;
+    var statusEl = document.getElementById('upgrade-waiting-status');
+
+    pollTimer = setInterval(function () {
+        attempts++;
+
+        if (attempts > 40) { // ~2 minutes at 3s intervals
+            clearInterval(pollTimer);
+            showFailed('Payment timed out. If you completed it on your phone, refresh the page in a moment.');
+            return;
+        }
+
+        fetch('{{ url('/subscription/status') }}/' + checkoutRequestId)
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    clearInterval(pollTimer);
+                    document.getElementById('upgrade-step-waiting').style.display = 'none';
+                    document.getElementById('upgrade-step-success').style.display = 'block';
+                } else if (data.status === 'failed' || data.status === 'cancelled') {
+                    clearInterval(pollTimer);
+                    showFailed(data.desc || 'The payment was cancelled or did not go through.');
+                } else {
+                    statusEl.textContent = 'Waiting for confirmation' + '.'.repeat((attempts % 3) + 1);
+                }
+            })
+            .catch(() => { /* keep polling on transient errors */ });
+    }, 3000);
+}
+
+function showFailed(message) {
+    document.getElementById('upgrade-step-waiting').style.display = 'none';
+    document.getElementById('upgrade-step-failed').style.display = 'block';
+    document.getElementById('upgrade-failed-desc').textContent = message;
+}
 </script>
 
 {{-- Reset Account Modal --}}

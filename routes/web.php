@@ -9,6 +9,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UtilityController;
@@ -25,6 +26,9 @@ Route::get('/', function () {
 Route::get('/invoices/{invoice}/download', [InvoiceController::class, 'publicPdf'])
     ->name('invoices.pdf.public')
     ->middleware('signed');
+
+// ─── M-Pesa STK callback — public, Safaricom calls this directly ──────────────
+Route::post('/mpesa/stk/callback', [SubscriptionController::class, 'callback'])->name('mpesa.stk.callback');
 
 // ─── Firebase auth endpoints ───────────────────────────────────────────────────
 Route::post('/auth/verify', [App\Http\Controllers\Auth\FirebaseAuthController::class, 'verify'])
@@ -114,6 +118,10 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
     Route::get('/audit', [App\Http\Controllers\AuditLogController::class, 'index'])->name('audit.index');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/subscription/expired', fn() => view('subscription.expired'))->name('subscription.expired');
+
+    // Subscription upgrades — M-Pesa STK push
+    Route::post('/subscription/upgrade', [SubscriptionController::class, 'initiate'])->name('subscription.upgrade');
+    Route::get('/subscription/status/{checkoutRequestId}', [SubscriptionController::class, 'status'])->name('subscription.status');
 
     // Properties + Units + Import
     Route::resource('properties', PropertyController::class)->only(['index', 'store', 'show', 'destroy']);
