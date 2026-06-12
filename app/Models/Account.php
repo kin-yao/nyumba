@@ -76,7 +76,7 @@ class Account extends Model
             'name'                => 'Starter',
             'unit_limit'          => 20,
             'sms_credits_monthly' => 80,
-            'price_monthly'       => 1,
+            'price_monthly'       => 2300,
             'price_yearly'        => 19300,
         ],
         'growth' => [
