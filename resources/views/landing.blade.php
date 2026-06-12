@@ -345,9 +345,9 @@ a{color:inherit;text-decoration:none}
     <div class="pricing-grid">
       @php
         $plans = [
-          ['Starter','KES 2,000','per month','For the new landlord moving off notebooks and onto schedule.',['Up to 20 units','50 SMS credits monthly','PDF invoices','Utility tracking'],false],
-          ['Growth','KES 4,500','per month','For the growing portfolio that should run without daily oversight.',['Up to 50 units','100 SMS credits monthly','Bulk invoicing','Advanced reports'],true],
-          ['Pro','KES 7,000','per month','For multiple buildings, caretaker teams and co-owners.',['Up to 100 units','200 SMS credits monthly','Multi-user access','Full audit trail'],false],
+          ['Starter','KES 2,300','per month','For the new landlord moving off notebooks and onto schedule.',['Up to 20 units','80 SMS credits monthly','PDF invoices','Utility tracking'],false],
+          ['Growth','KES 4,600','per month','For the growing portfolio that should run without daily oversight.',['Up to 50 units','200 SMS credits monthly','Bulk invoicing','Advanced reports'],true],
+          ['Pro','KES 7,500','per month','For multiple buildings, caretaker teams and co-owners.',['Up to 100 units','400 SMS credits monthly','Multi-user access','Full audit trail'],false],
           ['Enterprise','Custom','tailored to portfolio','For managers running 100+ units across many owners.',['Unlimited units','Custom SMS bundle','Dedicated support','API access'],false],
         ];
       @endphp
