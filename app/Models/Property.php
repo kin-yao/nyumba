@@ -24,6 +24,18 @@ class Property extends Model
         'business_number',
         'till_number',
         'account_format',
+        'mpesa_shortcode',
+        'mpesa_consumer_key',
+        'mpesa_consumer_secret',
+        'mpesa_nominated_number',
+        'mpesa_c2b_registered_at',
+        'mpesa_pull_registered_at',
+    ];
+
+    protected $casts = [
+        'mpesa_consumer_secret'    => 'encrypted',
+        'mpesa_c2b_registered_at'  => 'datetime',
+        'mpesa_pull_registered_at' => 'datetime',
     ];
 
     public function units()
@@ -71,5 +83,12 @@ class Property extends Model
     public function hasPaymentConfig(): bool
     {
         return !empty($this->payment_type);
+    }
+
+    public function hasMpesaCredentials(): bool
+    {
+        return !empty($this->mpesa_shortcode)
+            && !empty($this->mpesa_consumer_key)
+            && !empty($this->mpesa_consumer_secret);
     }
 }

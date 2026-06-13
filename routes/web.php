@@ -30,6 +30,10 @@ Route::get('/invoices/{invoice}/download', [InvoiceController::class, 'publicPdf
 // ─── M-Pesa STK callback — public, Safaricom calls this directly ──────────────
 Route::post('/mpesa/stk/callback', [SubscriptionController::class, 'callback'])->name('mpesa.stk.callback');
 
+// ─── M-Pesa C2B webhooks — public, Safaricom calls these directly ─────────
+Route::post('/mpesa/c2b/{property}/confirmation', [App\Http\Controllers\MpesaC2BController::class, 'confirmation'])->name('mpesa.c2b.confirmation');
+Route::post('/mpesa/c2b/{property}/validation', [App\Http\Controllers\MpesaC2BController::class, 'validation'])->name('mpesa.c2b.validation');
+
 // ─── Firebase auth endpoints ───────────────────────────────────────────────────
 Route::post('/auth/verify', [App\Http\Controllers\Auth\FirebaseAuthController::class, 'verify'])
     ->name('auth.verify');
@@ -90,6 +94,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/accounts/{account}/top-up-sms',  [App\Http\Controllers\AdminController::class, 'topUpSms'])->name('account.top-up-sms');
     Route::post('/accounts/{account}/impersonate', [App\Http\Controllers\AdminController::class, 'impersonate'])->name('account.impersonate');
     Route::delete('/accounts/{account}',           [App\Http\Controllers\AdminController::class, 'deleteAccount'])->name('account.delete');
+    Route::post('/accounts/{account}/properties/{property}/mpesa-register', [App\Http\Controllers\MpesaC2BController::class, 'register'])->name('account.property.mpesa-register');
 
     // Impersonation
     Route::post('/stop-impersonating', [App\Http\Controllers\AdminController::class, 'stopImpersonating'])->name('stop-impersonating');

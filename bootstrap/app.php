@@ -18,6 +18,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->validateCsrfTokens(except: [
             'mpesa/stk/callback',
+            'mpesa/c2b/*/confirmation',
+            'mpesa/c2b/*/validation',
         ]);
 
         $middleware->alias([

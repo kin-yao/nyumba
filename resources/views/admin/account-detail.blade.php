@@ -47,6 +47,8 @@
         td{padding:9px 0;font-size:13px;border-bottom:1px solid rgba(0,0,0,.04)}
         tr:last-child td{border-bottom:none}
         a{text-decoration:none;color:inherit}
+        .mpesa-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        @media (max-width:900px){.grid-2,.mpesa-grid{grid-template-columns:1fr}}
     </style>
 </head>
 <body>
@@ -258,6 +260,71 @@
                 </div>
             </div>
         </div>
+
+        {{-- Properties & M-Pesa C2B reconciliation --}}
+        @if($account->properties->isNotEmpty())
+            <div class="card">
+                <div class="card-title">Properties &amp; M-Pesa reconciliation</div>
+
+                @foreach($account->properties as $property)
+                    <div style="border:1px solid rgba(0,0,0,.07);border-radius:10px;padding:16px;margin-bottom:14px">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+                            <div>
+                                <span style="font-weight:500;font-size:14px">{{ $property->name }}</span>
+                                <span style="font-size:12px;color:#8a8880;margin-left:6px">{{ ucfirst($property->type) }} &middot; {{ $property->units->count() }} units</span>
+                            </div>
+                            <div style="display:flex;gap:6px;flex-wrap:wrap">
+                                @if($property->mpesa_c2b_registered_at)
+                                    <span class="badge badge-green">C2B registered {{ $property->mpesa_c2b_registered_at->format('d M Y') }}</span>
+                                @else
+                                    <span class="badge badge-gray">C2B not registered</span>
+                                @endif
+                                @if($property->mpesa_pull_registered_at)
+                                    <span class="badge badge-green">Pull registered {{ $property->mpesa_pull_registered_at->format('d M Y') }}</span>
+                                @else
+                                    <span class="badge badge-gray">Pull not registered</span>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div style="font-size:12px;color:#8a8880;margin-bottom:10px">
+                            Account format: <strong style="color:#111110">{{ ucfirst(str_replace('_',' ', $property->account_format ?? 'unit_number')) }}</strong>
+                            @if($property->business_number || $property->till_number)
+                                &middot; {{ $property->payment_type === 'till' ? 'Till' : 'Paybill' }}:
+                                <strong style="color:#111110">{{ $property->business_number ?: $property->till_number }}</strong>
+                            @endif
+                        </div>
+
+                        <form method="POST" action="{{ route('admin.account.property.mpesa-register', [$account, $property]) }}">
+                            @csrf
+                            <div class="mpesa-grid">
+                                <div class="form-group">
+                                    <label>M-Pesa Shortcode</label>
+                                    <input type="text" name="mpesa_shortcode" value="{{ $property->mpesa_shortcode }}" placeholder="e.g. 600638" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Nominated number</label>
+                                    <input type="text" name="mpesa_nominated_number" value="{{ $property->mpesa_nominated_number }}" placeholder="2547XXXXXXXX" required>
+                                </div>
+                            </div>
+                            <div class="mpesa-grid">
+                                <div class="form-group">
+                                    <label>Consumer Key</label>
+                                    <input type="text" name="mpesa_consumer_key" value="{{ $property->mpesa_consumer_key }}" placeholder="Consumer Key" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Consumer Secret</label>
+                                    <input type="password" name="mpesa_consumer_secret" value="{{ $property->mpesa_consumer_secret }}" placeholder="Consumer Secret" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-green" style="width:100%;justify-content:center">
+                                {{ $property->hasMpesaCredentials() ? 'Update & re-register' : 'Save & register C2B + Pull' }}
+                            </button>
+                        </form>
+                    </div>
+                @endforeach
+            </div>
+        @endif
 
         {{-- Recent payments --}}
         @if($recentPayments->count() > 0)

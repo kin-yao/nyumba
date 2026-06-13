@@ -168,4 +168,151 @@ class MpesaService
 
         return $phone;
     }
+
+    /**
+     * Get an OAuth token using arbitrary (e.g. per-property) credentials,
+     * rather than Nyumba's own configured credentials.
+     */
+    public function getAccessTokenFor(string $consumerKey, string $consumerSecret): ?string
+    {
+        $cacheKey = 'mpesa_token_' . md5($consumerKey);
+
+        return Cache::remember($cacheKey, now()->addMinutes(55), function () use ($consumerKey, $consumerSecret) {
+            $response = Http::withBasicAuth($consumerKey, $consumerSecret)
+                ->get($this->baseUrl . '/oauth/v1/generate', [
+                    'grant_type' => 'client_credentials',
+                ]);
+
+            if ($response->failed()) {
+                Log::error('M-Pesa: failed to get access token (property credentials)', [
+                    'response' => $response->body(),
+                ]);
+                return null;
+            }
+
+            return $response->json('access_token');
+        });
+    }
+
+    /**
+     * Register C2B validation/confirmation URLs for a landlord's own paybill/till.
+     */
+    public function registerC2B(
+        string $shortcode,
+        string $consumerKey,
+        string $consumerSecret,
+        string $confirmationUrl,
+        string $validationUrl,
+        string $responseType = 'Completed'
+    ): array {
+        $token = $this->getAccessTokenFor($consumerKey, $consumerSecret);
+
+        if (!$token) {
+            return ['success' => false, 'error' => 'Could not authenticate with the provided M-Pesa credentials.'];
+        }
+
+        $response = Http::withToken($token)
+            ->post($this->baseUrl . '/mpesa/c2b/v1/registerurl', [
+                'ShortCode'       => $shortcode,
+                'ResponseType'    => $responseType,
+                'ConfirmationURL' => $confirmationUrl,
+                'ValidationURL'   => $validationUrl,
+            ]);
+
+        $data = $response->json();
+
+        if ($response->failed() || (($data['ResponseCode'] ?? null) !== '0' && !isset($data['OriginatorCoversationID']))) {
+            Log::error('M-Pesa C2B registration failed', ['shortcode' => $shortcode, 'response' => $data]);
+            return [
+                'success' => false,
+                'error'   => $data['errorMessage'] ?? $data['ResponseDescription'] ?? 'C2B registration failed.',
+            ];
+        }
+
+        return ['success' => true, 'raw' => $data];
+    }
+
+    /**
+     * Register a shortcode for the Pull Transaction API (48hr reconciliation safety net).
+     */
+    public function registerPull(
+        string $shortcode,
+        string $consumerKey,
+        string $consumerSecret,
+        string $nominatedNumber,
+        string $callbackUrl
+    ): array {
+        $token = $this->getAccessTokenFor($consumerKey, $consumerSecret);
+
+        if (!$token) {
+            return ['success' => false, 'error' => 'Could not authenticate with the provided M-Pesa credentials.'];
+        }
+
+        $response = Http::withToken($token)
+            ->withHeaders(['Accept-Encoding' => 'application/json'])
+            ->post($this->baseUrl . '/pulltransactions/v1/register', [
+                'ShortCode'       => $shortcode,
+                'RequestType'     => 'Pull',
+                'NominatedNumber' => $nominatedNumber,
+                'CallBackURL'     => $callbackUrl,
+            ]);
+
+        $data = $response->json();
+        $code = $data['ResponseStatus'] ?? null;
+
+        // 1000 = registered successfully, 1001 = already registered (treat as success)
+        if ($response->failed() || !in_array($code, ['1000', '1001'])) {
+            Log::error('M-Pesa Pull registration failed', ['shortcode' => $shortcode, 'response' => $data]);
+            return [
+                'success' => false,
+                'error'   => $data['ResponseDescription'] ?? 'Pull API registration failed.',
+            ];
+        }
+
+        return ['success' => true, 'already_registered' => $code === '1001', 'raw' => $data];
+    }
+
+    /**
+     * Query the Pull Transaction API for transactions in a date range.
+     */
+    public function pullTransactions(
+        string $shortcode,
+        string $consumerKey,
+        string $consumerSecret,
+        string $startDate,
+        string $endDate,
+        int $offset = 0
+    ): array {
+        $token = $this->getAccessTokenFor($consumerKey, $consumerSecret);
+
+        if (!$token) {
+            return ['success' => false, 'error' => 'Could not authenticate with the provided M-Pesa credentials.'];
+        }
+
+        $response = Http::withToken($token)
+            ->post($this->baseUrl . '/pulltransactions/v1/query', [
+                'ShortCode'   => $shortcode,
+                'StartDate'   => $startDate,
+                'EndDate'     => $endDate,
+                'OffSetValue' => (string) $offset,
+            ]);
+
+        $data = $response->json();
+        $code = $data['ResponseCode'] ?? null;
+
+        if ($response->failed() || !in_array($code, ['1000', '1001'])) {
+            Log::error('M-Pesa Pull query failed', ['shortcode' => $shortcode, 'response' => $data]);
+            return ['success' => false, 'error' => $data['ResponseMessage'] ?? 'Pull query failed.'];
+        }
+
+        // Response is [[ {...}, {...} ]] — flatten
+        $transactions = [];
+        foreach (($data['Response'] ?? []) as $batch) {
+            foreach ((array) $batch as $txn) {
+                $transactions[] = $txn;
+            }
+        }
+
+        return ['success' => true, 'transactions' => $transactions];
+    }
 }

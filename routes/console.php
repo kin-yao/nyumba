@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\MpesaPullReconcile;
 use Illuminate\Support\Facades\Schedule;
 
 // Send monthly invoices — skip expired accounts (handled inside command)
@@ -16,6 +17,9 @@ Schedule::command('invoices:send-reminders')->dailyAt('08:00');
 
 // Send expiry alerts — 3 days before trial, 7 days before paid subscription
 Schedule::command('accounts:send-expiry-alerts')->dailyAt('09:00');
+
+// Reconcile M-Pesa C2B transactions via Pull API for registered properties
+Schedule::command(MpesaPullReconcile::class)->everySixHours()->withoutOverlapping();
 
 // Top up monthly SMS credits on renewal date
 Schedule::call(function () {
