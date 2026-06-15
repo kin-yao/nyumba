@@ -17,9 +17,11 @@ use Illuminate\Support\Facades\Log;
 
 class MpesaC2BController extends Controller
 {
-    // ── Admin: register C2B + Pull for a property ──────────────────────────
-    public function register(Request $request, Property $property, MpesaService $mpesa)
+    // ── Admin: save credentials + register C2B + Pull for a property ───────
+    public function register(Request $request, \App\Models\Account $account, int $property, MpesaService $mpesa)
     {
+        $property = Property::withoutGlobalScopes()->findOrFail($property);
+
         $validated = $request->validate([
             'mpesa_shortcode'        => ['required', 'string', 'max:20'],
             'mpesa_consumer_key'     => ['required', 'string', 'max:255'],
@@ -80,10 +82,15 @@ class MpesaC2BController extends Controller
         return back()->with('success', 'M-Pesa C2B and Pull registered successfully for "' . $property->name . '".');
     }
 
-    // ── Public: C2B validation (optional accept-all) ────────────────────────
-    public function validation(Request $request, Property $property)
+    // ── Public: C2B validation ─────────────────────────────────────────────
+    public function validation(Request $request, int $property)
     {
-        Log::info('M-Pesa C2B validation', ['property_id' => $property->id, 'payload' => $request->all()]);
+        $property = Property::withoutGlobalScopes()->findOrFail($property);
+
+        Log::info('M-Pesa C2B validation', [
+            'property_id' => $property->id,
+            'payload'     => $request->all(),
+        ]);
 
         return response()->json([
             'ResultCode' => 0,
@@ -92,10 +99,16 @@ class MpesaC2BController extends Controller
     }
 
     // ── Public: C2B confirmation — actual payment notification ─────────────
-    public function confirmation(Request $request, Property $property)
+    public function confirmation(Request $request, int $property)
     {
+        $property = Property::withoutGlobalScopes()->findOrFail($property);
+
         $payload = $request->all();
-        Log::info('M-Pesa C2B confirmation', ['property_id' => $property->id, 'payload' => $payload]);
+
+        Log::info('M-Pesa C2B confirmation', [
+            'property_id' => $property->id,
+            'payload'     => $payload,
+        ]);
 
         $this->processTransaction($property, [
             'TransID'           => $payload['TransID'] ?? null,
@@ -127,12 +140,15 @@ class MpesaC2BController extends Controller
         $transTime = $txn['TransTime'] ?? null;
 
         if (!$transId || $amount <= 0) {
-            Log::warning('M-Pesa C2B: incomplete transaction payload', ['property_id' => $property->id, 'txn' => $txn]);
+            Log::warning('M-Pesa C2B: incomplete transaction payload', [
+                'property_id' => $property->id,
+                'txn'         => $txn,
+            ]);
             return 'unmatched';
         }
 
         // Idempotency — don't double-record the same M-Pesa receipt
-        if (Payment::where('reference', $transId)->exists()) {
+        if (Payment::withoutGlobalScopes()->where('reference', $transId)->exists()) {
             return 'duplicate';
         }
 
@@ -144,7 +160,7 @@ class MpesaC2BController extends Controller
             : now()->toDateString();
 
         if (!$unit) {
-            // Unmatched — record for manual assignment, not allocated
+            // Unmatched — record for manual assignment
             Payment::create([
                 'account_id'   => $property->account_id,
                 'tenant_id'    => null,
@@ -154,22 +170,30 @@ class MpesaC2BController extends Controller
                 'payment_date' => $paymentDate,
                 'method'       => 'mpesa',
                 'reference'    => $transId,
-                'notes'        => 'Unmatched M-Pesa C2B payment. BillRef: "' . $billRef . '", Phone: ' . $msisdn
-                    . ', Property: ' . $property->name . '. Needs manual assignment.',
+                'notes'        => 'Unmatched M-Pesa C2B payment. BillRef: "' . $billRef
+                    . '", Phone: ' . $msisdn
+                    . ', Property: ' . $property->name
+                    . '. Needs manual assignment.',
                 'is_allocated' => false,
             ]);
 
             AuditService::log(
                 'payment.mpesa_unmatched',
-                'Unmatched M-Pesa payment of ' . currency($amount) . ' (ref: ' . $transId . ') for "' . $property->name . '" — needs manual assignment',
+                'Unmatched M-Pesa payment of ' . currency($amount) . ' (ref: ' . $transId . ') for "'
+                    . $property->name . '" — needs manual assignment',
                 $property,
-                ['trans_id' => $transId, 'bill_ref' => $billRef, 'msisdn' => $msisdn, 'amount' => $amount]
+                [
+                    'trans_id' => $transId,
+                    'bill_ref' => $billRef,
+                    'msisdn'   => $msisdn,
+                    'amount'   => $amount,
+                ]
             );
 
             return 'unmatched';
         }
 
-        $lease = $unit->leases()->where('status', 'active')->latest()->first();
+        $lease  = $unit->leases()->where('status', 'active')->latest()->first();
         $tenant = $lease?->tenant;
 
         $fullyPaidInvoices = collect();
@@ -241,10 +265,16 @@ class MpesaC2BController extends Controller
 
         AuditService::log(
             'payment.mpesa_reconciled',
-            'M-Pesa payment of ' . currency($amount) . ' auto-reconciled for ' . ($tenant?->full_name ?? 'unit ' . $unit->name)
+            'M-Pesa payment of ' . currency($amount) . ' auto-reconciled for '
+                . ($tenant?->full_name ?? 'unit ' . $unit->name)
                 . ' (ref: ' . $transId . ')',
             $payment,
-            ['trans_id' => $transId, 'bill_ref' => $billRef, 'unit_id' => $unit->id, 'amount' => $amount]
+            [
+                'trans_id' => $transId,
+                'bill_ref' => $billRef,
+                'unit_id'  => $unit->id,
+                'amount'   => $amount,
+            ]
         );
 
         if ($tenant && $tenant->phone) {
@@ -262,22 +292,23 @@ class MpesaC2BController extends Controller
         if ($accountFormat === 'unit_number') {
             if ($billRef === '') return null;
 
-            return Unit::where('property_id', $property->id)
+            return Unit::withoutGlobalScopes()
+                ->where('property_id', $property->id)
                 ->whereRaw('LOWER(name) = ?', [strtolower($billRef)])
                 ->first();
         }
 
         if ($accountFormat === 'phone_number') {
-            // Try MSISDN first (more reliable), fall back to BillRefNumber if it looks like a phone
             $candidates = array_filter([$msisdn, $billRef]);
 
             foreach ($candidates as $phone) {
                 $normalized = $this->normalizePhoneForMatch($phone);
                 if (!$normalized) continue;
 
-                $lease = Lease::where('status', 'active')
-                    ->whereHas('unit', fn($q) => $q->where('property_id', $property->id))
-                    ->whereHas('tenant', fn($q) => $q->where('phone', $normalized))
+                $lease = Lease::withoutGlobalScopes()
+                    ->where('status', 'active')
+                    ->whereHas('unit', fn($q) => $q->withoutGlobalScopes()->where('property_id', $property->id))
+                    ->whereHas('tenant', fn($q) => $q->withoutGlobalScopes()->where('phone', $normalized))
                     ->with('unit')
                     ->first();
 
@@ -290,10 +321,12 @@ class MpesaC2BController extends Controller
         if ($accountFormat === 'tenant_name') {
             if ($billRef === '') return null;
 
-            $lease = Lease::where('status', 'active')
-                ->whereHas('unit', fn($q) => $q->where('property_id', $property->id))
+            $lease = Lease::withoutGlobalScopes()
+                ->where('status', 'active')
+                ->whereHas('unit', fn($q) => $q->withoutGlobalScopes()->where('property_id', $property->id))
                 ->whereHas('tenant', function ($q) use ($billRef) {
-                    $q->whereRaw('LOWER(CONCAT(first_name, " ", last_name)) = ?', [strtolower(trim($billRef))]);
+                    $q->withoutGlobalScopes()
+                      ->whereRaw('LOWER(CONCAT(first_name, " ", last_name)) = ?', [strtolower(trim($billRef))]);
                 })
                 ->with('unit')
                 ->first();
@@ -305,7 +338,7 @@ class MpesaC2BController extends Controller
     }
 
     /**
-     * Normalize a phone to 07XXXXXXXX for matching against tenants.phone (which is stored as 07XXXXXXXX).
+     * Normalize phone to 07XXXXXXXX for matching against tenants.phone.
      */
     private function normalizePhoneForMatch(string $phone): ?string
     {
@@ -327,8 +360,13 @@ class MpesaC2BController extends Controller
         return null;
     }
 
-    private function sendConfirmationSms($property, $tenant, $payment, $fullyPaidInvoices, $newBalance): void
-    {
+    private function sendConfirmationSms(
+        Property $property,
+        Tenant $tenant,
+        Payment $payment,
+        $fullyPaidInvoices,
+        float $newBalance
+    ): void {
         $account = $property->account;
         $sms     = new SmsService($account);
         if (!$sms->hasCredits()) return;
@@ -339,7 +377,9 @@ class MpesaC2BController extends Controller
 
         if ($fullyPaidInvoices->isNotEmpty()) {
             $invoice = $fullyPaidInvoices->first();
-            $period  = \Carbon\Carbon::createFromDate($invoice->period_year, $invoice->period_month, 1)->format('F Y');
+            $period  = \Carbon\Carbon::createFromDate(
+                $invoice->period_year, $invoice->period_month, 1
+            )->format('F Y');
 
             $balanceLine = $newBalance <= 0
                 ? 'Balance: KES 0 - Fully paid.' . "\n" . 'Thank you for paying on time.'
