@@ -48,7 +48,7 @@
         tr:last-child td{border-bottom:none}
         a{text-decoration:none;color:inherit}
         .mpesa-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-        @media (max-width:900px){.grid-2,.mpesa-grid{grid-template-columns:1fr}}
+        @media(max-width:900px){.grid-2,.mpesa-grid{grid-template-columns:1fr}}
     </style>
 </head>
 <body>
@@ -161,7 +161,7 @@
                     <span class="field-value">{{ $account->unit_count_range ?? 'N/A' }} units</span>
                 </div>
 
-                {{-- Properties --}}
+                {{-- Properties summary --}}
                 @if($account->properties->isNotEmpty())
                     <div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(0,0,0,.06)">
                         <div style="font-size:11px;font-weight:500;color:#8a8880;text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">
@@ -287,7 +287,7 @@
                             </div>
                         </div>
 
-                        <div style="font-size:12px;color:#8a8880;margin-bottom:10px">
+                        <div style="font-size:12px;color:#8a8880;margin-bottom:12px">
                             Account format: <strong style="color:#111110">{{ ucfirst(str_replace('_',' ', $property->account_format ?? 'unit_number')) }}</strong>
                             @if($property->business_number || $property->till_number)
                                 &middot; {{ $property->payment_type === 'till' ? 'Till' : 'Paybill' }}:
@@ -300,21 +300,29 @@
                             <div class="mpesa-grid">
                                 <div class="form-group">
                                     <label>M-Pesa Shortcode</label>
-                                    <input type="text" name="mpesa_shortcode" value="{{ $property->mpesa_shortcode }}" placeholder="e.g. 600638" required>
+                                    <input type="text" name="mpesa_shortcode"
+                                           value="{{ $property->mpesa_shortcode }}"
+                                           placeholder="e.g. 600638" required>
                                 </div>
                                 <div class="form-group">
                                     <label>Nominated number</label>
-                                    <input type="text" name="mpesa_nominated_number" value="{{ $property->mpesa_nominated_number }}" placeholder="2547XXXXXXXX" required>
+                                    <input type="text" name="mpesa_nominated_number"
+                                           value="{{ $property->mpesa_nominated_number }}"
+                                           placeholder="2547XXXXXXXX" required>
                                 </div>
                             </div>
                             <div class="mpesa-grid">
                                 <div class="form-group">
                                     <label>Consumer Key</label>
-                                    <input type="text" name="mpesa_consumer_key" value="{{ $property->mpesa_consumer_key }}" placeholder="Consumer Key" required>
+                                    <input type="text" name="mpesa_consumer_key"
+                                           value="{{ $property->mpesa_consumer_key }}"
+                                           placeholder="Consumer Key from Daraja" required>
                                 </div>
                                 <div class="form-group">
                                     <label>Consumer Secret</label>
-                                    <input type="password" name="mpesa_consumer_secret" value="{{ $property->mpesa_consumer_secret }}" placeholder="Consumer Secret" required>
+                                    <input type="password" name="mpesa_consumer_secret"
+                                           value="{{ $property->mpesa_consumer_secret }}"
+                                           placeholder="Consumer Secret from Daraja" required>
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-green" style="width:100%;justify-content:center">

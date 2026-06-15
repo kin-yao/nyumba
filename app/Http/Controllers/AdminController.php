@@ -32,7 +32,6 @@ class AdminController extends Controller
     // ── Dashboard ──────────────────────────────────────────────────────────
     public function dashboard()
     {
-        // Load accounts once — derive all status stats from this collection
         $allAccounts = Account::all();
 
         $totalAccounts   = $allAccounts->count();
@@ -41,19 +40,16 @@ class AdminController extends Controller
         $expiredAccounts = $allAccounts->filter(fn($a) => $a->isExpired())->count();
         $graceAccounts   = $allAccounts->filter(fn($a) => $a->isInGracePeriod())->count();
 
-        // System health — single queries
-        $totalUnits      = Unit::count();
-        $totalProperties = Property::count();
-        $totalTenants    = Tenant::count();
+        $totalUnits      = Unit::withoutGlobalScopes()->count();
+        $totalProperties = Property::withoutGlobalScopes()->count();
+        $totalTenants    = Tenant::withoutGlobalScopes()->count();
         $totalSmsCredits = (int) $allAccounts->sum('sms_credits');
 
-        // MRR — active paid plans only
-        $planPrices = ['starter' => 2000, 'growth' => 4500, 'pro' => 7000, 'enterprise' => 0];
+        $planPrices = ['starter' => 2300, 'growth' => 4600, 'pro' => 7500, 'enterprise' => 0];
         $totalMrr   = $allAccounts
             ->filter(fn($a) => $a->isActive() && !$a->isOnTrial() && isset($planPrices[$a->plan]))
             ->sum(fn($a) => $planPrices[$a->plan]);
 
-        // Revenue by plan
         $revenueByPlan = collect(['starter', 'growth', 'pro', 'enterprise'])
             ->mapWithKeys(fn($plan) => [
                 $plan => [
@@ -63,12 +59,10 @@ class AdminController extends Controller
                 ]
             ])->toArray();
 
-        // Plan distribution (all accounts)
         $byPlan = $allAccounts->groupBy('plan')
             ->map(fn($g) => $g->count())
             ->toArray();
 
-        // Accounts approaching unit limit (>= 80% full)
         $approachingLimit = $allAccounts
             ->filter(function ($account) {
                 if ($account->unit_limit <= 0) return false;
@@ -100,9 +94,8 @@ class AdminController extends Controller
     // ── Accounts list ──────────────────────────────────────────────────────
     public function accounts(Request $request)
     {
-        // Subquery for unit count — avoids N+1
         $query = Account::addSelect([
-            'units_count' => Unit::selectRaw('COUNT(*)')
+            'units_count' => Unit::withoutGlobalScopes()->selectRaw('COUNT(*)')
                 ->join('properties', 'units.property_id', '=', 'properties.id')
                 ->whereColumn('properties.account_id', 'accounts.id'),
         ])
@@ -195,14 +188,28 @@ class AdminController extends Controller
     // ── Account detail ─────────────────────────────────────────────────────
     public function showAccount(Account $account)
     {
-        $account->load(['users', 'properties.units']);
+        // withoutGlobalScopes() bypasses BelongsToAccount trait which would
+        // otherwise filter all queries by the logged-in admin's own account_id
+        $account->load([
+            'users',
+            'properties'       => fn($q) => $q->withoutGlobalScopes(),
+            'properties.units' => fn($q) => $q->withoutGlobalScopes(),
+        ]);
 
-        $totalInvoiced = Invoice::where('account_id', $account->id)->sum('total_amount');
-        $totalPaid     = Payment::where('account_id', $account->id)->sum('amount');
-        $unitCount     = $account->properties->sum(fn($p) => $p->units->count());
+        $totalInvoiced = Invoice::withoutGlobalScopes()
+            ->where('account_id', $account->id)
+            ->sum('total_amount');
 
-        $recentPayments = Payment::where('account_id', $account->id)
-            ->with('tenant')
+        $totalPaid = Payment::withoutGlobalScopes()
+            ->where('account_id', $account->id)
+            ->where('payment_type', '!=', 'deposit')
+            ->sum('amount');
+
+        $unitCount = $account->properties->sum(fn($p) => $p->units->count());
+
+        $recentPayments = Payment::withoutGlobalScopes()
+            ->where('account_id', $account->id)
+            ->with(['tenant' => fn($q) => $q->withoutGlobalScopes()])
             ->latest()
             ->take(10)
             ->get();
@@ -328,12 +335,11 @@ class AdminController extends Controller
     public function sendBroadcast(Request $request)
     {
         $validated = $request->validate([
-            'message'   => ['required', 'string', 'max:320'],
-            'target'    => ['required', 'in:all,explore,starter,growth,pro,enterprise,trial'],
-            'test_phone'=> ['nullable', 'string', 'max:20'],
+            'message'    => ['required', 'string', 'max:320'],
+            'target'     => ['required', 'in:all,explore,starter,growth,pro,enterprise,trial'],
+            'test_phone' => ['nullable', 'string', 'max:20'],
         ]);
 
-        // Test send to a specific number
         if ($request->filled('test_phone')) {
             $testAccount = Account::first();
             if ($testAccount) {
@@ -396,27 +402,27 @@ class AdminController extends Controller
         ]);
 
         DB::transaction(function () use ($accountId, $account) {
-            $propertyIds = Property::where('account_id', $accountId)->pluck('id');
-            $unitIds     = Unit::whereIn('property_id', $propertyIds)->pluck('id');
-            $leaseIds    = Lease::whereIn('unit_id', $unitIds)->pluck('id');
-            $invoiceIds  = Invoice::whereIn('lease_id', $leaseIds)->pluck('id');
-            $paymentIds  = Payment::where('account_id', $accountId)->pluck('id');
+            $propertyIds = Property::withoutGlobalScopes()->where('account_id', $accountId)->pluck('id');
+            $unitIds     = Unit::withoutGlobalScopes()->whereIn('property_id', $propertyIds)->pluck('id');
+            $leaseIds    = Lease::withoutGlobalScopes()->whereIn('unit_id', $unitIds)->pluck('id');
+            $invoiceIds  = Invoice::withoutGlobalScopes()->whereIn('lease_id', $leaseIds)->pluck('id');
+            $paymentIds  = Payment::withoutGlobalScopes()->where('account_id', $accountId)->pluck('id');
 
             PaymentAllocation::whereIn('invoice_id', $invoiceIds)
                 ->orWhereIn('payment_id', $paymentIds)->delete();
             InvoiceLineItem::whereIn('invoice_id', $invoiceIds)->delete();
-            Invoice::whereIn('id', $invoiceIds)->delete();
-            Payment::where('account_id', $accountId)->delete();
-            UtilityReading::where('account_id', $accountId)->delete();
-            MaintenanceRequest::where('account_id', $accountId)->delete();
-            Lease::whereIn('unit_id', $unitIds)->delete();
-            Tenant::withTrashed()->where('account_id', $accountId)->forceDelete();
-            Unit::whereIn('property_id', $propertyIds)->delete();
-            UtilityRate::whereIn('property_id', $propertyIds)->delete();
-            Expense::where('account_id', $accountId)->delete();
-            Property::where('account_id', $accountId)->delete();
-            Message::where('account_id', $accountId)->delete();
-            MessageTemplate::where('account_id', $accountId)->delete();
+            Invoice::withoutGlobalScopes()->whereIn('id', $invoiceIds)->delete();
+            Payment::withoutGlobalScopes()->where('account_id', $accountId)->delete();
+            UtilityReading::withoutGlobalScopes()->where('account_id', $accountId)->delete();
+            MaintenanceRequest::withoutGlobalScopes()->where('account_id', $accountId)->delete();
+            Lease::withoutGlobalScopes()->whereIn('unit_id', $unitIds)->delete();
+            Tenant::withoutGlobalScopes()->withTrashed()->where('account_id', $accountId)->forceDelete();
+            Unit::withoutGlobalScopes()->whereIn('property_id', $propertyIds)->delete();
+            UtilityRate::withoutGlobalScopes()->whereIn('property_id', $propertyIds)->delete();
+            Expense::withoutGlobalScopes()->where('account_id', $accountId)->delete();
+            Property::withoutGlobalScopes()->where('account_id', $accountId)->delete();
+            Message::withoutGlobalScopes()->where('account_id', $accountId)->delete();
+            MessageTemplate::withoutGlobalScopes()->where('account_id', $accountId)->delete();
             Notification::where('account_id', $accountId)->delete();
             AuditLog::where('account_id', $accountId)->delete();
             User::where('account_id', $accountId)->delete();
