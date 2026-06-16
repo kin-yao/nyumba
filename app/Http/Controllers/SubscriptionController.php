@@ -30,13 +30,19 @@ class SubscriptionController extends Controller
             : $planDef['price_monthly'];
 
         if ($amount <= 0) {
-            return back()->with('error', 'This plan cannot be purchased online. Please contact support.');
+            return response()->json([
+                'success' => false,
+                'error'   => 'This plan cannot be purchased online. Please contact support.',
+            ], 422);
         }
 
         $phone = $mpesa->formatPhone($validated['phone']);
 
         if (!preg_match('/^254[71][0-9]{8}$/', $phone)) {
-            return back()->with('error', 'Please enter a valid M-Pesa phone number (e.g. 0712345678).');
+            return response()->json([
+                'success' => false,
+                'error'   => 'Please enter a valid M-Pesa phone number (e.g. 0712345678).',
+            ], 422);
         }
 
         $callbackUrl = 'https://nyumba-production.up.railway.app/mpesa/stk/callback';
@@ -50,7 +56,7 @@ class SubscriptionController extends Controller
         );
 
         if (!$result['success']) {
-            return back()->with('error', $result['error']);
+            return response()->json(['success' => false, 'error' => $result['error']], 422);
         }
 
         $transaction = MpesaTransaction::create([
@@ -113,17 +119,17 @@ class SubscriptionController extends Controller
         $transaction = MpesaTransaction::where('checkout_request_id', $checkoutRequestId)->first();
 
         if (!$transaction) {
-            Log::warning('M-Pesa callback: no matching transaction', ['checkout_request_id' => $checkoutRequestId]);
+            Log::warning('M-Pesa callback: no matching transaction', [
+                'checkout_request_id' => $checkoutRequestId,
+            ]);
             return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Accepted']);
         }
 
-        // Already processed — Safaricom may retry callbacks
         if ($transaction->status !== 'pending') {
             return response()->json(['ResultCode' => 0, 'ResultDesc' => 'Accepted']);
         }
 
         if ((int) $resultCode === 0) {
-            // Success — extract receipt number from CallbackMetadata
             $items = $stkCallback['CallbackMetadata']['Item'] ?? [];
             $meta  = [];
             foreach ($items as $item) {
@@ -140,7 +146,6 @@ class SubscriptionController extends Controller
 
             $this->applyPlanUpgrade($transaction);
         } else {
-            // Failed or cancelled by user
             $status = (int) $resultCode === 1032 ? 'cancelled' : 'failed';
 
             $transaction->update([
@@ -155,7 +160,13 @@ class SubscriptionController extends Controller
     }
 
     /**
-     * On successful payment, upgrade the account's plan and top up SMS credits.
+     * Apply the plan upgrade after successful M-Pesa payment.
+     *
+     * Duration logic:
+     * - Monthly: calculate months covered = floor(amount / price_monthly)
+     *   e.g. Starter at KES 2,300/mo, pay KES 4,600 → 2 months → 60 days
+     * - Yearly: fixed 365 days
+     * - Always from NOW — never stacked on existing expiry
      */
     private function applyPlanUpgrade(MpesaTransaction $transaction): void
     {
@@ -165,42 +176,60 @@ class SubscriptionController extends Controller
         $planDef = Account::PLANS[$transaction->plan] ?? null;
         if (!$planDef) return;
 
-        $duration = $transaction->billing_cycle === 'yearly' ? 12 : 1;
+        $amountPaid   = floatval($transaction->amount);
+        $priceMonthly = floatval($planDef['price_monthly']);
 
-        // Extend from current expiry if still active, otherwise from now
-        $base = ($account->plan_expires_at && $account->plan_expires_at->isFuture())
-            ? $account->plan_expires_at
-            : now();
+        if ($transaction->billing_cycle === 'yearly') {
+            $days          = 365;
+            $monthsCovered = 12;
+        } else {
+            $monthsCovered = $priceMonthly > 0
+                ? max(1, (int) floor($amountPaid / $priceMonthly))
+                : 1;
+            $days = $monthsCovered * 30;
+        }
+
+        $creditsToAdd = $planDef['sms_credits_monthly'] * $monthsCovered;
 
         $account->update([
-            'plan'            => $transaction->plan,
-            'plan_expires_at' => $base->copy()->addMonths($duration),
-            'subscribed_at'   => $account->subscribed_at ?? now(),
+            'plan'                => $transaction->plan,
+            'plan_expires_at'     => now()->addDays($days),
+            'subscribed_at'       => $account->subscribed_at ?? now(),
+            'trial_ends_at'       => null,
+            // Update unit_limit and sms_credits_monthly to match the new plan
+            // These were missing before — caused paid accounts to still show
+            // the Explore plan's 3-unit limit after upgrading
+            'unit_limit'          => $planDef['unit_limit'],
+            'sms_credits_monthly' => $planDef['sms_credits_monthly'],
         ]);
 
-        // Top up SMS credits for this billing period
-        $creditsToAdd = $planDef['sms_credits_monthly'] * $duration;
         $account->increment('sms_credits', $creditsToAdd);
 
         \App\Models\Notification::create([
             'account_id' => $account->id,
             'type'       => 'subscription_activated',
             'title'      => 'Plan upgraded to ' . $planDef['name'],
-            'body'       => 'Your payment of ' . currency($transaction->amount) . ' was received via M-Pesa ('
-                . $transaction->mpesa_receipt . '). Your account is now on the ' . $planDef['name']
-                . ' plan with ' . $creditsToAdd . ' SMS credits added.',
+            'body'       => 'Your payment of KES ' . number_format($amountPaid) . ' was received via M-Pesa ('
+                . $transaction->mpesa_receipt . '). Your ' . $planDef['name'] . ' plan is active for '
+                . $days . ' days (' . $monthsCovered . ' '
+                . ($monthsCovered === 1 ? 'month' : 'months') . '). '
+                . $creditsToAdd . ' SMS credits added.',
         ]);
 
         AuditService::log(
             'subscription.upgraded',
-            'Account upgraded to ' . $planDef['name'] . ' plan via M-Pesa (' . $transaction->mpesa_receipt . ')',
+            'Account upgraded to ' . $planDef['name'] . ' via M-Pesa (' . $transaction->mpesa_receipt . ')'
+                . ' — ' . $monthsCovered . ' month(s) / ' . $days . ' days',
             $account,
             [
-                'plan'          => $transaction->plan,
-                'billing_cycle' => $transaction->billing_cycle,
-                'amount'        => $transaction->amount,
-                'receipt'       => $transaction->mpesa_receipt,
-                'credits_added' => $creditsToAdd,
+                'plan'           => $transaction->plan,
+                'billing_cycle'  => $transaction->billing_cycle,
+                'amount_paid'    => $amountPaid,
+                'months_covered' => $monthsCovered,
+                'days'           => $days,
+                'unit_limit'     => $planDef['unit_limit'],
+                'receipt'        => $transaction->mpesa_receipt,
+                'credits_added'  => $creditsToAdd,
             ]
         );
     }
