@@ -18,8 +18,13 @@ Schedule::command('invoices:send-reminders')->dailyAt('08:00');
 // Send expiry alerts — 3 days before trial, 7 days before paid subscription
 Schedule::command('accounts:send-expiry-alerts')->dailyAt('09:00');
 
-// Reconcile M-Pesa C2B transactions via Pull API for registered properties
-Schedule::command(MpesaPullReconcile::class)->everySixHours()->withoutOverlapping();
+// Reconcile M-Pesa C2B transactions via Pull API for registered properties.
+// Runs every 3 hours — worst case a missed C2B callback is caught within 3hrs.
+// Reduce to ->hourly() if landlords report payment delays.
+// Pull API allows frequent polling — no rate limit concerns.
+Schedule::command(MpesaPullReconcile::class)
+    ->everyThreeHours()
+    ->withoutOverlapping();
 
 // Top up monthly SMS credits on renewal date
 Schedule::call(function () {
@@ -51,7 +56,6 @@ Schedule::call(function () {
     $accounts = \App\Models\Account::where('plan', '!=', 'explore')->get();
 
     foreach ($accounts as $account) {
-        // Skip expired accounts
         if (!$account->isActive()) continue;
         if (!$account->phone) continue;
 
