@@ -46,6 +46,23 @@
         </div>
     @endif
 
+    {{-- Credit balance notice --}}
+    @php
+        $tenantBalance = 0;
+        if ($invoice->lease?->tenant) {
+            $lease = $invoice->lease;
+            $lease->load(['invoices', 'payments']);
+            $tenantBalance = floatval($lease->invoices->sum('total_amount'))
+                           - floatval($lease->payments->where('payment_type', '!=', 'deposit')->sum('amount'));
+        }
+    @endphp
+    @if($tenantBalance < 0)
+        <div style="background:#e6f2ed;border:1px solid #a7d7c5;border-radius:10px;padding:12px 15px;margin-bottom:16px;font-size:13px;color:#166534">
+            <strong>Credit balance:</strong> {{ $invoice->lease->tenant->full_name }} has overpaid by {{ currency(abs($tenantBalance)) }}.
+            This credit will apply automatically when the next invoice is generated.
+        </div>
+    @endif
+
     <div class="invshow-layout">
 
         {{-- Invoice card --}}
@@ -145,11 +162,28 @@
                     <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(0,0,0,0.05);font-size:13px;gap:10px">
                         <div>
                             <div>{{ $allocation->payment->payment_date->format('d M Y') }}</div>
-                            <div style="font-size:11px;color:#8a8880;font-family:monospace">{{ $allocation->payment->reference }}</div>
+                            <div style="font-size:11px;color:#8a8880">
+                                {{ strtoupper($allocation->payment->method) }}
+                                @if($allocation->payment->reference)
+                                    &middot; <span style="font-family:monospace">{{ $allocation->payment->reference }}</span>
+                                @endif
+                            </div>
                         </div>
                         <div style="font-weight:500;color:#15803d;white-space:nowrap">{{ currency($allocation->amount) }}</div>
                     </div>
                 @endforeach
+
+                {{-- Amount paid vs total --}}
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(0,0,0,0.07);display:flex;justify-content:space-between;font-size:13px">
+                    <span style="color:#8a8880">Total paid</span>
+                    <span style="font-weight:500;color:#15803d">{{ currency($invoice->amount_paid) }}</span>
+                </div>
+                @if(floatval($invoice->total_amount) > floatval($invoice->amount_paid))
+                    <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:6px">
+                        <span style="color:#8a8880">Remaining</span>
+                        <span style="font-weight:500;color:#b91c1c">{{ currency(floatval($invoice->total_amount) - floatval($invoice->amount_paid)) }}</span>
+                    </div>
+                @endif
             @endif
         </div>
 

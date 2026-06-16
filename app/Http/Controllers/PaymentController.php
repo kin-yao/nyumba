@@ -25,9 +25,25 @@ class PaymentController extends Controller
             ->latest()
             ->get();
 
-        $unallocated = $payments->where('is_allocated', false);
+        $unallocated = $payments->where('is_allocated', false)
+            ->where('payment_type', '!=', 'deposit');
 
-        return view('payments.index', compact('payments', 'unallocated'));
+        // Unmatched M-Pesa C2B payments — no tenant/lease, recorded by auto-reconciliation
+        $unmatched = Payment::with(['lease.unit.property'])
+            ->where('account_id', auth()->user()->account_id)
+            ->whereNull('tenant_id')
+            ->whereNull('lease_id')
+            ->where('method', 'mpesa')
+            ->where('is_allocated', false)
+            ->latest()
+            ->get();
+
+        // Active tenants for the assign dropdown
+        $tenants = Tenant::with('activeLease.unit.property')
+            ->whereHas('activeLease', fn($q) => $q->whereIn('unit_id', $unitIds))
+            ->get();
+
+        return view('payments.index', compact('payments', 'unallocated', 'unmatched', 'tenants'));
     }
 
     public function create()
@@ -79,10 +95,9 @@ class PaymentController extends Controller
                 'method'       => $validated['method'],
                 'reference'    => $validated['reference'] ?? null,
                 'notes'        => $validated['notes'] ?? null,
-                'is_allocated' => $isDeposit ? false : false,
+                'is_allocated' => false,
             ]);
 
-            // Deposits are never allocated to invoices — they are held security
             if (!$isDeposit && $activeLease) {
                 $outstanding = $activeLease->invoices()
                     ->whereIn('status', ['sent', 'partial', 'overdue'])
@@ -126,7 +141,6 @@ class PaymentController extends Controller
 
                 $payment->update(['is_allocated' => true]);
 
-                // Compute fresh balance — rent payments only
                 $activeLease->load(['invoices', 'payments']);
                 $newBalance = floatval($activeLease->invoices->sum('total_amount'))
                             - floatval($activeLease->payments->where('payment_type', '!=', 'deposit')->sum('amount'));
@@ -161,6 +175,92 @@ class PaymentController extends Controller
 
         return redirect()->route('payments.index')
             ->with('success', $label . ' of ' . currency($validated['amount']) . ' recorded successfully.');
+    }
+
+    // ── Assign an unmatched M-Pesa payment to a tenant ────────────────────
+    public function assign(Request $request, Payment $payment)
+    {
+        $validated = $request->validate([
+            'tenant_id' => ['required', 'exists:tenants,id'],
+        ]);
+
+        if ($payment->account_id !== auth()->user()->account_id) {
+            abort(403);
+        }
+
+        $tenant      = Tenant::with('activeLease.unit.property')->find($validated['tenant_id']);
+        $activeLease = $tenant->activeLease;
+
+        $fullyPaidInvoices = collect();
+        $newBalance        = 0;
+
+        DB::transaction(function () use ($payment, $tenant, $activeLease, &$fullyPaidInvoices, &$newBalance) {
+            $payment->update([
+                'tenant_id'    => $tenant->id,
+                'lease_id'     => $activeLease?->id,
+                'payment_type' => 'rent',
+                'notes'        => ($payment->notes ?? '') . ' [Manually assigned to ' . $tenant->full_name . ' on ' . now()->format('d M Y') . ']',
+            ]);
+
+            if ($activeLease) {
+                $outstanding = $activeLease->invoices()
+                    ->whereIn('status', ['sent', 'partial', 'overdue'])
+                    ->orderBy('invoice_date')
+                    ->get();
+
+                $remaining = floatval($payment->amount);
+
+                foreach ($outstanding as $invoice) {
+                    if ($remaining <= 0) break;
+
+                    $invoiceBalance = floatval($invoice->total_amount) - floatval($invoice->amount_paid);
+                    if ($invoiceBalance <= 0) continue;
+
+                    $allocate = min($remaining, $invoiceBalance);
+
+                    PaymentAllocation::create([
+                        'payment_id' => $payment->id,
+                        'invoice_id' => $invoice->id,
+                        'amount'     => $allocate,
+                    ]);
+
+                    $newAmountPaid = floatval($invoice->amount_paid) + $allocate;
+                    $newStatus     = $newAmountPaid >= floatval($invoice->total_amount) ? 'paid' : 'partial';
+
+                    $invoice->update([
+                        'amount_paid' => $newAmountPaid,
+                        'status'      => $newStatus,
+                    ]);
+
+                    if ($newStatus === 'paid') {
+                        $fullyPaidInvoices->push($invoice->fresh());
+                    }
+
+                    $remaining -= $allocate;
+                }
+
+                $payment->update(['is_allocated' => true]);
+
+                $activeLease->load(['invoices', 'payments']);
+                $newBalance = floatval($activeLease->invoices->sum('total_amount'))
+                            - floatval($activeLease->payments->where('payment_type', '!=', 'deposit')->sum('amount'));
+            }
+        });
+
+        AuditService::log(
+            'payment.assigned',
+            'Unmatched M-Pesa payment of ' . currency($payment->amount) . ' manually assigned to ' . $tenant->full_name,
+            $payment,
+            ['tenant_id' => $tenant->id, 'amount' => $payment->amount, 'reference' => $payment->reference]
+        );
+
+        $this->sendPaymentConfirmationSms(
+            $tenant, $payment, $fullyPaidInvoices, $newBalance,
+            auth()->user()->account
+        );
+
+        return redirect()->route('payments.index')
+            ->with('success', 'Payment of ' . currency($payment->amount) . ' assigned to ' . $tenant->full_name . ' and allocated.');
     }
 
     private function sendDepositConfirmationSms(Tenant $tenant, Payment $payment, $account): void

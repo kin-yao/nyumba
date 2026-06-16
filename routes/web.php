@@ -152,6 +152,7 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
 
     // Payments
     Route::resource('payments', PaymentController::class)->only(['index', 'create', 'store']);
+    Route::post('/payments/{payment}/assign', [PaymentController::class, 'assign'])->name('payments.assign');
 
     // Utilities
     Route::get('/utilities/charges', [UtilityController::class, 'chargesForLease'])->name('utilities.charges');

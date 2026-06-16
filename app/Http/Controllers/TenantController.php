@@ -60,9 +60,24 @@ class TenantController extends Controller
             }
 
             foreach ($activeLease->payments as $payment) {
+                // Deposits shown separately — never count as rent payment
+                if ($payment->payment_type === 'deposit') {
+                    $ledger->push([
+                        'date'        => $payment->payment_date,
+                        'description' => 'Security deposit received'
+                            . ($payment->reference ? ' - ' . $payment->reference : ''),
+                        'charged'     => null,
+                        'paid'        => null, // not shown in paid column — it's not rent
+                        'type'        => 'deposit',
+                        'invoice_ref' => null,
+                    ]);
+                    continue;
+                }
+
                 $ledger->push([
                     'date'        => $payment->payment_date,
-                    'description' => 'Payment received' . ($payment->reference ? ' - ' . $payment->reference : ''),
+                    'description' => 'Payment received'
+                        . ($payment->reference ? ' - ' . $payment->reference : ''),
                     'charged'     => null,
                     'paid'        => $payment->amount,
                     'type'        => 'payment',
@@ -71,10 +86,18 @@ class TenantController extends Controller
             }
         }
 
-        $ledger       = $ledger->sortBy('date')->values();
-        $totalCharged = $activeLease?->invoices->sum('total_amount') ?? 0;
-        $totalPaid    = $activeLease?->payments->sum('amount') ?? 0;
-        $balance      = $totalCharged - $totalPaid;
+        $ledger = $ledger->sortBy('date')->values();
+
+        $totalCharged = floatval($activeLease?->invoices->sum('total_amount') ?? 0);
+
+        // CRITICAL: exclude deposits from balance — deposits are security, not rent payments
+        $totalPaid = floatval(
+            $activeLease?->payments
+                ->where('payment_type', '!=', 'deposit')
+                ->sum('amount') ?? 0
+        );
+
+        $balance = $totalCharged - $totalPaid;
 
         return view('tenants.show', compact('tenant', 'activeLease', 'ledger', 'balance'));
     }

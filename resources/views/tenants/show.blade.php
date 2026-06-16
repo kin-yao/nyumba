@@ -30,9 +30,7 @@
 }
 
 @media (max-width: 700px) {
-    .tshow-layout {
-        grid-template-columns: 1fr;
-    }
+    .tshow-layout { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 500px) {
@@ -114,7 +112,7 @@
                     @endif
                 </div>
 
-                {{-- Balance --}}
+                {{-- Balance + credit --}}
                 <div style="margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.07)">
                     <div style="font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Current balance</div>
                     <div style="font-family:'DM Serif Display',serif;font-size:28px;color:{{ $balance > 0 ? '#b91c1c' : ($balance < 0 ? '#1a6b52' : '#111110') }}">
@@ -122,10 +120,21 @@
                     </div>
                     <div style="font-size:11px;color:#8a8880;margin-top:2px">
                         @if($balance > 0) Owes this amount
-                        @elseif($balance < 0) In credit
+                        @elseif($balance < 0) In credit — {{ currency(abs($balance)) }} will apply to next invoice
                         @else Fully paid up
                         @endif
                     </div>
+
+                    {{-- Credit balance indicator --}}
+                    @if($balance < 0)
+                        <div style="margin-top:10px;background:#e6f2ed;border:1px solid #a7d7c5;border-radius:8px;padding:10px 12px">
+                            <div style="font-size:11px;font-weight:500;color:#1a6b52;margin-bottom:2px">Credit balance</div>
+                            <div style="font-size:13px;color:#166534">
+                                This tenant has overpaid by <strong>{{ currency(abs($balance)) }}</strong>.
+                                This credit will be applied automatically when the next invoice is generated.
+                            </div>
+                        </div>
+                    @endif
                 </div>
 
                 {{-- Actions --}}
@@ -159,16 +168,21 @@
                             </thead>
                             <tbody>
                                 @foreach($ledger as $entry)
-                                    <tr style="border-bottom:1px solid rgba(0,0,0,0.05)">
+                                    <tr style="border-bottom:1px solid rgba(0,0,0,0.05);{{ $entry['type'] === 'deposit' ? 'background:#f9fafb;' : '' }}">
                                         <td style="padding:10px 14px;font-size:12px;color:#8a8880;white-space:nowrap">
                                             {{ \Carbon\Carbon::parse($entry['date'])->format('d M Y') }}
                                         </td>
-                                        <td style="padding:10px 14px;font-size:13px">{{ $entry['description'] }}</td>
+                                        <td style="padding:10px 14px;font-size:13px;color:{{ $entry['type'] === 'deposit' ? '#8a8880' : '#111110' }};font-style:{{ $entry['type'] === 'deposit' ? 'italic' : 'normal' }}">
+                                            {{ $entry['description'] }}
+                                        </td>
                                         <td style="padding:10px 14px;font-size:13px;text-align:right;font-weight:500;white-space:nowrap">
                                             @if($entry['charged']) {{ currency($entry['charged']) }} @endif
                                         </td>
                                         <td style="padding:10px 14px;font-size:13px;text-align:right;font-weight:500;color:#15803d;white-space:nowrap">
                                             @if($entry['paid']) {{ currency($entry['paid']) }} @endif
+                                            @if($entry['type'] === 'deposit')
+                                                <span style="font-size:11px;color:#8a8880;font-style:italic">deposit</span>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
