@@ -140,6 +140,7 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
     Route::post('/tenants/{tenant}/move-out', [TenantController::class, 'moveOut'])->name('tenants.move-out');
     Route::delete('/tenants/{tenant}', [TenantController::class, 'destroy'])->name('tenants.destroy');
     Route::post('/tenants/{id}/restore', [TenantController::class, 'restore'])->name('tenants.restore');
+    Route::post('/tenants/{tenant}/transfer', [TenantController::class, 'transfer'])->name('tenants.transfer');
 
     // Invoices
     Route::get('/invoices/bulk', [InvoiceController::class, 'bulkCreate'])->name('invoices.bulk');

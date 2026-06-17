@@ -84,7 +84,6 @@ class FirebaseAuthController extends Controller
             Auth::login($user);
             session(['firebase_checked_at' => now()->timestamp]);
 
-            // Admin users go to the admin panel; everyone else goes to the app
             $redirect = $user->is_admin
                 ? route('admin.dashboard')
                 : route('dashboard');
@@ -304,17 +303,23 @@ class FirebaseAuthController extends Controller
                 $uid, $email, $phone, $name, $provider,
                 $emailVerified, $validated, $planMap
             ) {
+                // Always read from PLANS — never hardcode unit limits or SMS credits.
+                // If plan config changes, registration automatically reflects it.
+                $explorePlan = Account::PLANS['explore'];
+
                 $account = Account::create([
                     'name'                 => ($name ?? 'User') . "'s Properties",
                     'phone'                => $phone ?? '',
                     'email'                => $email ?? '',
                     'plan'                 => 'explore',
                     'billing_cycle'        => 'monthly',
-                    'unit_limit'           => 3,
+                    'unit_limit'           => $explorePlan['unit_limit'],
+                    'sms_credits'          => $explorePlan['sms_credits_monthly'],
+                    'sms_credits_monthly'  => $explorePlan['sms_credits_monthly'],
+                    // trial_ends_at = the 30-day free trial window
+                    // plan_expires_at = null until a paid plan is purchased via M-Pesa
                     'trial_ends_at'        => now()->addDays(30),
-                    'plan_expires_at'      => now()->addDays(30),
-                    'sms_credits'          => 10,
-                    'sms_credits_monthly'  => 10,
+                    'plan_expires_at'      => null,
                     'auto_invoice_enabled' => false,
                     'invoice_send_day'     => 1,
                     'use_case'             => session('reg.use_case', 'own_rental'),
@@ -341,7 +346,9 @@ class FirebaseAuthController extends Controller
                     'account_id' => $account->id,
                     'type'       => 'welcome',
                     'title'      => 'Welcome to Nyumba!',
-                    'body'       => 'Your 7 day free trial has started. Add your first property to get started.',
+                    'body'       => 'Your 30 day free trial has started. You have '
+                        . $explorePlan['sms_credits_monthly']
+                        . ' SMS credits to get started. Add your first property to begin.',
                 ]);
 
                 Auth::login($user);

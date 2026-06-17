@@ -27,7 +27,7 @@
         .option-icon { font-size: 20px; }
         .option-title { font-size: 14px; font-weight: 500; }
         .option-desc { font-size: 12px; color: #8a8880; margin-top: 2px; }
-        .option-plan { text-align: right; }
+        .option-plan { text-align: right; flex-shrink: 0; }
         .plan-name { font-size: 13px; font-weight: 500; color: #1a6b52; }
         .plan-price { font-size: 11px; color: #8a8880; margin-top: 2px; }
         .trial-note { background: #e6f2ed; border-radius: 10px; padding: 14px 16px; margin-bottom: 20px; font-size: 13px; color: #1a6b52; line-height: 1.5; }
@@ -48,10 +48,10 @@
         </div>
 
         <h1>How big is your portfolio?</h1>
-        <p class="subtitle">Step 4 of 4 — We will recommend the right plan for you</p>
+        <p class="subtitle">Step 4 of 4 — We'll recommend the right plan for you</p>
 
         <div class="trial-note">
-            🎉 All plans start with a <strong>7 day free trial</strong>. No payment required to get started.
+            🎉 All plans start with a <strong>30 day free trial</strong>. No payment required to get started.
         </div>
 
         @error('unit_range')
@@ -74,7 +74,7 @@
                     </div>
                     <div class="option-plan">
                         <div class="plan-name">Explore</div>
-                        <div class="plan-price">Free trial</div>
+                        <div class="plan-price">Free · 3 units · 10 SMS</div>
                     </div>
                 </label>
 
@@ -89,7 +89,7 @@
                     </div>
                     <div class="option-plan">
                         <div class="plan-name">Starter</div>
-                        <div class="plan-price">KES 2,000/mo</div>
+                        <div class="plan-price">KES 2,300/mo · 80 SMS</div>
                     </div>
                 </label>
 
@@ -104,7 +104,7 @@
                     </div>
                     <div class="option-plan">
                         <div class="plan-name">Growth</div>
-                        <div class="plan-price">KES 4,500/mo</div>
+                        <div class="plan-price">KES 4,600/mo · 200 SMS</div>
                     </div>
                 </label>
 
@@ -119,7 +119,7 @@
                     </div>
                     <div class="option-plan">
                         <div class="plan-name">Pro</div>
-                        <div class="plan-price">KES 7,000/mo</div>
+                        <div class="plan-price">KES 7,500/mo · 400 SMS</div>
                     </div>
                 </label>
 

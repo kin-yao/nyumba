@@ -14,17 +14,74 @@
         /* ── Responsive base ── */
         *, *::before, *::after { box-sizing: border-box; }
 
-        .nyumba-shell        { display:block; }
-        .nyumba-sidebar      { position:fixed; top:0; left:0; bottom:0; width:220px; background:#111110; display:flex; flex-direction:column; transition:transform .25s ease; z-index:40; }
-        .nyumba-main         { margin-left:220px; background:#f5f4f0; min-height:100vh; min-width:0; }
-        .nyumba-topbar       { display:none; }
-        .nyumba-overlay      { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:39; }
+        html {
+            /* Prevent horizontal scroll which causes GPU layer bleed on Android */
+            overflow-x: hidden;
+        }
+
+        body {
+            overflow-x: hidden;
+            /* Establish a single root compositing context */
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
+        }
+
+        .nyumba-shell { display: block; }
+
+        .nyumba-sidebar {
+            position: fixed;
+            top: 0; left: 0; bottom: 0;
+            width: 220px;
+            background: #111110;
+            display: flex;
+            flex-direction: column;
+            transition: transform .25s ease;
+            z-index: 40;
+            /*
+             * Pre-promote sidebar to its own GPU compositing layer.
+             * Without this, Android Chrome creates the layer lazily during
+             * the slide animation, which causes texture memory thrashing
+             * and the "static/scratches" rendering artifact.
+             */
+            will-change: transform;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+        }
+
+        .nyumba-main {
+            margin-left: 220px;
+            background: #f5f4f0;
+            min-height: 100vh;
+            min-width: 0;
+            /*
+             * Isolate main content into its own stacking context so it
+             * doesn't share a GPU layer with the sidebar. This prevents
+             * the sidebar's compositing layer from bleeding pixel artifacts
+             * into the main content area during scroll or animation.
+             */
+            isolation: isolate;
+            position: relative;
+            z-index: 0;
+        }
+
+        .nyumba-topbar  { display: none; }
+
+        .nyumba-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 39;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+        }
 
         /* ── Mobile ── */
         @media (max-width: 768px) {
             .nyumba-sidebar      { transform: translateX(-100%); }
             .nyumba-sidebar.open { transform: translateX(0); }
             .nyumba-overlay.open { display: block; }
+
             .nyumba-topbar {
                 display: flex;
                 align-items: center;
@@ -35,12 +92,20 @@
                 position: sticky;
                 top: 0;
                 z-index: 30;
+                /*
+                 * Sticky elements need their own layer — pre-promote cleanly
+                 * to avoid being merged into the sidebar's layer
+                 */
+                will-change: transform;
+                -webkit-backface-visibility: hidden;
+                backface-visibility: hidden;
             }
+
             .nyumba-main { margin-left: 0; }
         }
 
         /* ── Global responsive helpers ── */
-        .tbl-wrap            { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
         @media (max-width: 768px) {
             .hide-mobile     { display: none !important; }
@@ -59,8 +124,8 @@
         }
 
         @media (max-width: 480px) {
-            .stat-grid       { grid-template-columns: 1fr !important; }
-            .stat-grid-3     { grid-template-columns: 1fr !important; }
+            .stat-grid   { grid-template-columns: 1fr !important; }
+            .stat-grid-3 { grid-template-columns: 1fr !important; }
         }
     </style>
 </head>
@@ -86,18 +151,15 @@
         </div>
 
         @php
-            
-            $account          = auth()->user()->account;
-            $smsCredits       = $account->sms_credits ?? 0;
+            $account     = auth()->user()->account;
+            $smsCredits  = $account->sms_credits ?? 0;
 
-            // Cache notification count for 60 seconds per account
             $unreadCount = cache()->remember(
                 'notif_count_' . auth()->user()->account_id, 60,
                 fn() => \App\Models\Notification::where('account_id', auth()->user()->account_id)
                     ->unread()->count()
             );
 
-            // Cache properties list for 5 minutes per account
             $allProperties = $account ? cache()->remember(
                 'props_list_' . auth()->user()->account_id, 300,
                 fn() => \App\Models\Property::where('account_id', auth()->user()->account_id)
@@ -406,7 +468,6 @@
             </div>
         @endif
 
-        {{-- Subscription / plan notices (expired, trial-gated features, etc.) --}}
         @if(session('subscription_notice'))
             <div style="background:#fef3c7;border-bottom:1px solid #fcd34d;color:#92400e;padding:11px 20px;font-size:13px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
                 <span>{{ session('subscription_notice') }}</span>

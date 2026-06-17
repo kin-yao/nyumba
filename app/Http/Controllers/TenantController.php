@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Lease;
+use App\Models\Payment;
 use App\Models\Property;
 use App\Models\Tenant;
 use App\Models\Unit;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class TenantController extends Controller
 {
@@ -60,14 +62,13 @@ class TenantController extends Controller
             }
 
             foreach ($activeLease->payments as $payment) {
-                // Deposits shown separately — never count as rent payment
                 if ($payment->payment_type === 'deposit') {
                     $ledger->push([
                         'date'        => $payment->payment_date,
                         'description' => 'Security deposit received'
                             . ($payment->reference ? ' - ' . $payment->reference : ''),
                         'charged'     => null,
-                        'paid'        => null, // not shown in paid column — it's not rent
+                        'paid'        => null,
                         'type'        => 'deposit',
                         'invoice_ref' => null,
                     ]);
@@ -90,7 +91,6 @@ class TenantController extends Controller
 
         $totalCharged = floatval($activeLease?->invoices->sum('total_amount') ?? 0);
 
-        // CRITICAL: exclude deposits from balance — deposits are security, not rent payments
         $totalPaid = floatval(
             $activeLease?->payments
                 ->where('payment_type', '!=', 'deposit')
@@ -99,7 +99,19 @@ class TenantController extends Controller
 
         $balance = $totalCharged - $totalPaid;
 
-        return view('tenants.show', compact('tenant', 'activeLease', 'ledger', 'balance'));
+        // Load vacant units in the same property for the transfer modal
+        $vacantUnits = collect();
+        if ($activeLease?->unit?->property_id) {
+            $vacantUnits = Unit::where('property_id', $activeLease->unit->property_id)
+                ->where('status', 'vacant')
+                ->where('id', '!=', $activeLease->unit_id)
+                ->orderBy('name')
+                ->get();
+        }
+
+        return view('tenants.show', compact(
+            'tenant', 'activeLease', 'ledger', 'balance', 'vacantUnits'
+        ));
     }
 
     public function create()
@@ -168,6 +180,120 @@ class TenantController extends Controller
 
         return redirect()->route('tenants.index')
             ->with('success', $tenant->first_name . ' ' . $tenant->last_name . ' has been moved in successfully.');
+    }
+
+    // ── Transfer tenant to another unit in the same property ─────────────
+    public function transfer(Request $request, Tenant $tenant)
+    {
+        $validated = $request->validate([
+            'new_unit_id'      => ['required', 'exists:units,id'],
+            'transfer_date'    => ['required', 'date'],
+            'new_monthly_rent' => ['required', 'numeric', 'min:0'],
+            'deposit_action'   => ['required', 'in:carry_forward,keep,refund'],
+            'new_deposit'      => ['nullable', 'numeric', 'min:0'],
+            'notes'            => ['nullable', 'string'],
+        ]);
+
+        $activeLease = $tenant->leases()->where('status', 'active')->first();
+
+        if (!$activeLease) {
+            return back()->with('error', 'This tenant has no active lease to transfer.');
+        }
+
+        $oldUnit = $activeLease->unit;
+        $newUnit = Unit::find($validated['new_unit_id']);
+
+        // Verify new unit is in same property
+        if ($newUnit->property_id !== $oldUnit->property_id) {
+            return back()->with('error', 'Transfer is only allowed within the same property.');
+        }
+
+        // Verify new unit is vacant
+        if ($newUnit->status !== 'vacant') {
+            return back()->with('error', 'Unit ' . $newUnit->name . ' is not vacant. Cannot transfer.');
+        }
+
+        DB::transaction(function () use (
+            $tenant, $activeLease, $oldUnit, $newUnit, $validated
+        ) {
+            $depositToCarry = 0;
+
+            if ($validated['deposit_action'] === 'carry_forward') {
+                $depositToCarry = floatval($activeLease->deposit_paid);
+            } elseif ($validated['deposit_action'] === 'keep') {
+                $depositToCarry = 0;
+            } elseif ($validated['deposit_action'] === 'refund') {
+                $depositToCarry = 0;
+            }
+
+            // Use custom new deposit if provided, otherwise use carried amount
+            $newDepositPaid     = floatval($validated['new_deposit'] ?? $depositToCarry);
+            $newDepositRequired = $newUnit->deposit_amount > 0
+                ? $newUnit->deposit_amount
+                : $newDepositPaid;
+
+            // End the old lease
+            $activeLease->update([
+                'status'        => 'transferred',
+                'move_out_date' => $validated['transfer_date'],
+                'notes'         => trim(($activeLease->notes ?? '') . "\nTransferred to Unit " . $newUnit->name . ' on ' . $validated['transfer_date']
+                    . ($validated['notes'] ? '. ' . $validated['notes'] : '')),
+            ]);
+
+            // Mark old unit vacant
+            $oldUnit->update(['status' => 'vacant']);
+
+            // Create new lease on the new unit
+            $newLease = Lease::create([
+                'unit_id'               => $newUnit->id,
+                'tenant_id'             => $tenant->id,
+                'move_in_date'          => $validated['transfer_date'],
+                'lease_end_date'        => $activeLease->lease_end_date,
+                'monthly_rent'          => $validated['new_monthly_rent'],
+                'deposit_required'      => $newDepositRequired,
+                'deposit_paid'          => $newDepositPaid,
+                'escalation_percentage' => $activeLease->escalation_percentage,
+                'status'                => 'active',
+                'notes'                 => 'Transferred from Unit ' . $oldUnit->name
+                    . ' on ' . $validated['transfer_date']
+                    . ($validated['notes'] ? '. ' . $validated['notes'] : ''),
+            ]);
+
+            // If deposit is carried forward, create a deposit payment on the new lease
+            if ($validated['deposit_action'] === 'carry_forward' && $depositToCarry > 0) {
+                Payment::create([
+                    'account_id'   => auth()->user()->account_id,
+                    'tenant_id'    => $tenant->id,
+                    'lease_id'     => $newLease->id,
+                    'amount'       => $depositToCarry,
+                    'payment_type' => 'deposit',
+                    'payment_date' => $validated['transfer_date'],
+                    'method'       => 'bank', // internal transfer, no actual payment
+                    'reference'    => null,
+                    'notes'        => 'Deposit carried forward from Unit ' . $oldUnit->name,
+                    'is_allocated' => false,
+                ]);
+            }
+
+            // Mark new unit occupied
+            $newUnit->update(['status' => 'occupied']);
+        });
+
+        AuditService::log(
+            'tenant.transferred',
+            $tenant->full_name . ' transferred from Unit ' . $oldUnit->name . ' to Unit ' . $newUnit->name,
+            $tenant,
+            [
+                'from_unit'      => $oldUnit->name,
+                'to_unit'        => $newUnit->name,
+                'transfer_date'  => $validated['transfer_date'],
+                'new_rent'       => $validated['new_monthly_rent'],
+                'deposit_action' => $validated['deposit_action'],
+            ]
+        );
+
+        return redirect()->route('tenants.show', $tenant)
+            ->with('success', $tenant->first_name . ' has been transferred from Unit ' . $oldUnit->name . ' to Unit ' . $newUnit->name . ' successfully.');
     }
 
     public function moveOut(Request $request, Tenant $tenant)

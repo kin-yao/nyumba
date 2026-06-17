@@ -125,7 +125,6 @@
                         @endif
                     </div>
 
-                    {{-- Credit balance indicator --}}
                     @if($balance < 0)
                         <div style="margin-top:10px;background:#e6f2ed;border:1px solid #a7d7c5;border-radius:8px;padding:10px 12px">
                             <div style="font-size:11px;font-weight:500;color:#1a6b52;margin-bottom:2px">Credit balance</div>
@@ -138,10 +137,23 @@
                 </div>
 
                 {{-- Actions --}}
-                <button onclick="document.getElementById('move-out-modal').style.display='flex'"
-                        style="width:100%;padding:8px 15px;background:transparent;color:#b91c1c;border:1px solid rgba(185,28,28,0.25);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
-                    Move out
-                </button>
+                <div style="display:grid;gap:8px">
+                    @if($activeLease && $vacantUnits->isNotEmpty())
+                        <button onclick="document.getElementById('transfer-modal').style.display='flex'"
+                                style="width:100%;padding:8px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                            Transfer unit
+                        </button>
+                    @elseif($activeLease && $vacantUnits->isEmpty())
+                        <div style="font-size:12px;color:#8a8880;text-align:center;padding:6px 0">
+                            No vacant units available for transfer
+                        </div>
+                    @endif
+
+                    <button onclick="document.getElementById('move-out-modal').style.display='flex'"
+                            style="width:100%;padding:8px 15px;background:transparent;color:#b91c1c;border:1px solid rgba(185,28,28,0.25);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
+                        Move out
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -194,6 +206,113 @@
         </div>
     </div>
 </div>
+
+{{-- Transfer Unit Modal --}}
+@if($activeLease && $vacantUnits->isNotEmpty())
+<div id="transfer-modal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:50;align-items:center;justify-content:center;padding:16px">
+    <div class="modal-inner">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.07)">
+            <div style="font-size:15px;font-weight:500">Transfer unit &ndash; {{ $tenant->full_name }}</div>
+            <button onclick="document.getElementById('transfer-modal').style.display='none'"
+                    style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;line-height:1">&times;</button>
+        </div>
+
+        {{-- Current unit summary --}}
+        <div style="background:#f5f4f0;border-radius:8px;padding:12px 14px;margin-bottom:18px;font-size:12px">
+            <div style="color:#8a8880;margin-bottom:4px">Currently in</div>
+            <div style="font-weight:500;font-size:14px">Unit {{ $activeLease->unit->name }}</div>
+            <div style="color:#8a8880;margin-top:2px">
+                Rent: {{ currency($activeLease->monthly_rent) }} &middot;
+                Deposit held: {{ currency($activeLease->deposit_paid) }}
+                @if($balance > 0)
+                    &middot; <span style="color:#b91c1c">Owes {{ currency($balance) }}</span>
+                @elseif($balance < 0)
+                    &middot; <span style="color:#1a6b52">Credit {{ currency(abs($balance)) }}</span>
+                @endif
+            </div>
+        </div>
+
+        <form method="POST" action="{{ route('tenants.transfer', $tenant) }}">
+            @csrf
+            <div style="display:grid;gap:13px;margin-bottom:18px">
+
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">New unit</label>
+                    <select name="new_unit_id" required
+                            style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none"
+                            onchange="updateNewUnitRent(this)">
+                        <option value="">Select vacant unit...</option>
+                        @foreach($vacantUnits as $unit)
+                            <option value="{{ $unit->id }}"
+                                    data-rent="{{ $unit->rent_amount }}"
+                                    data-deposit="{{ $unit->deposit_amount }}">
+                                Unit {{ $unit->name }}
+                                @if($unit->type) — {{ $unit->type }} @endif
+                                — {{ currency($unit->rent_amount) }}/mo
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Transfer date</label>
+                    <input name="transfer_date" type="date" required value="{{ date('Y-m-d') }}"
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                </div>
+
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">New monthly rent ({{ currency_symbol() }})</label>
+                    <input name="new_monthly_rent" id="new_monthly_rent" type="number" step="0.01" min="0" required
+                           value="{{ $activeLease->monthly_rent }}"
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                    <div style="font-size:11px;color:#8a8880;margin-top:3px">Pre-filled from the new unit's configured rent. Adjust if needed.</div>
+                </div>
+
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Deposit handling</label>
+                    <select name="deposit_action" required id="deposit_action"
+                            style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none"
+                            onchange="toggleNewDeposit(this.value)">
+                        <option value="carry_forward">Carry forward to new unit ({{ currency($activeLease->deposit_paid) }})</option>
+                        <option value="keep">Keep deposit for old unit (landlord retains)</option>
+                        <option value="refund">Refund deposit to tenant</option>
+                    </select>
+                </div>
+
+                <div id="new_deposit_wrap" style="display:none">
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">New deposit amount ({{ currency_symbol() }})</label>
+                    <input name="new_deposit" id="new_deposit" type="number" step="0.01" min="0"
+                           value="{{ $activeLease->deposit_paid }}"
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                    <div style="font-size:11px;color:#8a8880;margin-top:3px">Override the carried deposit amount if needed.</div>
+                </div>
+
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Notes (optional)</label>
+                    <textarea name="notes" rows="2" placeholder="Reason for transfer, any special conditions..."
+                              style="width:100%;padding:9px 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;resize:vertical"></textarea>
+                </div>
+            </div>
+
+            <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:12px;color:#92400e">
+                ⚠ Outstanding invoices on the current lease will remain on the old lease history. Any balance owed ({{ currency(max(0,$balance)) }}) should be settled separately.
+            </div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="submit"
+                        style="padding:7px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                    Confirm transfer
+                </button>
+                <button type="button" onclick="document.getElementById('transfer-modal').style.display='none'"
+                        style="padding:7px 15px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+@endif
 
 {{-- Move Out Modal --}}
 <div id="move-out-modal"
@@ -262,4 +381,24 @@
         @endif
     </div>
 </div>
+
+<script>
+function updateNewUnitRent(select) {
+    const opt = select.options[select.selectedIndex];
+    const rent = opt.dataset.rent;
+    if (rent) {
+        document.getElementById('new_monthly_rent').value = rent;
+    }
+}
+
+function toggleNewDeposit(value) {
+    document.getElementById('new_deposit_wrap').style.display =
+        value === 'carry_forward' ? 'block' : 'none';
+}
+
+// Show new deposit field by default since carry_forward is default
+document.addEventListener('DOMContentLoaded', function() {
+    toggleNewDeposit('carry_forward');
+});
+</script>
 </x-layouts.app>
