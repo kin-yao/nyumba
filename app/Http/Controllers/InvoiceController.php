@@ -20,18 +20,25 @@ class InvoiceController extends Controller
     // ── Helpers ───────────────────────────────────────────────────────────
 
     /**
-     * Generate a per-account sequential invoice reference.
-     * Must be called inside a DB transaction with lockForUpdate() to prevent
-     * duplicate references under concurrent requests (race condition).
+     * Generate the next sequential invoice reference for this account.
+     * MUST be called inside a DB::transaction() — uses lockForUpdate()
+     * to prevent duplicate references under concurrent requests.
+     * Derives the next number from the highest existing INV-XXXX reference.
      */
     private function nextReference(int $accountId): string
     {
-        $count = Invoice::where('account_id', $accountId)
-            ->where('reference', 'not like', 'TEMP-%')
+        $max = Invoice::where('account_id', $accountId)
+            ->where('reference', 'like', 'INV-%')
             ->lockForUpdate()
-            ->count();
+            ->orderByRaw("CAST(SUBSTRING(reference, 5) AS UNSIGNED) DESC")
+            ->value('reference');
 
-        return 'INV-' . str_pad($count + 1, 4, '0', STR_PAD_LEFT);
+        if (!$max) {
+            return 'INV-0001';
+        }
+
+        $num = (int) substr($max, 4);
+        return 'INV-' . str_pad($num + 1, 4, '0', STR_PAD_LEFT);
     }
 
     // ── Index / Create ────────────────────────────────────────────────────
@@ -81,7 +88,7 @@ class InvoiceController extends Controller
             'types.*'        => ['required', 'string'],
         ]);
 
-        // Check duplicate outside transaction — fast early exit
+        // Fast duplicate check before entering transaction
         $exists = Invoice::where('lease_id', $validated['lease_id'])
             ->where('period_month', $validated['period_month'])
             ->where('period_year', $validated['period_year'])
@@ -101,25 +108,21 @@ class InvoiceController extends Controller
         $accountId   = auth()->user()->account_id;
         $totalAmount = array_sum($validated['amounts']);
 
-        // Wrap in a transaction so the reference generation and insert are atomic
         $invoice = DB::transaction(function () use ($validated, $accountId, $totalAmount) {
+            // Generate reference inside transaction with row-level lock
+            // No TEMP step — insert with final reference directly
+            $reference = $this->nextReference($accountId);
 
             $invoice = Invoice::create([
                 'account_id'   => $accountId,
                 'lease_id'     => $validated['lease_id'],
-                'reference'    => 'TEMP-' . uniqid(),
+                'reference'    => $reference,
                 'period_month' => $validated['period_month'],
                 'period_year'  => $validated['period_year'],
                 'invoice_date' => $validated['invoice_date'],
                 'due_date'     => $validated['due_date'],
                 'total_amount' => $totalAmount,
                 'status'       => 'draft',
-            ]);
-
-            // nextReference uses lockForUpdate inside the transaction
-            // so concurrent requests can't grab the same number
-            $invoice->update([
-                'reference' => $this->nextReference($accountId),
             ]);
 
             foreach ($validated['descriptions'] as $index => $description) {
@@ -136,14 +139,16 @@ class InvoiceController extends Controller
             return $invoice;
         });
 
-        $invoice->load('lease.tenant');
-
-        AuditService::log(
-            'invoice.created',
-            'Invoice ' . $invoice->reference . ' created (draft) for ' . $invoice->lease->tenant->full_name,
-            $invoice,
-            ['amount' => $totalAmount, 'period' => $validated['period_month'] . '/' . $validated['period_year']]
-        );
+        try {
+            AuditService::log(
+                'invoice.created',
+                'Invoice ' . $invoice->reference . ' created (draft)',
+                $invoice,
+                ['amount' => $totalAmount, 'period' => $validated['period_month'] . '/' . $validated['period_year']]
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Audit log failed: ' . $e->getMessage());
+        }
 
         return redirect()->route('invoices.show', $invoice)
             ->with('success', 'Invoice ' . $invoice->reference . ' created as draft. Send it when ready.');
@@ -390,7 +395,6 @@ class InvoiceController extends Controller
             $lease = Lease::with('unit.property.utilityRates')->find($leaseId);
             if (!$lease) continue;
 
-            // Skip if already invoiced for this period
             $exists = Invoice::where('lease_id', $leaseId)
                 ->where('period_month', $month)
                 ->where('period_year', $year)
@@ -407,22 +411,19 @@ class InvoiceController extends Controller
 
             $totalAmount = array_sum(array_column($lineItems, 'amount'));
 
-            // Wrap each invoice creation in its own transaction
             DB::transaction(function () use ($accountId, $leaseId, $month, $year, $validated, $totalAmount, $lineItems, &$count) {
+                $reference = $this->nextReference($accountId);
+
                 $invoice = Invoice::create([
                     'account_id'   => $accountId,
                     'lease_id'     => $leaseId,
-                    'reference'    => 'TEMP-' . uniqid(),
+                    'reference'    => $reference,
                     'period_month' => $month,
                     'period_year'  => $year,
                     'invoice_date' => $validated['invoice_date'],
                     'due_date'     => $validated['due_date'],
                     'total_amount' => $totalAmount,
                     'status'       => 'draft',
-                ]);
-
-                $invoice->update([
-                    'reference' => $this->nextReference($accountId),
                 ]);
 
                 foreach ($lineItems as $item) {
@@ -440,12 +441,16 @@ class InvoiceController extends Controller
             });
         }
 
-        AuditService::log(
-            'invoice.bulk_created',
-            $count . ' invoices bulk generated for ' . $monthName,
-            null,
-            ['count' => $count, 'skipped' => $skipped, 'period' => $monthName]
-        );
+        try {
+            AuditService::log(
+                'invoice.bulk_created',
+                $count . ' invoices bulk generated for ' . $monthName,
+                null,
+                ['count' => $count, 'skipped' => $skipped, 'period' => $monthName]
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Audit log failed: ' . $e->getMessage());
+        }
 
         $message = $count . ' ' . Str::plural('invoice', $count) . ' created as drafts.';
         if ($skipped > 0) {
