@@ -18,6 +18,12 @@ Schedule::command('invoices:send-reminders')->dailyAt('08:00');
 // Send expiry alerts — 3 days before trial, 7 days before paid subscription
 Schedule::command('accounts:send-expiry-alerts')->dailyAt('09:00');
 
+// Alert landlords when tenant leases expire in 30 or 7 days
+Schedule::command('leases:send-expiry-alerts')->dailyAt('08:30')->withoutOverlapping();
+
+// Apply rent escalations on review date
+Schedule::command('leases:apply-escalations')->dailyAt('07:00')->withoutOverlapping();
+
 // Reconcile M-Pesa C2B transactions via Pull API for registered properties.
 // Runs every 3 hours — worst case a missed C2B callback is caught within 3hrs.
 // Reduce to ->hourly() if landlords report payment delays.
