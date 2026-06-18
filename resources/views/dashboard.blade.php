@@ -228,6 +228,20 @@
 </div>
 @endif
 
+{{-- ── Flash messages ── --}}
+@if(session('success'))
+<div style="background:var(--green-soft);border:1px solid #a7d7c5;border-radius:6px;padding:11px 16px;margin-bottom:12px;font-size:13px;color:var(--green);display:flex;align-items:center;gap:8px">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+    {{ session('success') }}
+</div>
+@endif
+@if(session('error'))
+<div style="background:var(--red-soft);border:1px solid #fca5a5;border-radius:6px;padding:11px 16px;margin-bottom:12px;font-size:13px;color:var(--red);display:flex;align-items:center;gap:8px">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    {{ session('error') }}
+</div>
+@endif
+
 {{-- ── Alerts ── --}}
 @if($urgentMaintenance > 0)
 <div class="dash-alert" style="background:var(--red-soft);border:1px solid #fca5a5;color:var(--red)">
@@ -238,7 +252,7 @@
 @if($overdueCount > 0)
 <div class="dash-alert" style="background:#fef3c7;border:1px solid #fcd34d;color:#78350f">
     <span>{{ $overdueCount }} overdue {{ Str::plural('invoice',$overdueCount) }} require follow up</span>
-    <a href="{{ route('invoices.index') }}" style="color:#78350f;font-weight:700;text-decoration:none;font-size:11px;font-family:'Cabinet Grotesk',sans-serif;letter-spacing:.08em;text-transform:uppercase;background:rgba(120,53,15,.1);padding:4px 10px;border-radius:4px">View →</a>
+    <a href="{{ route('invoices.index') }}" style="color:#78350f;font-weight:700;text-decoration:none;font-size:11px;font-family:'Cabinet Grotesk',sans-serif;letter-spacing:.08em;text-transform:uppercase;background:rgba(120,53,14,.1);padding:4px 10px;border-radius:4px">View →</a>
 </div>
 @endif
 
@@ -254,7 +268,6 @@
 @endphp
 
 <div class="dash-hero">
-    {{-- Geometric shards (matching landing page) --}}
     <div class="dash-hero-shards">
         <svg width="100%" height="100%" viewBox="0 0 1200 280" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
             <polygon points="-72,0 792,0 480,280 -72,280" fill="#1a6b52" opacity="0.22"/>
@@ -434,7 +447,9 @@
                         <input type="hidden" name="recipient_type" value="individual">
                         <input type="hidden" name="tenant_id" value="{{ $item['tenant']->id }}">
                         <input type="hidden" name="message" value="Dear {{ $item['tenant']->first_name }}, your outstanding balance is {{ currency($item['balance']) }}. Please make payment at your earliest convenience. Thank you.">
-                        <button type="submit" style="font-family:'Cabinet Grotesk',sans-serif;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:4px;cursor:pointer;white-space:nowrap">
+                        <button type="submit"
+                                onclick="this.textContent='Sending…';this.style.opacity='0.6';this.style.pointerEvents='none';"
+                                style="font-family:'Cabinet Grotesk',sans-serif;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:5px 10px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:4px;cursor:pointer;white-space:nowrap">
                             Remind
                         </button>
                     </form>
