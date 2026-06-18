@@ -55,8 +55,11 @@ class CommunicationController extends Controller
         $account = auth()->user()->account;
         $sms     = new \App\Services\SmsService($account);
 
+        // Redirect back to wherever the request came from (dashboard, communications, etc.)
+        $redirectBack = redirect()->back()->fallback(route('communications.index'));
+
         if (!$sms->hasCredits()) {
-            return redirect()->route('communications.index')
+            return $redirectBack
                 ->with('error', 'You have no SMS credits remaining. Please top up to continue sending messages.');
         }
 
@@ -93,21 +96,21 @@ class CommunicationController extends Controller
             case 'overdue':
                 $tenants = Tenant::whereHas('activeLease', function ($q) use ($unitIds) {
                     $q->whereIn('unit_id', $unitIds)
-                      ->whereHas('invoices', function ($q2) {
-                          $q2->whereIn('status', ['overdue', 'sent', 'partial'])
-                             ->where('due_date', '<', now());
-                      });
+                    ->whereHas('invoices', function ($q2) {
+                        $q2->whereIn('status', ['overdue', 'sent', 'partial'])
+                            ->where('due_date', '<', now());
+                    });
                 })->get();
                 break;
         }
 
         if ($tenants->isEmpty()) {
-            return redirect()->route('communications.index')
+            return $redirectBack
                 ->with('error', 'No recipients found. Please check your selection.');
         }
 
         if (!$sms->hasCredits($tenants->count())) {
-            return redirect()->route('communications.index')
+            return $redirectBack
                 ->with('error', 'You need ' . $tenants->count() . ' SMS credits but only have ' . $sms->remainingCredits() . '. Please top up.');
         }
 
@@ -131,19 +134,23 @@ class CommunicationController extends Controller
             default      => $validated['recipient_type'],
         };
 
-        AuditService::log(
-            'sms.sent',
-            $sent . ' SMS ' . Str::plural('message', $sent) . ' sent to ' . $recipientLabel
-                . ($failed > 0 ? ' (' . $failed . ' failed)' : ''),
-            null,
-            [
-                'sent'           => $sent,
-                'failed'         => $failed,
-                'recipient_type' => $validated['recipient_type'],
-                'credits_left'   => $sms->remainingCredits(),
-            ],
-            !empty($validated['property_id']) ? (int) $validated['property_id'] : null
-        );
+        try {
+            AuditService::log(
+                'sms.sent',
+                $sent . ' SMS ' . Str::plural('message', $sent) . ' sent to ' . $recipientLabel
+                    . ($failed > 0 ? ' (' . $failed . ' failed)' : ''),
+                null,
+                [
+                    'sent'           => $sent,
+                    'failed'         => $failed,
+                    'recipient_type' => $validated['recipient_type'],
+                    'credits_left'   => $sms->remainingCredits(),
+                ],
+                !empty($validated['property_id']) ? (int) $validated['property_id'] : null
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Audit log failed: ' . $e->getMessage());
+        }
 
         $message = $sent . ' ' . Str::plural('message', $sent) . ' sent successfully.';
         if ($failed > 0) {
@@ -151,8 +158,7 @@ class CommunicationController extends Controller
         }
         $message .= ' ' . $sms->remainingCredits() . ' credits remaining.';
 
-        return redirect()->route('communications.index')
-            ->with('success', $message);
+        return $redirectBack->with('success', $message);
     }
 
     public function storeTemplate(Request $request)
