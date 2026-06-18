@@ -16,6 +16,11 @@ use App\Http\Controllers\UtilityController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
+// Health check — keeps Railway container warm
+Route::get('/health', function () {
+    return response('ok', 200);
+});
+
 // ─── Root ──────────────────────────────────────────────────────────────────────
 Route::get('/', function () {
     if (auth()->check()) return redirect()->route('dashboard');
