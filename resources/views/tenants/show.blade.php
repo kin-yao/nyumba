@@ -1,6 +1,9 @@
 <x-layouts.app>
 <style>
-.tshow-wrap { padding: clamp(16px,4vw,34px); padding-bottom: 48px; }
+.tshow-wrap {
+    padding: clamp(16px,4vw,34px);
+    padding-bottom: 48px;
+}
 
 .tshow-layout {
     display: grid;
@@ -12,11 +15,12 @@
 .tbl-scroll {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    max-width: 100%;
 }
 .tbl-scroll table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 420px;
+    min-width: 380px;
 }
 
 .modal-inner {
@@ -29,6 +33,12 @@
     overflow-y: auto;
 }
 
+.moveout-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
 @media (max-width: 700px) {
     .tshow-layout { grid-template-columns: 1fr; }
 }
@@ -38,6 +48,17 @@
         width: calc(100vw - 24px);
         padding: 20px;
         border-radius: 12px;
+    }
+    .moveout-summary {
+        grid-template-columns: 1fr;
+    }
+    .tbl-scroll table {
+        min-width: 300px;
+    }
+    .tbl-scroll th,
+    .tbl-scroll td {
+        padding: 8px 10px !important;
+        font-size: 11px !important;
     }
 }
 </style>
@@ -60,8 +81,8 @@
                     <div style="width:42px;height:42px;border-radius:50%;background:#e6f2ed;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:#1a6b52;flex-shrink:0">
                         {{ strtoupper(substr($tenant->first_name,0,1).substr($tenant->last_name,0,1)) }}
                     </div>
-                    <div>
-                        <div style="font-size:15px;font-weight:500">{{ $tenant->full_name }}</div>
+                    <div style="min-width:0">
+                        <div style="font-size:15px;font-weight:500;word-break:break-word">{{ $tenant->full_name }}</div>
                         <div style="font-size:12px;color:#8a8880">
                             {{ $activeLease?->unit?->name }} &middot; {{ $activeLease?->unit?->property?->name }}
                         </div>
@@ -70,43 +91,43 @@
 
                 {{-- Details --}}
                 <div style="display:grid;gap:9px;font-size:12px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.07)">
-                    <div style="display:flex;justify-content:space-between;gap:8px">
-                        <span style="color:#8a8880">Phone</span>
-                        <span style="font-family:monospace;text-align:right">{{ $tenant->phone }}</span>
+                    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                        <span style="color:#8a8880;flex-shrink:0">Phone</span>
+                        <span style="font-family:monospace;text-align:right;word-break:break-all">{{ $tenant->phone }}</span>
                     </div>
                     @if($tenant->alt_phone)
-                        <div style="display:flex;justify-content:space-between;gap:8px">
-                            <span style="color:#8a8880">Alt phone</span>
-                            <span style="font-family:monospace;text-align:right">{{ $tenant->alt_phone }}</span>
+                        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                            <span style="color:#8a8880;flex-shrink:0">Alt phone</span>
+                            <span style="font-family:monospace;text-align:right;word-break:break-all">{{ $tenant->alt_phone }}</span>
                         </div>
                     @endif
                     @if($tenant->id_number)
-                        <div style="display:flex;justify-content:space-between;gap:8px">
-                            <span style="color:#8a8880">ID number</span>
-                            <span style="text-align:right">{{ $tenant->id_number }}</span>
+                        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                            <span style="color:#8a8880;flex-shrink:0">ID number</span>
+                            <span style="text-align:right;word-break:break-all">{{ $tenant->id_number }}</span>
                         </div>
                     @endif
                     @if($tenant->email)
-                        <div style="display:flex;justify-content:space-between;gap:8px">
-                            <span style="color:#8a8880">Email</span>
+                        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                            <span style="color:#8a8880;flex-shrink:0">Email</span>
                             <span style="text-align:right;word-break:break-all">{{ $tenant->email }}</span>
                         </div>
                     @endif
                     @if($activeLease)
-                        <div style="display:flex;justify-content:space-between;gap:8px">
-                            <span style="color:#8a8880">Move-in</span>
+                        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                            <span style="color:#8a8880;flex-shrink:0">Move-in</span>
                             <span>{{ $activeLease->move_in_date->format('d M Y') }}</span>
                         </div>
-                        <div style="display:flex;justify-content:space-between;gap:8px">
-                            <span style="color:#8a8880">Lease end</span>
+                        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                            <span style="color:#8a8880;flex-shrink:0">Lease end</span>
                             <span>{{ $activeLease->lease_end_date?->format('d M Y') ?? 'Open-ended' }}</span>
                         </div>
-                        <div style="display:flex;justify-content:space-between;gap:8px">
-                            <span style="color:#8a8880">Monthly rent</span>
+                        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                            <span style="color:#8a8880;flex-shrink:0">Monthly rent</span>
                             <span style="font-weight:500">{{ currency($activeLease->monthly_rent) }}</span>
                         </div>
-                        <div style="display:flex;justify-content:space-between;gap:8px">
-                            <span style="color:#8a8880">Deposit held</span>
+                        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+                            <span style="color:#8a8880;flex-shrink:0">Deposit held</span>
                             <span style="font-weight:500">{{ currency($activeLease->deposit_paid) }}</span>
                         </div>
                     @endif
@@ -172,10 +193,10 @@
                         <table>
                             <thead>
                                 <tr>
-                                    <th style="font-size:10px;letter-spacing:.05em;color:#8a8880;text-transform:uppercase;padding:9px 14px;text-align:left;border-bottom:1px solid rgba(0,0,0,0.07);font-weight:500">Date</th>
+                                    <th style="font-size:10px;letter-spacing:.05em;color:#8a8880;text-transform:uppercase;padding:9px 14px;text-align:left;border-bottom:1px solid rgba(0,0,0,0.07);font-weight:500;white-space:nowrap">Date</th>
                                     <th style="font-size:10px;letter-spacing:.05em;color:#8a8880;text-transform:uppercase;padding:9px 14px;text-align:left;border-bottom:1px solid rgba(0,0,0,0.07);font-weight:500">Description</th>
-                                    <th style="font-size:10px;letter-spacing:.05em;color:#8a8880;text-transform:uppercase;padding:9px 14px;text-align:right;border-bottom:1px solid rgba(0,0,0,0.07);font-weight:500">Charged</th>
-                                    <th style="font-size:10px;letter-spacing:.05em;color:#8a8880;text-transform:uppercase;padding:9px 14px;text-align:right;border-bottom:1px solid rgba(0,0,0,0.07);font-weight:500">Paid</th>
+                                    <th style="font-size:10px;letter-spacing:.05em;color:#8a8880;text-transform:uppercase;padding:9px 14px;text-align:right;border-bottom:1px solid rgba(0,0,0,0.07);font-weight:500;white-space:nowrap">Charged</th>
+                                    <th style="font-size:10px;letter-spacing:.05em;color:#8a8880;text-transform:uppercase;padding:9px 14px;text-align:right;border-bottom:1px solid rgba(0,0,0,0.07);font-weight:500;white-space:nowrap">Paid</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -218,11 +239,10 @@
                     style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;line-height:1">&times;</button>
         </div>
 
-        {{-- Current unit summary --}}
         <div style="background:#f5f4f0;border-radius:8px;padding:12px 14px;margin-bottom:18px;font-size:12px">
             <div style="color:#8a8880;margin-bottom:4px">Currently in</div>
             <div style="font-weight:500;font-size:14px">Unit {{ $activeLease->unit->name }}</div>
-            <div style="color:#8a8880;margin-top:2px">
+            <div style="color:#8a8880;margin-top:2px;word-break:break-word">
                 Rent: {{ currency($activeLease->monthly_rent) }} &middot;
                 Deposit held: {{ currency($activeLease->deposit_paid) }}
                 @if($balance > 0)
@@ -325,7 +345,7 @@
         </div>
 
         @if($activeLease)
-            <div style="background:#f5f4f0;border-radius:8px;padding:14px;margin-bottom:18px;display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px">
+            <div class="moveout-summary" style="background:#f5f4f0;border-radius:8px;padding:14px;margin-bottom:18px;font-size:12px">
                 <div>
                     <div style="color:#8a8880;margin-bottom:3px">Balance owed</div>
                     <div style="font-family:'DM Serif Display',serif;font-size:20px;color:{{ $balance > 0 ? '#b91c1c' : '#15803d' }}">
@@ -396,7 +416,6 @@ function toggleNewDeposit(value) {
         value === 'carry_forward' ? 'block' : 'none';
 }
 
-// Show new deposit field by default since carry_forward is default
 document.addEventListener('DOMContentLoaded', function() {
     toggleNewDeposit('carry_forward');
 });
