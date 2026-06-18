@@ -56,11 +56,11 @@ class CommunicationController extends Controller
         $sms     = new \App\Services\SmsService($account);
 
         // Redirect back to wherever the request came from (dashboard, communications, etc.)
-        $redirectBack = redirect()->back()->fallback(route('communications.index'));
+        $redirectBack = url()->previous() ? redirect()->back() : redirect()->route('communications.index');
 
         if (!$sms->hasCredits()) {
             return $redirectBack
-                ->with('error', 'You have no SMS credits remaining. Please top up to continue sending messages.');
+                ->with('error', 'Reminder not sent — no SMS credits remaining.');
         }
 
         $unitIds = $this->filteredUnitIds();
@@ -96,22 +96,22 @@ class CommunicationController extends Controller
             case 'overdue':
                 $tenants = Tenant::whereHas('activeLease', function ($q) use ($unitIds) {
                     $q->whereIn('unit_id', $unitIds)
-                    ->whereHas('invoices', function ($q2) {
-                        $q2->whereIn('status', ['overdue', 'sent', 'partial'])
-                            ->where('due_date', '<', now());
-                    });
+                      ->whereHas('invoices', function ($q2) {
+                          $q2->whereIn('status', ['overdue', 'sent', 'partial'])
+                             ->where('due_date', '<', now());
+                      });
                 })->get();
                 break;
         }
 
         if ($tenants->isEmpty()) {
             return $redirectBack
-                ->with('error', 'No recipients found. Please check your selection.');
+                ->with('error', 'Reminder not sent — no recipients found.');
         }
 
         if (!$sms->hasCredits($tenants->count())) {
             return $redirectBack
-                ->with('error', 'You need ' . $tenants->count() . ' SMS credits but only have ' . $sms->remainingCredits() . '. Please top up.');
+                ->with('error', 'Reminder not sent — insufficient SMS credits (' . $sms->remainingCredits() . ' remaining, ' . $tenants->count() . ' needed).');
         }
 
         $sent   = 0;
@@ -152,9 +152,13 @@ class CommunicationController extends Controller
             \Log::warning('Audit log failed: ' . $e->getMessage());
         }
 
-        $message = $sent . ' ' . Str::plural('message', $sent) . ' sent successfully.';
+        if ($sent === 0 && $failed > 0) {
+            return $redirectBack->with('error', 'Reminder not sent — all ' . $failed . ' attempts failed.');
+        }
+
+        $message = 'Reminder sent successfully.';
         if ($failed > 0) {
-            $message .= ' ' . $failed . ' failed.';
+            $message = $sent . ' sent, ' . $failed . ' failed.';
         }
         $message .= ' ' . $sms->remainingCredits() . ' credits remaining.';
 
