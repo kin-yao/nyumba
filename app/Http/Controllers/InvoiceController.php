@@ -11,7 +11,6 @@ use App\Models\UtilityReading;
 use App\Services\AuditService;
 use App\Services\SmsService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
@@ -20,25 +19,14 @@ class InvoiceController extends Controller
     // ── Helpers ───────────────────────────────────────────────────────────
 
     /**
-     * Generate the next sequential invoice reference for this account.
-     * MUST be called inside a DB::transaction() — uses lockForUpdate()
-     * to prevent duplicate references under concurrent requests.
-     * Derives the next number from the highest existing INV-XXXX reference.
+     * Generate a globally unique invoice reference per account.
+     * Format: INV-{accountId}-{microsecond timestamp}
+     * e.g. INV-7-20260618143052123456
+     * No locking or transactions needed — timestamp makes it unique.
      */
     private function nextReference(int $accountId): string
     {
-        $max = Invoice::where('account_id', $accountId)
-            ->where('reference', 'like', 'INV-%')
-            ->lockForUpdate()
-            ->orderByRaw("CAST(SUBSTRING(reference, 5) AS UNSIGNED) DESC")
-            ->value('reference');
-
-        if (!$max) {
-            return 'INV-0001';
-        }
-
-        $num = (int) substr($max, 4);
-        return 'INV-' . str_pad($num + 1, 4, '0', STR_PAD_LEFT);
+        return 'INV-' . $accountId . '-' . now()->format('YmdHisu');
     }
 
     // ── Index / Create ────────────────────────────────────────────────────
@@ -88,7 +76,7 @@ class InvoiceController extends Controller
             'types.*'        => ['required', 'string'],
         ]);
 
-        // Fast duplicate check before entering transaction
+        // Duplicate period check — one invoice per tenant per month
         $exists = Invoice::where('lease_id', $validated['lease_id'])
             ->where('period_month', $validated['period_month'])
             ->where('period_year', $validated['period_year'])
@@ -107,37 +95,30 @@ class InvoiceController extends Controller
 
         $accountId   = auth()->user()->account_id;
         $totalAmount = array_sum($validated['amounts']);
+        $reference   = $this->nextReference($accountId);
 
-        $invoice = DB::transaction(function () use ($validated, $accountId, $totalAmount) {
-            // Generate reference inside transaction with row-level lock
-            // No TEMP step — insert with final reference directly
-            $reference = $this->nextReference($accountId);
+        $invoice = Invoice::create([
+            'account_id'   => $accountId,
+            'lease_id'     => $validated['lease_id'],
+            'reference'    => $reference,
+            'period_month' => $validated['period_month'],
+            'period_year'  => $validated['period_year'],
+            'invoice_date' => $validated['invoice_date'],
+            'due_date'     => $validated['due_date'],
+            'total_amount' => $totalAmount,
+            'status'       => 'draft',
+        ]);
 
-            $invoice = Invoice::create([
-                'account_id'   => $accountId,
-                'lease_id'     => $validated['lease_id'],
-                'reference'    => $reference,
-                'period_month' => $validated['period_month'],
-                'period_year'  => $validated['period_year'],
-                'invoice_date' => $validated['invoice_date'],
-                'due_date'     => $validated['due_date'],
-                'total_amount' => $totalAmount,
-                'status'       => 'draft',
+        foreach ($validated['descriptions'] as $index => $description) {
+            InvoiceLineItem::create([
+                'invoice_id'  => $invoice->id,
+                'description' => $description,
+                'quantity'    => 1,
+                'unit_price'  => $validated['amounts'][$index],
+                'amount'      => $validated['amounts'][$index],
+                'type'        => $validated['types'][$index],
             ]);
-
-            foreach ($validated['descriptions'] as $index => $description) {
-                InvoiceLineItem::create([
-                    'invoice_id'  => $invoice->id,
-                    'description' => $description,
-                    'quantity'    => 1,
-                    'unit_price'  => $validated['amounts'][$index],
-                    'amount'      => $validated['amounts'][$index],
-                    'type'        => $validated['types'][$index],
-                ]);
-            }
-
-            return $invoice;
-        });
+        }
 
         try {
             AuditService::log(
@@ -410,35 +391,32 @@ class InvoiceController extends Controller
             }
 
             $totalAmount = array_sum(array_column($lineItems, 'amount'));
+            $reference   = $this->nextReference($accountId);
 
-            DB::transaction(function () use ($accountId, $leaseId, $month, $year, $validated, $totalAmount, $lineItems, &$count) {
-                $reference = $this->nextReference($accountId);
+            $invoice = Invoice::create([
+                'account_id'   => $accountId,
+                'lease_id'     => $leaseId,
+                'reference'    => $reference,
+                'period_month' => $month,
+                'period_year'  => $year,
+                'invoice_date' => $validated['invoice_date'],
+                'due_date'     => $validated['due_date'],
+                'total_amount' => $totalAmount,
+                'status'       => 'draft',
+            ]);
 
-                $invoice = Invoice::create([
-                    'account_id'   => $accountId,
-                    'lease_id'     => $leaseId,
-                    'reference'    => $reference,
-                    'period_month' => $month,
-                    'period_year'  => $year,
-                    'invoice_date' => $validated['invoice_date'],
-                    'due_date'     => $validated['due_date'],
-                    'total_amount' => $totalAmount,
-                    'status'       => 'draft',
+            foreach ($lineItems as $item) {
+                InvoiceLineItem::create([
+                    'invoice_id'  => $invoice->id,
+                    'description' => $item['description'],
+                    'quantity'    => 1,
+                    'unit_price'  => $item['amount'],
+                    'amount'      => $item['amount'],
+                    'type'        => $item['type'],
                 ]);
+            }
 
-                foreach ($lineItems as $item) {
-                    InvoiceLineItem::create([
-                        'invoice_id'  => $invoice->id,
-                        'description' => $item['description'],
-                        'quantity'    => 1,
-                        'unit_price'  => $item['amount'],
-                        'amount'      => $item['amount'],
-                        'type'        => $item['type'],
-                    ]);
-                }
-
-                $count++;
-            });
+            $count++;
         }
 
         try {
