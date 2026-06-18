@@ -35,7 +35,6 @@ class ExpenseController extends Controller
 
         $expenses   = $query->get();
         $properties = Property::whereIn('id', $propertyIds)->get();
-
         $totalAmount = $expenses->sum('amount');
 
         $totalThisMonthQuery = Expense::whereMonth('expense_date', now()->month)
@@ -74,12 +73,16 @@ class ExpenseController extends Controller
 
         $expense = Expense::create($validated);
 
-        AuditService::log(
-            'expense.recorded',
-            'Expense of ' . currency($validated['amount']) . ' recorded — ' . $validated['description'],
-            $expense,
-            ['amount' => $validated['amount'], 'category' => $validated['category'], 'vendor' => $validated['vendor'] ?? null]
-        );
+        try {
+            AuditService::log(
+                'expense.recorded',
+                'Expense of ' . currency($validated['amount']) . ' recorded — ' . $validated['description'],
+                $expense,
+                ['amount' => $validated['amount'], 'category' => $validated['category'], 'vendor' => $validated['vendor'] ?? null]
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Audit log failed: ' . $e->getMessage());
+        }
 
         return redirect()->route('expenses.index')
             ->with('success', 'Expense of ' . currency($validated['amount']) . ' recorded.');
@@ -87,12 +90,16 @@ class ExpenseController extends Controller
 
     public function destroy(Expense $expense)
     {
-        AuditService::log(
-            'expense.deleted',
-            'Expense deleted — ' . $expense->description . ' (' . currency($expense->amount) . ')',
-            null,
-            ['amount' => $expense->amount, 'category' => $expense->category]
-        );
+        try {
+            AuditService::log(
+                'expense.deleted',
+                'Expense deleted — ' . $expense->description . ' (' . currency($expense->amount) . ')',
+                null,
+                ['amount' => $expense->amount, 'category' => $expense->category]
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Audit log failed: ' . $e->getMessage());
+        }
 
         $expense->delete();
 
