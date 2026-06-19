@@ -4,7 +4,7 @@
 
 .set-layout {
     display: grid;
-    grid-template-columns: 190px 1fr;
+    grid-template-columns: 170px 1fr;
     gap: 22px;
     align-items: start;
 }
@@ -67,7 +67,6 @@
     .form-3col  { grid-template-columns: 1fr 1fr; }
     .plans-grid { grid-template-columns: 1fr; max-width: 100%; }
 }
-
 @media (max-width: 400px) {
     .form-3col { grid-template-columns: 1fr; }
 }
@@ -118,6 +117,12 @@
     margin: 0 auto 14px;
 }
 @keyframes stkspin { to { transform: rotate(360deg); } }
+
+.section-divider {
+    margin: 28px 0 16px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(0,0,0,0.07);
+}
 </style>
 
 @php
@@ -143,16 +148,14 @@
 
     <div class="set-layout">
 
-        {{-- Settings nav --}}
+        {{-- Settings nav — 5 tabs --}}
         <div class="set-nav">
             @foreach([
                 ['account',      'Account'],
-                ['schedule',     'Invoices'],
-                ['reports',      'Reports'],
-                ['password',     'Password'],
+                ['invoicing',    'Invoices & Reports'],
                 ['users',        'Users'],
                 ['subscription', 'Subscription'],
-                ['danger',       'Danger zone'],
+                ['advanced',     'Advanced'],
             ] as [$id, $label])
                 <button class="sni {{ $id === $openPanel ? 'on' : '' }}"
                         onclick="showPanel('{{ $id }}', this)"
@@ -207,7 +210,6 @@
                                     </option>
                                 @endforeach
                             </select>
-                            <div style="font-size:11px;color:#8a8880;margin-top:3px">All amounts in the app and on invoices will use this currency</div>
                         </div>
                         <div>
                             <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Company logo</label>
@@ -220,7 +222,7 @@
                             @endif
                             <input name="logo" type="file" accept="image/png,image/jpeg,image/webp"
                                    style="width:100%;font-size:13px;font-family:'DM Sans',sans-serif;color:#111110">
-                            <div style="font-size:11px;color:#8a8880;margin-top:3px">PNG, JPG or WebP. Max 2MB. Appears on PDF invoices.</div>
+                            <div style="font-size:11px;color:#8a8880;margin-top:3px">PNG/JPG/WebP, max 2MB</div>
                         </div>
                     </div>
                     <div style="margin-top:16px">
@@ -231,8 +233,8 @@
                 </form>
             </div>
 
-            {{-- ── Invoice schedule ── --}}
-            <div id="panel-schedule" class="sp" style="display:{{ $openPanel === 'schedule' ? 'block' : 'none' }}">
+            {{-- ── Invoices & Reports ── --}}
+            <div id="panel-invoicing" class="sp" style="display:{{ $openPanel === 'invoicing' ? 'block' : 'none' }}">
                 <div style="font-size:15px;font-weight:500;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,0.07)">
                     Automatic invoice schedule
                 </div>
@@ -243,10 +245,7 @@
                             <input type="checkbox" name="auto_invoice_enabled" value="1"
                                    {{ $account->auto_invoice_enabled?'checked':'' }}
                                    style="width:16px;height:16px;accent-color:#1a6b52;flex-shrink:0">
-                            <div>
-                                <div style="font-weight:500">Enable automatic invoice generation</div>
-                                <div style="font-size:12px;color:#8a8880;margin-top:2px">System will automatically generate and send invoices on the configured day each month</div>
-                            </div>
+                            <div style="font-weight:500">Enable automatic invoice generation</div>
                         </label>
                     </div>
                     <div style="margin-bottom:16px">
@@ -261,25 +260,19 @@
                             </select>
                             <span style="font-size:13px;color:#8a8880">of every month</span>
                         </div>
-                        <div style="font-size:11px;color:#8a8880;margin-top:5px">Choose between 1st and 28th to avoid month-end issues</div>
-                    </div>
-                    <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#92400e">
-                        Make sure all meter readings are entered before this date each month.
                     </div>
                     <button type="submit" style="padding:7px 16px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
                         Save schedule
                     </button>
                 </form>
-            </div>
 
-            {{-- ── Report alerts ── --}}
-            <div id="panel-reports" class="sp" style="display:{{ $openPanel === 'reports' ? 'block' : 'none' }}">
-                <div style="font-size:15px;font-weight:500;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,0.07)">
-                    Report alerts
+                <div class="section-divider">
+                    <div style="font-size:15px;font-weight:500;margin-bottom:4px">Report alerts</div>
+                    <div style="font-size:13px;color:#8a8880;margin-bottom:16px">
+                        Sent via SMS to <strong style="color:#111110">{{ $account->phone }}</strong>
+                    </div>
                 </div>
-                <div style="font-size:13px;color:#8a8880;margin-bottom:20px">
-                    Receive automated SMS reports. Sent to: <strong style="color:#111110">{{ $account->phone }}</strong>
-                </div>
+
                 <form method="POST" action="{{ route('settings.report-alerts') }}">
                     @csrf
                     @php
@@ -290,15 +283,12 @@
                     @endphp
 
                     @foreach([
-                        ['weekly',  'Weekly report',  'Collections, payments and maintenance summary for the week'],
-                        ['monthly', 'Monthly report', 'Income, expenses, occupancy and top balances for the month'],
-                    ] as [$freq, $title, $desc])
+                        ['weekly',  'Weekly report'],
+                        ['monthly', 'Monthly report'],
+                    ] as [$freq, $title])
                         <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:18px;margin-bottom:12px">
                             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-                                <div>
-                                    <div style="font-size:13px;font-weight:500">{{ $title }}</div>
-                                    <div style="font-size:12px;color:#8a8880;margin-top:2px">{{ $desc }}</div>
-                                </div>
+                                <div style="font-size:13px;font-weight:500">{{ $title }}</div>
                                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0">
                                     <input type="checkbox" name="{{ $freq }}_report_enabled" value="1"
                                            {{ $account->{$freq.'_report_enabled'}?'checked':'' }}
@@ -343,10 +333,7 @@
 
                     <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:18px;margin-bottom:20px">
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-                            <div>
-                                <div style="font-size:13px;font-weight:500">Yearly report</div>
-                                <div style="font-size:12px;color:#8a8880;margin-top:2px">Annual income, expenses, net profit and best performing month</div>
-                            </div>
+                            <div style="font-size:13px;font-weight:500">Yearly report</div>
                             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0">
                                 <input type="checkbox" name="yearly_report_enabled" value="1"
                                        {{ $account->yearly_report_enabled?'checked':'' }}
@@ -392,34 +379,6 @@
                 </form>
             </div>
 
-            {{-- ── Password ── --}}
-            <div id="panel-password" class="sp" style="display:{{ $openPanel === 'password' ? 'block' : 'none' }}">
-                <div style="font-size:15px;font-weight:500;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,0.07)">Change password</div>
-                <form method="POST" action="{{ route('settings.password') }}" style="max-width:400px">
-                    @csrf
-                    <div style="display:grid;gap:13px">
-                        <div>
-                            <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Current password</label>
-                            <input name="current_password" type="password" required style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
-                            @error('current_password')<div style="font-size:12px;color:#b91c1c;margin-top:3px">{{ $message }}</div>@enderror
-                        </div>
-                        <div>
-                            <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">New password</label>
-                            <input name="password" type="password" required style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
-                        </div>
-                        <div>
-                            <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Confirm new password</label>
-                            <input name="password_confirmation" type="password" required style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
-                        </div>
-                    </div>
-                    <div style="margin-top:16px">
-                        <button type="submit" style="padding:7px 16px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
-                            Update password
-                        </button>
-                    </div>
-                </form>
-            </div>
-
             {{-- ── Users ── --}}
             <div id="panel-users" class="sp" style="display:{{ $openPanel === 'users' ? 'block' : 'none' }}">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,0.07);flex-wrap:wrap;gap:8px">
@@ -437,7 +396,7 @@
                     </div>
                     <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8a8880">
                         <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:#dbeafe;color:#1e40af">Manager</span>
-                        Financials &amp; tenants, no settings
+                        No settings
                     </div>
                     <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8a8880">
                         <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:#fef3c7;color:#92400e">Caretaker</span>
@@ -517,14 +476,14 @@
                     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(0,0,0,0.07);flex-wrap:wrap;gap:8px">
                         <div>
                             <div style="font-size:15px;font-weight:500">{{ $account->planName() }} plan</div>
-                            <div style="font-size:12px;color:#8a8880;margin-top:2px">{{ $account->unit_limit }} unit limit &middot; {{ $account->sms_credits_monthly }} SMS/month</div>
+                            <div style="font-size:12px;color:#8a8880;margin-top:2px">{{ $account->unit_limit }} units &middot; {{ $account->sms_credits_monthly }} SMS/month</div>
                         </div>
                         @if($account->isOnTrial())
-                            <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:#fef3c7;color:#92400e">Trial &middot; {{ $account->trialDaysRemaining() }} days left</span>
+                            <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:#fef3c7;color:#92400e">Trial &middot; {{ $account->trialDaysRemaining() }}d</span>
                         @elseif($account->isInGracePeriod())
-                            <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:#fee2e2;color:#991b1b">Grace &middot; {{ $account->graceDaysRemaining() }} days</span>
+                            <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:#fee2e2;color:#991b1b">Grace &middot; {{ $account->graceDaysRemaining() }}d</span>
                         @elseif($account->isActive())
-                            <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:#e6f2ed;color:#1a6b52">Active &middot; {{ $account->subscriptionDaysRemaining() }} days left</span>
+                            <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:#e6f2ed;color:#1a6b52">Active &middot; {{ $account->subscriptionDaysRemaining() }}d</span>
                         @else
                             <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:#fee2e2;color:#991b1b">Expired</span>
                         @endif
@@ -535,7 +494,7 @@
                             <span style="font-weight:500">{{ $account->currentUnitCount() }} of {{ $account->unit_limit }}</span>
                         </div>
                         <div style="display:flex;justify-content:space-between">
-                            <span style="color:#8a8880">SMS credits remaining</span>
+                            <span style="color:#8a8880">SMS credits</span>
                             <span style="font-weight:500;color:{{ $account->sms_credits<=20?'#b91c1c':'#111110' }}">{{ number_format($account->sms_credits) }}</span>
                         </div>
                         @if($account->plan_expires_at)
@@ -574,7 +533,6 @@
                                 <div style="font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:2px">{{ currency($plan['price_yearly']) }}</div>
                                 <div style="font-size:11px;color:#8a8880;margin-bottom:6px">per year</div>
                             </div>
-                            <div style="font-size:11px;color:#1a6b52;font-weight:500;margin-bottom:10px">Save 2 months on yearly</div>
                             <div style="border-top:1px solid rgba(0,0,0,0.06);padding-top:10px;font-size:12px;display:grid;gap:3px;color:#8a8880;margin-bottom:12px">
                                 <div>Up to {{ $plan['unit_limit'] }} units</div>
                                 <div>{{ $plan['sms_credits_monthly'] }} SMS/month</div>
@@ -588,56 +546,53 @@
                     @endforeach
                 </div>
 
-                <div style="background:#111110;border-radius:10px;padding:16px 20px;max-width:700px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-                    <div>
-                        <div style="font-size:13px;font-weight:500;color:#fff">Enterprise</div>
-                        <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:2px">100+ units &middot; Custom SMS &middot; Dedicated support</div>
-                    </div>
-                    <a href="mailto:{{ config('app.support_email','support@nyumba.co.ke') }}"
-                       style="padding:7px 14px;background:#1a6b52;color:#fff;border-radius:7px;font-size:12px;font-weight:500;text-decoration:none;white-space:nowrap">
-                        Contact us
-                    </a>
-                </div>
-
-                <div style="background:#e6f2ed;border:1px solid #a7d7c5;border-radius:10px;padding:14px 16px;max-width:700px;margin-bottom:16px;font-size:13px">
-                    <div style="font-weight:500;color:#1a6b52;margin-bottom:6px">Loyalty discounts</div>
-                    <div style="color:#166534;display:flex;flex-direction:column;gap:4px">
-                        <div>🎁 Pay 6 months → get 1 month free</div>
-                        <div>🎁 Pay 12 months → get 2 months free</div>
-                    </div>
-                </div>
-
                 <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:16px 18px;max-width:700px;font-size:13px">
                     <div style="font-weight:500;margin-bottom:6px">Pay with M-Pesa</div>
-                    <div style="color:#8a8880;line-height:1.7;margin-bottom:10px">
-                        Click "Upgrade" on any plan above to pay instantly via M-Pesa STK push — your account is upgraded automatically the moment payment is confirmed.
-                    </div>
-                    <div style="color:#8a8880;line-height:1.7;margin-bottom:10px">
-                        Prefer to pay manually or need an Enterprise plan? Contact us:
-                    </div>
-                    <div style="display:flex;gap:20px;flex-wrap:wrap">
-                        <div>📞 <strong>{{ config('app.support_phone','0700 000 000') }}</strong></div>
-                        <div>✉ <strong>{{ config('app.support_email','support@nyumba.co.ke') }}</strong></div>
+                    <div style="color:#8a8880;line-height:1.7">
+                        Click "Upgrade" to pay via M-Pesa STK push — your account upgrades automatically once payment is confirmed.
                     </div>
                 </div>
             </div>
 
-            {{-- ── Danger zone ── --}}
-            <div id="panel-danger" class="sp" style="display:{{ $openPanel === 'danger' ? 'block' : 'none' }}">
-                <div style="font-size:15px;font-weight:500;margin-bottom:6px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,0.07)">
-                    Danger zone
+            {{-- ── Advanced (Password + Danger zone) ── --}}
+            <div id="panel-advanced" class="sp" style="display:{{ $openPanel === 'advanced' ? 'block' : 'none' }}">
+                <div style="font-size:15px;font-weight:500;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,0.07)">Change password</div>
+                <form method="POST" action="{{ route('settings.password') }}" style="max-width:400px">
+                    @csrf
+                    <div style="display:grid;gap:13px">
+                        <div>
+                            <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Current password</label>
+                            <input name="current_password" type="password" required style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                            @error('current_password')<div style="font-size:12px;color:#b91c1c;margin-top:3px">{{ $message }}</div>@enderror
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">New password</label>
+                            <input name="password" type="password" required style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Confirm new password</label>
+                            <input name="password_confirmation" type="password" required style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                        </div>
+                    </div>
+                    <div style="margin-top:16px">
+                        <button type="submit" style="padding:7px 16px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                            Update password
+                        </button>
+                    </div>
+                </form>
+
+                <div class="section-divider">
+                    <div style="font-size:15px;font-weight:500;color:#991b1b;margin-bottom:6px">Danger zone</div>
                 </div>
+
                 <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:20px;max-width:560px">
                     <div style="display:flex;align-items:flex-start;gap:14px">
                         <div style="font-size:22px;flex-shrink:0;margin-top:2px">⚠️</div>
                         <div>
                             <div style="font-size:14px;font-weight:600;color:#991b1b;margin-bottom:6px">Reset account data</div>
                             <div style="font-size:13px;color:#7f1d1d;line-height:1.6;margin-bottom:16px">
-                                This permanently deletes all properties, units, tenants, leases, invoices, payments, expenses,
-                                maintenance requests, utility data, SMS logs, notifications and audit logs.
-                                <br><br>
-                                <strong>Your account, users and subscription are kept.</strong>
-                                This action cannot be undone.
+                                Permanently deletes all properties, tenants, invoices, payments and related data.
+                                Your account and users are kept. This cannot be undone.
                             </div>
                             @if(auth()->user()->role === 'owner')
                                 <button type="button"
@@ -697,17 +652,14 @@
                 <div>
                     <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Role</label>
                     <select name="role" required style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
-                        <option value="owner" {{ old('role')==='owner'?'selected':'' }}>Owner — full access including settings and billing</option>
-                        <option value="manager" {{ old('role')==='manager'?'selected':'' }}>Manager — financials, tenants, invoices, payments (no settings)</option>
-                        <option value="caretaker" {{ old('role')==='caretaker'?'selected':'' }}>Caretaker — properties and maintenance only</option>
+                        <option value="owner" {{ old('role')==='owner'?'selected':'' }}>Owner — full access</option>
+                        <option value="manager" {{ old('role')==='manager'?'selected':'' }}>Manager — no settings</option>
+                        <option value="caretaker" {{ old('role')==='caretaker'?'selected':'' }}>Caretaker — properties only</option>
                     </select>
-                    <div style="font-size:11px;color:#8a8880;margin-top:4px">
-                        Owner: full access &middot; Manager: no settings/billing &middot; Caretaker: properties &amp; maintenance only
-                    </div>
                 </div>
             </div>
             <div style="background:#f5f4f0;border-radius:7px;padding:10px 12px;font-size:12px;color:#8a8880;margin-bottom:16px">
-                A temporary password of <strong>password123</strong> will be assigned. Ask the user to change it after first login.
+                Temporary password: <strong>password123</strong>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button type="submit" style="padding:7px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
@@ -751,14 +703,13 @@
             <div class="stk-spinner"></div>
             <div style="font-size:14px;font-weight:500;margin-bottom:6px">Check your phone</div>
             <div style="font-size:13px;color:#8a8880;line-height:1.6">
-                Enter your M-Pesa PIN on the prompt sent to <strong id="upgrade-phone-display"></strong> to complete payment.
+                Enter your M-Pesa PIN sent to <strong id="upgrade-phone-display"></strong>.
             </div>
             <div style="font-size:12px;color:#8a8880;margin-top:14px" id="upgrade-waiting-status">Waiting for confirmation...</div>
         </div>
         <div id="upgrade-step-success" style="display:none;text-align:center;padding:20px 0">
             <div style="font-size:36px;margin-bottom:10px">✅</div>
             <div style="font-size:14px;font-weight:500;margin-bottom:6px">Payment successful</div>
-            <div style="font-size:13px;color:#8a8880;line-height:1.6;margin-bottom:18px">Your plan has been upgraded. The page will refresh now.</div>
             <button type="button" onclick="window.location.reload()"
                     style="padding:8px 20px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
                 Continue
@@ -786,10 +737,7 @@
                     style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;line-height:1">&times;</button>
         </div>
         <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px;margin-bottom:20px;font-size:13px;color:#7f1d1d;line-height:1.6">
-            You are about to permanently delete <strong>all business data</strong> in this account.
-            This includes all properties, tenants, invoices, payments and everything else.
-            <br><br>
-            This <strong>cannot be undone</strong>.
+            This cannot be undone.
         </div>
         <form method="POST" action="{{ route('settings.reset-account') }}" id="reset-form">
             @csrf
