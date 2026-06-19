@@ -2,7 +2,6 @@
 <style>
 .set-wrap { padding: clamp(16px,4vw,34px); padding-bottom: 48px; }
 
-/* Two-column layout: nav + panel */
 .set-layout {
     display: grid;
     grid-template-columns: 190px 1fr;
@@ -10,7 +9,6 @@
     align-items: start;
 }
 
-/* Nav pills */
 .set-nav {
     display: flex;
     flex-direction: column;
@@ -32,12 +30,8 @@
     width: 100%;
 }
 
-/* Mobile: nav becomes horizontal scrollable pill row */
 @media (max-width: 700px) {
-    .set-layout {
-        grid-template-columns: 1fr;
-        gap: 14px;
-    }
+    .set-layout { grid-template-columns: 1fr; gap: 14px; }
     .set-nav {
         flex-direction: row;
         flex-wrap: nowrap;
@@ -58,17 +52,8 @@
     }
 }
 
-/* Form grids */
-.form-2col {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-}
-.form-3col {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 12px;
-}
+.form-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 .plans-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -84,10 +69,9 @@
 }
 
 @media (max-width: 400px) {
-    .form-3col  { grid-template-columns: 1fr; }
+    .form-3col { grid-template-columns: 1fr; }
 }
 
-/* Modal */
 .modal-box {
     background: #fff;
     border-radius: 14px;
@@ -96,14 +80,9 @@
     max-width: 440px;
 }
 @media (max-width: 500px) {
-    .modal-box {
-        width: calc(100vw - 24px);
-        padding: 20px;
-        border-radius: 12px;
-    }
+    .modal-box { width: calc(100vw - 24px); padding: 20px; border-radius: 12px; }
 }
 
-/* Billing cycle toggle */
 .cycle-toggle {
     display: inline-flex;
     background: #f5f4f0;
@@ -129,7 +108,6 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 
-/* STK push spinner */
 .stk-spinner {
     width: 28px;
     height: 28px;
@@ -141,6 +119,10 @@
 }
 @keyframes stkspin { to { transform: rotate(360deg); } }
 </style>
+
+@php
+    $openPanel = old('_panel', session('_panel', 'account'));
+@endphp
 
 <div class="set-wrap">
 
@@ -169,14 +151,13 @@
                 ['reports',      'Reports'],
                 ['password',     'Password'],
                 ['users',        'Users'],
-
                 ['subscription', 'Subscription'],
                 ['danger',       'Danger zone'],
             ] as [$id, $label])
-                <button class="sni {{ $id === 'account' ? 'on' : '' }}"
+                <button class="sni {{ $id === $openPanel ? 'on' : '' }}"
                         onclick="showPanel('{{ $id }}', this)"
                         id="nav-{{ $id }}"
-                        style="{{ $id === 'account' ? 'background:#e6f2ed;color:#1a6b52;font-weight:500' : '' }}">
+                        style="{{ $id === $openPanel ? 'background:#e6f2ed;color:#1a6b52;font-weight:500' : '' }}">
                     {{ $label }}
                 </button>
             @endforeach
@@ -186,7 +167,7 @@
         <div>
 
             {{-- ── Account ── --}}
-            <div id="panel-account" class="sp" style="display:block">
+            <div id="panel-account" class="sp" style="display:{{ $openPanel === 'account' ? 'block' : 'none' }}">
                 <div style="font-size:15px;font-weight:500;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,0.07)">
                     Business details
                 </div>
@@ -250,9 +231,8 @@
                 </form>
             </div>
 
-
             {{-- ── Invoice schedule ── --}}
-            <div id="panel-schedule" class="sp" style="display:none">
+            <div id="panel-schedule" class="sp" style="display:{{ $openPanel === 'schedule' ? 'block' : 'none' }}">
                 <div style="font-size:15px;font-weight:500;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,0.07)">
                     Automatic invoice schedule
                 </div>
@@ -293,7 +273,7 @@
             </div>
 
             {{-- ── Report alerts ── --}}
-            <div id="panel-reports" class="sp" style="display:none">
+            <div id="panel-reports" class="sp" style="display:{{ $openPanel === 'reports' ? 'block' : 'none' }}">
                 <div style="font-size:15px;font-weight:500;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,0.07)">
                     Report alerts
                 </div>
@@ -361,7 +341,6 @@
                         </div>
                     @endforeach
 
-                    {{-- Yearly --}}
                     <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:18px;margin-bottom:20px">
                         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
                             <div>
@@ -414,7 +393,7 @@
             </div>
 
             {{-- ── Password ── --}}
-            <div id="panel-password" class="sp" style="display:none">
+            <div id="panel-password" class="sp" style="display:{{ $openPanel === 'password' ? 'block' : 'none' }}">
                 <div style="font-size:15px;font-weight:500;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,0.07)">Change password</div>
                 <form method="POST" action="{{ route('settings.password') }}" style="max-width:400px">
                     @csrf
@@ -442,7 +421,7 @@
             </div>
 
             {{-- ── Users ── --}}
-            <div id="panel-users" class="sp" style="display:none">
+            <div id="panel-users" class="sp" style="display:{{ $openPanel === 'users' ? 'block' : 'none' }}">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,0.07);flex-wrap:wrap;gap:8px">
                     <div style="font-size:15px;font-weight:500">Users and Roles</div>
                     <button onclick="document.getElementById('invite-modal').style.display='flex'"
@@ -450,6 +429,22 @@
                         + Add user
                     </button>
                 </div>
+
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+                    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8a8880">
+                        <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:#e6f2ed;color:#1a6b52">Owner</span>
+                        Full access
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8a8880">
+                        <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:#dbeafe;color:#1e40af">Manager</span>
+                        Financials &amp; tenants, no settings
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#8a8880">
+                        <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:#fef3c7;color:#92400e">Caretaker</span>
+                        Properties &amp; maintenance only
+                    </div>
+                </div>
+
                 <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:10px;border:1px solid rgba(0,0,0,0.07)">
                     <table style="width:100%;border-collapse:collapse;min-width:400px">
                         <thead>
@@ -476,8 +471,16 @@
                                     </td>
                                     <td style="padding:11px 14px;font-size:13px;color:#8a8880">{{ $user->email }}</td>
                                     <td style="padding:11px 14px">
-                                        <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:{{ $user->role==='owner'?'#e6f2ed':'#f3f4f6' }};color:{{ $user->role==='owner'?'#1a6b52':'#4b5563' }}">
-                                            {{ $user->role==='owner'?'Owner':'Read only' }}
+                                        @php
+                                            $roleBadge = match($user->role) {
+                                                'owner'     => ['#e6f2ed', '#1a6b52', 'Owner'],
+                                                'manager'   => ['#dbeafe', '#1e40af', 'Manager'],
+                                                'caretaker' => ['#fef3c7', '#92400e', 'Caretaker'],
+                                                default     => ['#f3f4f6', '#4b5563', ucfirst($user->role)],
+                                            };
+                                        @endphp
+                                        <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:{{ $roleBadge[0] }};color:{{ $roleBadge[1] }}">
+                                            {{ $roleBadge[2] }}
                                         </span>
                                     </td>
                                     <td style="padding:11px 14px;text-align:right">
@@ -499,7 +502,7 @@
             </div>
 
             {{-- ── Subscription ── --}}
-            <div id="panel-subscription" class="sp" style="display:none">
+            <div id="panel-subscription" class="sp" style="display:{{ $openPanel === 'subscription' ? 'block' : 'none' }}">
                 <div style="font-size:15px;font-weight:500;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,0.07)">
                     Subscription and Billing
                 </div>
@@ -510,7 +513,6 @@
                     </div>
                 @endif
 
-                {{-- Current plan --}}
                 <div style="background:#fff;border-radius:10px;border:1px solid {{ $account->isExpired()?'#fca5a5':'#1a6b52' }};border-left-width:3px;padding:20px;max-width:560px;margin-bottom:20px">
                     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(0,0,0,0.07);flex-wrap:wrap;gap:8px">
                         <div>
@@ -545,7 +547,6 @@
                     </div>
                 </div>
 
-                {{-- Plans --}}
                 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">
                     <div style="font-size:13px;font-weight:500">Available plans</div>
                     <div class="cycle-toggle">
@@ -557,16 +558,14 @@
                 <div class="plans-grid">
                     @foreach(['starter','growth','pro'] as $planKey)
                         @php
-                            $plan       = \App\Models\Account::PLANS[$planKey];
-                            $isCurrent  = $account->plan === $planKey;
-                            $canUpgrade = !$account->isOnTrial() ? true : true; // always purchasable
+                            $plan      = \App\Models\Account::PLANS[$planKey];
+                            $isCurrent = $account->plan === $planKey;
                         @endphp
                         <div style="background:#fff;border-radius:10px;border:2px solid {{ $isCurrent?'#1a6b52':'rgba(0,0,0,0.07)' }};padding:16px;position:relative">
                             @if($isCurrent)
                                 <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#1a6b52;color:#fff;font-size:10px;font-weight:600;padding:2px 10px;border-radius:10px;white-space:nowrap">CURRENT</div>
                             @endif
                             <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:#8a8880;margin-bottom:6px">{{ $plan['name'] }}</div>
-
                             <div class="price-monthly">
                                 <div style="font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:2px">{{ currency($plan['price_monthly']) }}</div>
                                 <div style="font-size:11px;color:#8a8880;margin-bottom:6px">per month</div>
@@ -575,14 +574,11 @@
                                 <div style="font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:2px">{{ currency($plan['price_yearly']) }}</div>
                                 <div style="font-size:11px;color:#8a8880;margin-bottom:6px">per year</div>
                             </div>
-
                             <div style="font-size:11px;color:#1a6b52;font-weight:500;margin-bottom:10px">Save 2 months on yearly</div>
-
                             <div style="border-top:1px solid rgba(0,0,0,0.06);padding-top:10px;font-size:12px;display:grid;gap:3px;color:#8a8880;margin-bottom:12px">
                                 <div>Up to {{ $plan['unit_limit'] }} units</div>
                                 <div>{{ $plan['sms_credits_monthly'] }} SMS/month</div>
                             </div>
-
                             <button type="button"
                                     onclick="openUpgradeModal('{{ $planKey }}', '{{ $plan['name'] }}')"
                                     style="width:100%;padding:7px;background:{{ $isCurrent?'transparent':'#1a6b52' }};color:{{ $isCurrent?'#1a6b52':'#fff' }};border:1px solid #1a6b52;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
@@ -627,11 +623,10 @@
             </div>
 
             {{-- ── Danger zone ── --}}
-            <div id="panel-danger" class="sp" style="display:none">
+            <div id="panel-danger" class="sp" style="display:{{ $openPanel === 'danger' ? 'block' : 'none' }}">
                 <div style="font-size:15px;font-weight:500;margin-bottom:6px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,0.07)">
                     Danger zone
                 </div>
-
                 <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:20px;max-width:560px">
                     <div style="display:flex;align-items:flex-start;gap:14px">
                         <div style="font-size:22px;flex-shrink:0;margin-top:2px">⚠️</div>
@@ -666,7 +661,7 @@
 
 {{-- Invite User Modal --}}
 <div id="invite-modal"
-     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:50;align-items:center;justify-content:center;padding:16px">
+     style="display:{{ $errors->any() && $openPanel === 'users' ? 'flex' : 'none' }};position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:50;align-items:center;justify-content:center;padding:16px">
     <div class="modal-box">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.07)">
             <div style="font-size:15px;font-weight:500">Add a user</div>
@@ -675,29 +670,44 @@
         </div>
         <form method="POST" action="{{ route('settings.users.invite') }}">
             @csrf
+            <input type="hidden" name="_panel" value="users">
+            @if($errors->any())
+                <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:7px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#991b1b">
+                    @foreach($errors->all() as $err)
+                        <div>{{ $err }}</div>
+                    @endforeach
+                </div>
+            @endif
             <div style="display:grid;gap:13px;margin-bottom:18px">
                 <div>
                     <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Full name</label>
-                    <input name="name" type="text" required style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                    <input name="name" type="text" required value="{{ old('name') }}" style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                    @error('name')<div style="font-size:11px;color:#b91c1c;margin-top:3px">{{ $message }}</div>@enderror
                 </div>
                 <div>
                     <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Email address</label>
-                    <input name="email" type="email" required style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                    <input name="email" type="email" required value="{{ old('email') }}" style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                    @error('email')<div style="font-size:11px;color:#b91c1c;margin-top:3px">{{ $message }}</div>@enderror
                 </div>
                 <div>
                     <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Phone number</label>
-                    <input name="phone" type="text" required placeholder="07XX" style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                    <input name="phone" type="text" required placeholder="07XX" value="{{ old('phone') }}" style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                    @error('phone')<div style="font-size:11px;color:#b91c1c;margin-top:3px">{{ $message }}</div>@enderror
                 </div>
                 <div>
                     <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Role</label>
                     <select name="role" required style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
-                        <option value="owner">Owner (full access)</option>
-                        <option value="read_only">Read only (view only)</option>
+                        <option value="owner" {{ old('role')==='owner'?'selected':'' }}>Owner — full access including settings and billing</option>
+                        <option value="manager" {{ old('role')==='manager'?'selected':'' }}>Manager — financials, tenants, invoices, payments (no settings)</option>
+                        <option value="caretaker" {{ old('role')==='caretaker'?'selected':'' }}>Caretaker — properties and maintenance only</option>
                     </select>
+                    <div style="font-size:11px;color:#8a8880;margin-top:4px">
+                        Owner: full access &middot; Manager: no settings/billing &middot; Caretaker: properties &amp; maintenance only
+                    </div>
                 </div>
             </div>
             <div style="background:#f5f4f0;border-radius:7px;padding:10px 12px;font-size:12px;color:#8a8880;margin-bottom:16px">
-                A temporary password of <strong>password123</strong> will be assigned.
+                A temporary password of <strong>password123</strong> will be assigned. Ask the user to change it after first login.
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button type="submit" style="padding:7px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
@@ -721,28 +731,22 @@
             <button onclick="closeUpgradeModal()"
                     style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;line-height:1">&times;</button>
         </div>
-
-        {{-- Step 1: phone entry --}}
         <div id="upgrade-step-form">
             <div style="background:#f5f4f0;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;display:flex;justify-content:space-between">
                 <span style="color:#8a8880">Amount to pay</span>
                 <span style="font-weight:500;font-family:'DM Serif Display',serif;font-size:16px" id="upgrade-amount">KES 0</span>
             </div>
-
             <div style="margin-bottom:16px">
                 <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">M-Pesa phone number</label>
                 <input type="text" id="upgrade-phone" placeholder="07XXXXXXXX"
                        style="width:100%;height:40px;padding:0 12px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:14px;font-family:'DM Sans',sans-serif;outline:none">
                 <div id="upgrade-error" style="display:none;color:#b91c1c;font-size:12px;margin-top:6px"></div>
             </div>
-
             <button type="button" id="upgrade-pay-btn" onclick="initiateStkPush()"
                     style="width:100%;padding:10px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
                 Pay with M-Pesa
             </button>
         </div>
-
-        {{-- Step 2: waiting for STK --}}
         <div id="upgrade-step-waiting" style="display:none;text-align:center;padding:20px 0">
             <div class="stk-spinner"></div>
             <div style="font-size:14px;font-weight:500;margin-bottom:6px">Check your phone</div>
@@ -751,32 +755,64 @@
             </div>
             <div style="font-size:12px;color:#8a8880;margin-top:14px" id="upgrade-waiting-status">Waiting for confirmation...</div>
         </div>
-
-        {{-- Step 3: success --}}
         <div id="upgrade-step-success" style="display:none;text-align:center;padding:20px 0">
             <div style="font-size:36px;margin-bottom:10px">✅</div>
             <div style="font-size:14px;font-weight:500;margin-bottom:6px">Payment successful</div>
-            <div style="font-size:13px;color:#8a8880;line-height:1.6;margin-bottom:18px">
-                Your plan has been upgraded. The page will refresh now.
-            </div>
+            <div style="font-size:13px;color:#8a8880;line-height:1.6;margin-bottom:18px">Your plan has been upgraded. The page will refresh now.</div>
             <button type="button" onclick="window.location.reload()"
                     style="padding:8px 20px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
                 Continue
             </button>
         </div>
-
-        {{-- Step 4: failed --}}
         <div id="upgrade-step-failed" style="display:none;text-align:center;padding:20px 0">
             <div style="font-size:36px;margin-bottom:10px">⚠️</div>
             <div style="font-size:14px;font-weight:500;margin-bottom:6px">Payment not completed</div>
-            <div style="font-size:13px;color:#8a8880;line-height:1.6;margin-bottom:18px" id="upgrade-failed-desc">
-                The payment was cancelled or did not go through.
-            </div>
+            <div style="font-size:13px;color:#8a8880;line-height:1.6;margin-bottom:18px" id="upgrade-failed-desc">The payment was cancelled or did not go through.</div>
             <button type="button" onclick="resetUpgradeModal()"
                     style="padding:8px 20px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
                 Try again
             </button>
         </div>
+    </div>
+</div>
+
+{{-- Reset Account Modal --}}
+<div id="reset-modal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:50;align-items:center;justify-content:center;padding:16px">
+    <div style="background:#fff;border-radius:14px;padding:28px;width:100%;max-width:460px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.07)">
+            <div style="font-size:15px;font-weight:600;color:#991b1b">Reset account data</div>
+            <button onclick="closeResetModal()"
+                    style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;line-height:1">&times;</button>
+        </div>
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px;margin-bottom:20px;font-size:13px;color:#7f1d1d;line-height:1.6">
+            You are about to permanently delete <strong>all business data</strong> in this account.
+            This includes all properties, tenants, invoices, payments and everything else.
+            <br><br>
+            This <strong>cannot be undone</strong>.
+        </div>
+        <form method="POST" action="{{ route('settings.reset-account') }}" id="reset-form">
+            @csrf
+            <div style="margin-bottom:20px">
+                <label style="display:block;font-size:12px;font-weight:500;color:#991b1b;margin-bottom:8px">
+                    Type <strong>RESET</strong> to confirm:
+                </label>
+                <input type="text" name="confirmation" id="reset-confirmation" placeholder="RESET" autocomplete="off"
+                       oninput="checkResetInput(this)"
+                       style="width:100%;height:40px;padding:0 14px;border:2px solid #fca5a5;border-radius:7px;font-size:15px;font-family:'DM Sans',sans-serif;outline:none;letter-spacing:.08em;text-transform:uppercase">
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="submit" id="reset-submit-btn" disabled
+                        style="padding:8px 20px;background:#e5e7eb;color:#9ca3af;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:not-allowed;font-family:'DM Sans',sans-serif;transition:all .15s"
+                        onclick="return confirm('Last chance — this will permanently delete all data. Are you absolutely sure?')">
+                    Yes, reset everything
+                </button>
+                <button type="button" onclick="closeResetModal()"
+                        style="padding:8px 15px;background:transparent;color:#6b7280;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
+                    Cancel
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -796,40 +832,19 @@ function showPanel(id, el) {
     el.style.border     = '1px solid #a7d7c5';
 }
 
-function switchType(type) {
-    const isPaybill = type === 'paybill';
-    document.getElementById('fields-paybill').style.display = isPaybill ? 'grid' : 'none';
-    document.getElementById('fields-till').style.display    = isPaybill ? 'none' : 'grid';
-    const lp = document.getElementById('label-paybill');
-    const lt = document.getElementById('label-till');
-    lp.style.borderColor = isPaybill ? '#1a6b52' : 'rgba(0,0,0,0.1)';
-    lp.style.background  = isPaybill ? '#f0fdf4' : '#fff';
-    lt.style.borderColor = isPaybill ? 'rgba(0,0,0,0.1)' : '#1a6b52';
-    lt.style.background  = isPaybill ? '#fff' : '#f0fdf4';
-}
-
-// Fix nav pill borders on desktop (no borders)
 function fixNavBorders() {
     if (window.innerWidth > 700) {
         document.querySelectorAll('.sni').forEach(n => n.style.border = 'none');
-        const active = document.querySelector('.sni[style*="#e6f2ed"]');
-        if (active) active.style.border = 'none';
     }
 }
 window.addEventListener('resize', fixNavBorders);
 fixNavBorders();
 
-// ── Billing cycle toggle ──────────────────────────────────────────────────
 var currentCycle = 'monthly';
 var planPrices = {
     starter: { monthly: {{ \App\Models\Account::PLANS['starter']['price_monthly'] }}, yearly: {{ \App\Models\Account::PLANS['starter']['price_yearly'] }} },
     growth:  { monthly: {{ \App\Models\Account::PLANS['growth']['price_monthly'] }},  yearly: {{ \App\Models\Account::PLANS['growth']['price_yearly'] }} },
     pro:     { monthly: {{ \App\Models\Account::PLANS['pro']['price_monthly'] }},     yearly: {{ \App\Models\Account::PLANS['pro']['price_yearly'] }} },
-};
-var planNames = {
-    starter: '{{ \App\Models\Account::PLANS['starter']['name'] }}',
-    growth:  '{{ \App\Models\Account::PLANS['growth']['name'] }}',
-    pro:     '{{ \App\Models\Account::PLANS['pro']['name'] }}',
 };
 
 function setCycle(cycle) {
@@ -840,7 +855,6 @@ function setCycle(cycle) {
     document.querySelectorAll('.price-yearly').forEach(el => el.style.display = cycle === 'yearly' ? 'block' : 'none');
 }
 
-// ── M-Pesa upgrade modal ─────────────────────────────────────────────────
 var selectedPlan = null;
 var pollTimer    = null;
 
@@ -859,42 +873,32 @@ function closeUpgradeModal() {
 }
 
 function resetUpgradeModal() {
-    document.getElementById('upgrade-step-form').style.display     = 'block';
-    document.getElementById('upgrade-step-waiting').style.display  = 'none';
-    document.getElementById('upgrade-step-success').style.display  = 'none';
-    document.getElementById('upgrade-step-failed').style.display   = 'none';
-    document.getElementById('upgrade-error').style.display         = 'none';
-    document.getElementById('upgrade-pay-btn').disabled             = false;
-    document.getElementById('upgrade-pay-btn').textContent          = 'Pay with M-Pesa';
+    document.getElementById('upgrade-step-form').style.display    = 'block';
+    document.getElementById('upgrade-step-waiting').style.display = 'none';
+    document.getElementById('upgrade-step-success').style.display = 'none';
+    document.getElementById('upgrade-step-failed').style.display  = 'none';
+    document.getElementById('upgrade-error').style.display        = 'none';
+    document.getElementById('upgrade-pay-btn').disabled           = false;
+    document.getElementById('upgrade-pay-btn').textContent        = 'Pay with M-Pesa';
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
 }
 
 function initiateStkPush() {
     var phone = document.getElementById('upgrade-phone').value.trim();
     var errEl = document.getElementById('upgrade-error');
-
     if (!/^(0[71][0-9]{8}|254[71][0-9]{8}|\+254[71][0-9]{8})$/.test(phone)) {
         errEl.textContent = 'Enter a valid M-Pesa number, e.g. 0712345678';
         errEl.style.display = 'block';
         return;
     }
     errEl.style.display = 'none';
-
     var btn = document.getElementById('upgrade-pay-btn');
     btn.disabled = true;
     btn.textContent = 'Sending request...';
-
     fetch('{{ route('subscription.upgrade') }}', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-        },
-        body: JSON.stringify({
-            plan: selectedPlan,
-            billing_cycle: currentCycle,
-            phone: phone,
-        }),
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+        body: JSON.stringify({ plan: selectedPlan, billing_cycle: currentCycle, phone: phone }),
     })
     .then(r => r.json().then(data => ({ ok: r.ok, data })))
     .then(({ ok, data }) => {
@@ -905,11 +909,9 @@ function initiateStkPush() {
             btn.textContent = 'Pay with M-Pesa';
             return;
         }
-
-        document.getElementById('upgrade-step-form').style.display = 'none';
+        document.getElementById('upgrade-step-form').style.display    = 'none';
         document.getElementById('upgrade-step-waiting').style.display = 'block';
-        document.getElementById('upgrade-phone-display').textContent = phone;
-
+        document.getElementById('upgrade-phone-display').textContent   = phone;
         pollStkStatus(data.checkout_request_id);
     })
     .catch(() => {
@@ -923,16 +925,13 @@ function initiateStkPush() {
 function pollStkStatus(checkoutRequestId) {
     var attempts = 0;
     var statusEl = document.getElementById('upgrade-waiting-status');
-
     pollTimer = setInterval(function () {
         attempts++;
-
-        if (attempts > 40) { // ~2 minutes at 3s intervals
+        if (attempts > 40) {
             clearInterval(pollTimer);
             showFailed('Payment timed out. If you completed it on your phone, refresh the page in a moment.');
             return;
         }
-
         fetch('{{ url('/subscription/status') }}/' + checkoutRequestId)
             .then(r => r.json())
             .then(data => {
@@ -947,77 +946,24 @@ function pollStkStatus(checkoutRequestId) {
                     statusEl.textContent = 'Waiting for confirmation' + '.'.repeat((attempts % 3) + 1);
                 }
             })
-            .catch(() => { /* keep polling on transient errors */ });
+            .catch(() => {});
     }, 3000);
 }
 
 function showFailed(message) {
     document.getElementById('upgrade-step-waiting').style.display = 'none';
-    document.getElementById('upgrade-step-failed').style.display = 'block';
-    document.getElementById('upgrade-failed-desc').textContent = message;
+    document.getElementById('upgrade-step-failed').style.display  = 'block';
+    document.getElementById('upgrade-failed-desc').textContent    = message;
 }
-</script>
 
-{{-- Reset Account Modal --}}
-<div id="reset-modal"
-     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:50;align-items:center;justify-content:center;padding:16px">
-    <div style="background:#fff;border-radius:14px;padding:28px;width:100%;max-width:460px">
-
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.07)">
-            <div style="font-size:15px;font-weight:600;color:#991b1b">Reset account data</div>
-            <button onclick="closeResetModal()"
-                    style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;line-height:1">&times;</button>
-        </div>
-
-        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px;margin-bottom:20px;font-size:13px;color:#7f1d1d;line-height:1.6">
-            You are about to permanently delete <strong>all business data</strong> in this account.
-            This includes all properties, tenants, invoices, payments and everything else.
-            <br><br>
-            This <strong>cannot be undone</strong>.
-        </div>
-
-        <form method="POST" action="{{ route('settings.reset-account') }}" id="reset-form">
-            @csrf
-            <div style="margin-bottom:20px">
-                <label style="display:block;font-size:12px;font-weight:500;color:#991b1b;margin-bottom:8px">
-                    Type <strong>RESET</strong> to confirm:
-                </label>
-                <input type="text"
-                       name="confirmation"
-                       id="reset-confirmation"
-                       placeholder="RESET"
-                       autocomplete="off"
-                       oninput="checkResetInput(this)"
-                       style="width:100%;height:40px;padding:0 14px;border:2px solid #fca5a5;border-radius:7px;font-size:15px;font-family:'DM Sans',sans-serif;outline:none;letter-spacing:.08em;text-transform:uppercase">
-            </div>
-
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <button type="submit"
-                        id="reset-submit-btn"
-                        disabled
-                        style="padding:8px 20px;background:#e5e7eb;color:#9ca3af;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:not-allowed;font-family:'DM Sans',sans-serif;transition:all .15s"
-                        onclick="return confirm('Last chance — this will permanently delete all data. Are you absolutely sure?')">
-                    Yes, reset everything
-                </button>
-                <button type="button"
-                        onclick="closeResetModal()"
-                        style="padding:8px 15px;background:transparent;color:#6b7280;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
-                    Cancel
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<script>
 function closeResetModal() {
     document.getElementById('reset-modal').style.display = 'none';
     document.getElementById('reset-confirmation').value  = '';
     var btn = document.getElementById('reset-submit-btn');
-    btn.disabled          = true;
-    btn.style.background  = '#e5e7eb';
-    btn.style.color       = '#9ca3af';
-    btn.style.cursor      = 'not-allowed';
+    btn.disabled         = true;
+    btn.style.background = '#e5e7eb';
+    btn.style.color      = '#9ca3af';
+    btn.style.cursor     = 'not-allowed';
 }
 
 function checkResetInput(input) {

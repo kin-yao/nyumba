@@ -47,4 +47,44 @@ class FirebaseService
             return true; // Fail open — do not lock out users if Firebase is unreachable
         }
     }
+
+    /**
+     * Create a Firebase Auth account server-side (Admin SDK).
+     * Used when an owner/manager invites a teammate from Settings —
+     * there's no client-side signup flow for invited users.
+     * Returns the Firebase UID on success, null on failure.
+     */
+    public function createUser(string $email, string $password, string $displayName): ?string
+    {
+        try {
+            $userRecord = $this->auth->createUser([
+                'email'         => $email,
+                'emailVerified' => true,
+                'password'      => $password,
+                'displayName'   => $displayName,
+            ]);
+
+            return $userRecord->uid;
+        } catch (\Kreait\Firebase\Exception\Auth\EmailExists $e) {
+            \Log::warning('Firebase createUser: email already exists — ' . $email);
+            return null;
+        } catch (\Exception $e) {
+            \Log::error('Firebase createUser failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Delete a Firebase Auth account. Used when removing an invited user.
+     */
+    public function deleteUser(string $uid): bool
+    {
+        try {
+            $this->auth->deleteUser($uid);
+            return true;
+        } catch (\Exception $e) {
+            \Log::warning('Firebase deleteUser failed for uid ' . $uid . ': ' . $e->getMessage());
+            return false;
+        }
+    }
 }

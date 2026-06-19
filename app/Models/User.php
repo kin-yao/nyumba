@@ -54,4 +54,36 @@ class User extends Authenticatable
     {
         return $this->onboarding_complete;
     }
+
+    // ── Role helpers ──────────────────────────────────────────────────────
+
+    public function isOwner(): bool
+    {
+        return $this->role === 'owner';
+    }
+
+    public function isManager(): bool
+    {
+        return $this->role === 'manager';
+    }
+
+    public function isCaretaker(): bool
+    {
+        return $this->role === 'caretaker';
+    }
+
+    public function canAccessFinancials(): bool
+    {
+        return in_array($this->role, ['owner', 'manager']);
+    }
+
+    public function canManageSettings(): bool
+    {
+        return $this->role === 'owner';
+    }
+
+    public function canManageTenants(): bool
+    {
+        return in_array($this->role, ['owner', 'manager']);
+    }
 }

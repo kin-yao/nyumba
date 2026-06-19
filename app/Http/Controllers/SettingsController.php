@@ -180,16 +180,32 @@ class SettingsController extends Controller
             'name'  => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email'],
             'phone' => ['required', 'string', 'max:20'],
-            'role'  => ['required', 'in:owner,read_only'],
+            'role'  => ['required', 'in:owner,manager,caretaker'],
         ]);
 
+        $tempPassword = 'password123';
+
+        // Create the Firebase account first — this app authenticates via Firebase,
+        // so a User row without a matching firebase_uid cannot log in.
+        $firebase    = app(\App\Services\FirebaseService::class);
+        $firebaseUid = $firebase->createUser($validated['email'], $tempPassword, $validated['name']);
+
+        if (!$firebaseUid) {
+            return back()->withInput()->with('_panel', 'users')->withErrors([
+                'email' => 'Could not create a login for this email. It may already be registered, or there was a connection issue. Please try again.',
+            ]);
+        }
+
         $user = User::create([
-            'account_id' => auth()->user()->account_id,
-            'name'       => $validated['name'],
-            'email'      => $validated['email'],
-            'phone'      => $validated['phone'],
-            'role'       => $validated['role'],
-            'password'   => Hash::make('password123'),
+            'account_id'         => auth()->user()->account_id,
+            'firebase_uid'       => $firebaseUid,
+            'auth_provider'      => 'email',
+            'name'               => $validated['name'],
+            'email'              => $validated['email'],
+            'phone'              => $validated['phone'],
+            'role'               => $validated['role'],
+            'password'           => Hash::make($tempPassword),
+            'email_verified_at'  => now(),
         ]);
 
         AuditService::log(
@@ -200,7 +216,8 @@ class SettingsController extends Controller
         );
 
         return redirect()->route('settings.index')
-            ->with('success', $validated['name'] . ' has been added. Temporary password: password123');
+            ->with('success', $validated['name'] . ' has been added. They can sign in with email ' . $validated['email'] . ' and temporary password: ' . $tempPassword)
+            ->with('_panel', 'users');
     }
 
     public function removeUser(User $user)
@@ -216,6 +233,10 @@ class SettingsController extends Controller
         $name  = $user->name;
         $email = $user->email;
 
+        if ($user->firebase_uid) {
+            app(\App\Services\FirebaseService::class)->deleteUser($user->firebase_uid);
+        }
+
         AuditService::log(
             'user.removed',
             'User ' . $name . ' (' . $email . ') was removed from the account',
@@ -226,7 +247,8 @@ class SettingsController extends Controller
         $user->delete();
 
         return redirect()->route('settings.index')
-            ->with('success', 'User removed.');
+            ->with('success', 'User removed.')
+            ->with('_panel', 'users');
     }
 
     public function resetAccount(Request $request)
@@ -240,12 +262,10 @@ class SettingsController extends Controller
         $user    = auth()->user();
         $account = $user->account;
 
-        // Owner only
         if ($user->role !== 'owner') {
             return back()->with('error', 'Only the account owner can reset the account.');
         }
 
-        // Log permanently to system log before wiping
         \Log::warning('ACCOUNT RESET', [
             'account_id'   => $account->id,
             'account_name' => $account->name,
@@ -259,14 +279,12 @@ class SettingsController extends Controller
             \DB::transaction(function () use ($account) {
                 $accountId = $account->id;
 
-                // Get scoped IDs first
                 $propertyIds = \App\Models\Property::where('account_id', $accountId)->pluck('id');
                 $unitIds     = \App\Models\Unit::whereIn('property_id', $propertyIds)->pluck('id');
                 $leaseIds    = \App\Models\Lease::whereIn('unit_id', $unitIds)->pluck('id');
                 $invoiceIds  = \App\Models\Invoice::whereIn('lease_id', $leaseIds)->pluck('id');
                 $paymentIds  = \App\Models\Payment::where('account_id', $accountId)->pluck('id');
 
-                // Delete in dependency order
                 \App\Models\PaymentAllocation::whereIn('invoice_id', $invoiceIds)
                     ->orWhereIn('payment_id', $paymentIds)
                     ->delete();
@@ -278,7 +296,6 @@ class SettingsController extends Controller
                 \App\Models\MaintenanceRequest::where('account_id', $accountId)->delete();
                 \App\Models\Lease::whereIn('unit_id', $unitIds)->delete();
 
-                // Force delete tenants including soft-deleted
                 \App\Models\Tenant::withTrashed()
                     ->where('account_id', $accountId)
                     ->forceDelete();
@@ -288,11 +305,9 @@ class SettingsController extends Controller
                 \App\Models\Expense::where('account_id', $accountId)->delete();
                 \App\Models\Property::where('account_id', $accountId)->delete();
 
-                // Communications
                 \App\Models\Message::where('account_id', $accountId)->delete();
                 \App\Models\MessageTemplate::where('account_id', $accountId)->delete();
 
-                // Housekeeping
                 \App\Models\Notification::where('account_id', $accountId)->delete();
                 \App\Models\AuditLog::where('account_id', $accountId)->delete();
             });
