@@ -2,12 +2,22 @@
 <style>
 .props-wrap { padding: clamp(16px,4vw,34px); padding-bottom: 48px; }
 
-.props-header {
+.props-band {
+    position: relative;
+    background: #0e3f30;
+    border-radius: 12px;
+    overflow: hidden;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+}
+.props-band-shards { position: absolute; inset: 0; pointer-events: none; }
+.props-band-content {
+    position: relative;
+    z-index: 2;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 24px;
     flex-wrap: wrap;
 }
 
@@ -65,22 +75,32 @@
     .props-grid  { grid-template-columns: 1fr; }
     .modal-inner { width: calc(100vw - 24px); padding: 20px; border-radius: 12px; }
     .modal-grid  { grid-template-columns: 1fr; }
+    .props-band  { padding: 18px; }
 }
 </style>
 
 <div class="props-wrap">
 
-    <div class="props-header">
-        <div>
-            <div style="font-family:'DM Serif Display',serif;font-size:clamp(20px,5vw,25px);line-height:1.1">Properties</div>
-            <div style="font-size:13px;color:#8a8880;margin-top:3px">
-                {{ $properties->count() }} {{ Str::plural('property', $properties->count()) }}
-            </div>
+    {{-- Header band with dashboard's signature pattern --}}
+    <div class="props-band">
+        <div class="props-band-shards">
+            <svg width="100%" height="100%" viewBox="0 0 1200 120" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="-72,0 792,0 480,120 -72,120" fill="#ffffff" opacity="0.04"/>
+                <polygon points="96,0 756,0 360,120 -72,120" fill="#ffffff" opacity="0.05"/>
+            </svg>
         </div>
-        <button onclick="openPropertyModal()"
-                style="display:inline-flex;align-items:center;gap:6px;padding:7px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;flex-shrink:0">
-            + Add property
-        </button>
+        <div class="props-band-content">
+            <div>
+                <div style="font-family:'DM Serif Display',serif;font-size:clamp(20px,5vw,25px);line-height:1.1;color:#fff">Properties</div>
+                <div style="font-size:13px;color:rgba(244,242,236,.6);margin-top:3px">
+                    {{ $properties->count() }} {{ Str::plural('property', $properties->count()) }}
+                </div>
+            </div>
+            <button onclick="openPropertyModal()"
+                    style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#fff;color:#0e3f30;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;flex-shrink:0">
+                + Add property
+            </button>
+        </div>
     </div>
 
     @if(session('success'))
@@ -180,7 +200,7 @@
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.07)">
             <div>
                 <div style="font-size:15px;font-weight:500">Add a property</div>
-                <div id="modal-step-label" style="font-size:11px;color:#8a8880;margin-top:2px">Step 1 of 2 — Property details</div>
+                <div id="modal-step-label" style="font-size:11px;color:#8a8880;margin-top:2px">Step 1 of 2</div>
             </div>
             <button onclick="closePropertyModal()"
                     style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;line-height:1;flex-shrink:0;margin-left:12px">&times;</button>
@@ -227,7 +247,7 @@
                     </div>
                     <div>
                         <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Address</label>
-                        <input name="address" type="text" placeholder="Street address (optional)" value="{{ old('address') }}"
+                        <input name="address" type="text" placeholder="Optional" value="{{ old('address') }}"
                                style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
                     </div>
                     <div>
@@ -242,7 +262,7 @@
                     </div>
                     <div style="grid-column:span 2">
                         <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Notes</label>
-                        <textarea name="notes" rows="2" placeholder="Any additional notes..."
+                        <textarea name="notes" rows="2" placeholder="Optional"
                                   style="width:100%;padding:9px 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;resize:vertical">{{ old('notes') }}</textarea>
                     </div>
                 </div>
@@ -261,26 +281,25 @@
             {{-- Step 2 --}}
             <div id="step-2" style="display:none">
 
-                <p style="font-size:13px;color:#8a8880;margin-bottom:18px;line-height:1.6">
+                <p style="font-size:13px;color:#8a8880;margin-bottom:18px">
                     How do tenants pay rent for this property?
                 </p>
 
                 <div style="margin-bottom:18px">
-                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px">Payment type</label>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
 
                         <label class="pt-label active" id="pt-label-paybill" onclick="switchPayType('paybill')">
                             <input type="radio" name="payment_type" value="paybill" checked style="display:none">
                             <span style="font-size:24px">📱</span>
                             <span style="font-size:12px;font-weight:500">Paybill</span>
-                            <span style="font-size:10px;color:#8a8880;line-height:1.4">Supports auto payment matching</span>
+                            <span style="font-size:10px;color:#8a8880">Auto matching</span>
                         </label>
 
                         <label class="pt-label" id="pt-label-till" onclick="switchPayType('till')">
                             <input type="radio" name="payment_type" value="till" style="display:none">
                             <span style="font-size:24px">🔢</span>
                             <span style="font-size:12px;font-weight:500">Till number</span>
-                            <span style="font-size:10px;color:#8a8880;line-height:1.4">Manual payment recording only</span>
+                            <span style="font-size:10px;color:#8a8880">Manual recording</span>
                         </label>
 
                     </div>
@@ -297,14 +316,13 @@
                         <div>
                             <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Account reference format</label>
                             <select name="account_format" style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
-                                <option value="unit_number">Unit number (e.g. A1, B3)</option>
+                                <option value="unit_number">Unit number</option>
                                 <option value="tenant_name">Tenant name</option>
-                                <option value="phone_number">Tenant phone number</option>
+                                <option value="phone_number">Tenant phone</option>
                             </select>
-                            <div style="font-size:11px;color:#8a8880;margin-top:3px">What tenants type as the account reference when paying</div>
                         </div>
-                        <div style="background:#e6f2ed;border:1px solid #a7d7c5;border-radius:8px;padding:10px 13px;font-size:12px;color:#166534;line-height:1.5">
-                            ✓ Paybill supports automatic payment matching. Contact us after saving to complete setup on our end.
+                        <div style="background:#e6f2ed;border:1px solid #a7d7c5;border-radius:8px;padding:10px 13px;font-size:12px;color:#166534">
+                            ✓ Supports automatic payment matching
                         </div>
                     </div>
                 </div>
@@ -317,8 +335,8 @@
                             <input name="till_number" type="text" placeholder="e.g. 123456"
                                    style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
                         </div>
-                        <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 13px;font-size:12px;color:#92400e;line-height:1.5">
-                            ⚠ Till numbers do not support automatic payment matching. You will need to record payments manually.
+                        <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 13px;font-size:12px;color:#92400e">
+                            ⚠ Manual payment recording only
                         </div>
                     </div>
                 </div>
@@ -360,7 +378,7 @@ function goToStep(n) {
     document.getElementById('step-1').style.display = n === 1 ? 'block' : 'none';
     document.getElementById('step-2').style.display = n === 2 ? 'block' : 'none';
     document.getElementById('modal-step-label').textContent =
-        n === 1 ? 'Step 1 of 2 — Property details' : 'Step 2 of 2 — Payment setup';
+        n === 1 ? 'Step 1 of 2' : 'Step 2 of 2';
     document.getElementById('step-dot-1').style.background = '#1a6b52';
     document.getElementById('step-dot-2').style.background = n === 2 ? '#1a6b52' : '#ece9e2';
 }
