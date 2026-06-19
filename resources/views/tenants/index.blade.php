@@ -2,12 +2,22 @@
 <style>
 .ten-wrap { padding: clamp(16px,4vw,34px); padding-bottom: 48px; }
 
-.ten-header {
+.ten-band {
+    position: relative;
+    background: #0e3f30;
+    border-radius: 12px;
+    overflow: hidden;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+}
+.ten-band-shards { position: absolute; inset: 0; pointer-events: none; }
+.ten-band-content {
+    position: relative;
+    z-index: 2;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 24px;
     flex-wrap: wrap;
 }
 
@@ -65,25 +75,34 @@
 @media (max-width: 640px) {
     .tbl-scroll { display: none; }
     .ten-cards  { display: block; }
+    .ten-band   { padding: 18px; }
 }
 </style>
 
 <div class="ten-wrap">
 
-    <div class="ten-header">
-        <div>
-            <div style="font-family:'DM Serif Display',serif;font-size:clamp(20px,5vw,25px);line-height:1.1">Tenants</div>
-            <div style="font-size:13px;color:#8a8880;margin-top:3px">
-                {{ $tenants->count() }} active {{ Str::plural('tenant', $tenants->count()) }}
-                @if($archivedTenants->count() > 0)
-                    &middot; {{ $archivedTenants->count() }} archived
-                @endif
-            </div>
+    <div class="ten-band">
+        <div class="ten-band-shards">
+            <svg width="100%" height="100%" viewBox="0 0 1200 120" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="-72,0 792,0 480,120 -72,120" fill="#ffffff" opacity="0.04"/>
+                <polygon points="96,0 756,0 360,120 -72,120" fill="#ffffff" opacity="0.05"/>
+            </svg>
         </div>
-        <a href="{{ route('tenants.create') }}"
-           style="display:inline-flex;align-items:center;gap:6px;padding:7px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;text-decoration:none;white-space:nowrap;flex-shrink:0">
-            + Move in tenant
-        </a>
+        <div class="ten-band-content">
+            <div>
+                <div style="font-family:'DM Serif Display',serif;font-size:clamp(20px,5vw,25px);line-height:1.1;color:#fff">Tenants</div>
+                <div style="font-size:13px;color:rgba(244,242,236,.6);margin-top:3px">
+                    {{ $tenants->count() }} active {{ Str::plural('tenant', $tenants->count()) }}
+                    @if($archivedTenants->count() > 0)
+                        &middot; {{ $archivedTenants->count() }} archived
+                    @endif
+                </div>
+            </div>
+            <a href="{{ route('tenants.create') }}"
+               style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#fff;color:#0e3f30;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;text-decoration:none;white-space:nowrap;flex-shrink:0">
+                + Move in tenant
+            </a>
+        </div>
     </div>
 
     @if(session('success'))
