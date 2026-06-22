@@ -2,12 +2,22 @@
 <style>
 .maint-wrap { padding: clamp(16px,4vw,34px); padding-bottom: 48px; }
 
-.maint-header {
+.maint-band {
+    position: relative;
+    background: #0e3f30;
+    border-radius: 12px;
+    overflow: hidden;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+}
+.maint-band-shards { position: absolute; inset: 0; pointer-events: none; }
+.maint-band-content {
+    position: relative;
+    z-index: 2;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 24px;
     flex-wrap: wrap;
 }
 
@@ -76,24 +86,33 @@
     .tbl-scroll   { display: none; }
     .maint-cards  { display: block; }
     .modal-inner  { width: calc(100vw - 24px); padding: 20px; border-radius: 12px; }
+    .maint-band   { padding: 18px; }
 }
 </style>
 
 <div class="maint-wrap">
 
-    <div class="maint-header">
-        <div>
-            <div style="font-family:'DM Serif Display',serif;font-size:clamp(20px,5vw,25px);line-height:1.1">Maintenance</div>
-            <div style="font-size:13px;color:#8a8880;margin-top:3px">Track and resolve property issues</div>
+    <div class="maint-band">
+        <div class="maint-band-shards">
+            <svg width="100%" height="100%" viewBox="0 0 1200 120" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="-72,0 792,0 480,120 -72,120" fill="#ffffff" opacity="0.04"/>
+                <polygon points="96,0 756,0 360,120 -72,120" fill="#ffffff" opacity="0.05"/>
+            </svg>
         </div>
-        <button onclick="document.getElementById('log-modal').style.display='flex'"
-                style="display:inline-flex;align-items:center;gap:6px;padding:7px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;flex-shrink:0">
-            + Log request
-        </button>
+        <div class="maint-band-content">
+            <div>
+                <div style="font-family:'DM Serif Display',serif;font-size:clamp(20px,5vw,25px);line-height:1.1;color:#fff">Maintenance</div>
+                <div style="font-size:13px;color:rgba(244,242,236,.6);margin-top:3px">Track and resolve property issues</div>
+            </div>
+            <button onclick="document.getElementById('log-modal').style.display='flex'"
+                    style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#fff;color:#0e3f30;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;flex-shrink:0">
+                + Log request
+            </button>
+        </div>
     </div>
 
     @if(session('success'))
-        <div style="background:#dcfce7;border:1px solid #86efac;border-radius:10px;padding:11px 15px;margin-bottom:16px;font-size:13px;color:#166534">
+        <div style="background:#dcfce7;border:1px solid #86efac;border-radius:10px;padding:11px 15px;margin-bottom:16px;font-size:13px;color:#166634">
             {{ session('success') }}
         </div>
     @endif
@@ -116,7 +135,7 @@
         <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:60px;text-align:center;color:#8a8880;font-size:13px">
             <div style="font-size:36px;margin-bottom:12px">🔧</div>
             <div style="font-weight:500;margin-bottom:4px">No maintenance requests</div>
-            <div>Log your first request when something needs attention</div>
+            <div>Log a request when something needs attention</div>
         </div>
     @else
 
@@ -262,7 +281,7 @@
      style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:50;align-items:center;justify-content:center;padding:16px">
     <div class="modal-inner">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.07)">
-            <div style="font-size:15px;font-weight:500">Log a maintenance request</div>
+            <div style="font-size:15px;font-weight:500">Log a request</div>
             <button onclick="document.getElementById('log-modal').style.display='none'"
                     style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;line-height:1">&times;</button>
         </div>
@@ -283,7 +302,7 @@
                     </select>
                 </div>
                 <div>
-                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Issue description</label>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Issue</label>
                     <textarea name="description" required rows="3" placeholder="Describe what needs attention..."
                               style="width:100%;padding:9px 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;resize:vertical"></textarea>
                 </div>
@@ -306,13 +325,13 @@
                 </div>
                 <div>
                     <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Notes</label>
-                    <textarea name="notes" rows="2" placeholder="Optional additional context..."
+                    <textarea name="notes" rows="2" placeholder="Optional"
                               style="width:100%;padding:9px 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;resize:vertical"></textarea>
                 </div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button type="submit" style="padding:7px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
-                    Submit request
+                    Submit
                 </button>
                 <button type="button" onclick="document.getElementById('log-modal').style.display='none'"
                         style="padding:7px 15px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
@@ -348,13 +367,13 @@
                 </div>
                 <div>
                     <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Resolution notes</label>
-                    <textarea name="resolution_notes" rows="3" placeholder="What was done to resolve this..."
+                    <textarea name="resolution_notes" rows="3" placeholder="What was done..."
                               style="width:100%;padding:9px 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;resize:vertical"></textarea>
                 </div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button type="submit" style="padding:7px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
-                    Save update
+                    Save
                 </button>
                 <button type="button" onclick="document.getElementById('update-modal').style.display='none'"
                         style="padding:7px 15px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
