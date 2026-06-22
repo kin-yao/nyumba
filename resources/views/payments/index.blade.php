@@ -2,12 +2,22 @@
 <style>
 .pay-wrap { padding: clamp(16px,4vw,34px); padding-bottom: 48px; }
 
-.pay-header {
+.pay-band {
+    position: relative;
+    background: #0e3f30;
+    border-radius: 12px;
+    overflow: hidden;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+}
+.pay-band-shards { position: absolute; inset: 0; pointer-events: none; }
+.pay-band-content {
+    position: relative;
+    z-index: 2;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 24px;
     flex-wrap: wrap;
 }
 
@@ -95,22 +105,31 @@
 }
 
 @media (max-width: 640px) {
-    .tbl-scroll  { display: none; }
-    .pay-cards   { display: block; }
+    .tbl-scroll { display: none; }
+    .pay-cards  { display: block; }
+    .pay-band   { padding: 18px; }
 }
 </style>
 
 <div class="pay-wrap">
 
-    <div class="pay-header">
-        <div>
-            <div style="font-family:'DM Serif Display',serif;font-size:clamp(20px,5vw,25px);line-height:1.1">Payments</div>
-            <div style="font-size:13px;color:#8a8880;margin-top:3px">{{ $payments->count() }} total transactions</div>
+    <div class="pay-band">
+        <div class="pay-band-shards">
+            <svg width="100%" height="100%" viewBox="0 0 1200 120" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="-72,0 792,0 480,120 -72,120" fill="#ffffff" opacity="0.04"/>
+                <polygon points="96,0 756,0 360,120 -72,120" fill="#ffffff" opacity="0.05"/>
+            </svg>
         </div>
-        <a href="{{ route('payments.create') }}"
-           style="display:inline-flex;align-items:center;gap:6px;padding:7px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;text-decoration:none;white-space:nowrap;flex-shrink:0">
-            + Record payment
-        </a>
+        <div class="pay-band-content">
+            <div>
+                <div style="font-family:'DM Serif Display',serif;font-size:clamp(20px,5vw,25px);line-height:1.1;color:#fff">Payments</div>
+                <div style="font-size:13px;color:rgba(244,242,236,.6);margin-top:3px">{{ $payments->count() }} total</div>
+            </div>
+            <a href="{{ route('payments.create') }}"
+               style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#fff;color:#0e3f30;border:none;border-radius:7px;font-size:13px;font-weight:500;text-decoration:none;white-space:nowrap;flex-shrink:0">
+                + Record payment
+            </a>
+        </div>
     </div>
 
     @if(session('success'))
@@ -124,7 +143,6 @@
         </div>
     @endif
 
-    {{-- Tabs --}}
     <div class="pay-tabs">
         <button class="pay-tab active" onclick="showTab('all', this)">
             All payments
@@ -137,7 +155,7 @@
         </button>
     </div>
 
-    {{-- All payments tab --}}
+    {{-- All payments --}}
     <div id="tab-all">
         @if($payments->isEmpty())
             <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:60px;text-align:center;color:#8a8880;font-size:13px">
@@ -155,7 +173,6 @@
                 ];
             @endphp
 
-            {{-- Desktop table --}}
             <div class="tbl-scroll">
                 <table>
                     <thead>
@@ -183,7 +200,7 @@
                                             <span style="font-size:13px">{{ $payment->tenant->full_name }}</span>
                                         </div>
                                     @else
-                                        <span style="color:#8a8880;font-size:13px;font-style:italic">Unmatched</span>
+                                        <span style="color:#8a8880;font-size:13px">Unmatched</span>
                                     @endif
                                 </td>
                                 <td style="padding:11px 14px;font-size:13px;color:#8a8880">{{ $payment->lease?->unit?->property?->name ?? '-' }}</td>
@@ -209,7 +226,6 @@
                 </table>
             </div>
 
-            {{-- Mobile cards --}}
             <div class="pay-cards">
                 @foreach($payments as $payment)
                     @php $mc = $methodColors[$payment->method] ?? $methodColors['cash']; @endphp
@@ -254,17 +270,17 @@
         @endif
     </div>
 
-    {{-- Unmatched M-Pesa tab --}}
+    {{-- Unmatched M-Pesa --}}
     <div id="tab-unmatched" style="display:none">
         @if($unmatched->isEmpty())
             <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:60px;text-align:center;color:#8a8880;font-size:13px">
                 <div style="font-size:36px;margin-bottom:12px">✅</div>
                 <div style="font-weight:500;margin-bottom:4px">No unmatched payments</div>
-                <div>All M-Pesa payments have been matched to tenants</div>
+                <div>All M-Pesa payments have been matched</div>
             </div>
         @else
             <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:12px 15px;margin-bottom:16px;font-size:13px;color:#92400e">
-                ⚠ {{ $unmatched->count() }} M-Pesa payment(s) could not be automatically matched. This usually happens when the tenant typed the wrong account number. Assign each one to the correct tenant below.
+                ⚠ {{ $unmatched->count() }} payment(s) could not be automatically matched. Assign each one to the correct tenant below.
             </div>
 
             <div style="display:grid;gap:12px">
@@ -311,7 +327,7 @@
                             </div>
                             <button type="submit"
                                     style="height:36px;padding:0 16px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
-                                Assign &amp; allocate
+                                Assign
                             </button>
                         </form>
                     </div>
@@ -329,7 +345,6 @@ function showTab(name, el) {
     el.classList.add('active');
 }
 
-// Auto-open unmatched tab if URL hash is #unmatched
 if (window.location.hash === '#unmatched') {
     showTab('unmatched', document.querySelectorAll('.pay-tab')[1]);
 }
