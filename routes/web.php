@@ -39,6 +39,11 @@ Route::post('/mpesa/stk/callback', [SubscriptionController::class, 'callback'])-
 Route::post('/mpesa/c2b/{property}/confirmation', [App\Http\Controllers\MpesaC2BController::class, 'confirmation'])->name('mpesa.c2b.confirmation');
 Route::post('/mpesa/c2b/{property}/validation', [App\Http\Controllers\MpesaC2BController::class, 'validation'])->name('mpesa.c2b.validation');
 
+// ── Alias routes for Safaricom sandbox (rejects URLs containing 'mpesa') ──────
+Route::post('/payments/c2b/{property}/confirmation', [App\Http\Controllers\MpesaC2BController::class, 'confirmation'])->name('payments.c2b.confirmation');
+Route::post('/payments/c2b/{property}/validation', [App\Http\Controllers\MpesaC2BController::class, 'validation'])->name('payments.c2b.validation');
+Route::post('/payments/pull/{property}/callback', [App\Http\Controllers\MpesaC2BController::class, 'pullCallback'])->name('payments.pull.callback');
+
 // ─── Firebase auth endpoints ───────────────────────────────────────────────────
 Route::post('/auth/verify', [App\Http\Controllers\Auth\FirebaseAuthController::class, 'verify'])
     ->name('auth.verify');
