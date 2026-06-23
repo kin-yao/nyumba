@@ -67,13 +67,17 @@ class MpesaC2BController extends Controller
             $errors[] = 'Pull: ' . $pull['error'];
         }
 
-        AuditService::log(
-            'property.mpesa_registered',
-            'M-Pesa C2B/Pull registration attempted for "' . $property->name . '"'
-                . (empty($errors) ? ' — both succeeded' : ' — ' . implode('; ', $errors)),
-            $property,
-            ['shortcode' => $validated['mpesa_shortcode'], 'errors' => $errors]
-        );
+        try {
+            AuditService::log(
+                'property.mpesa_registered',
+                'M-Pesa C2B/Pull registration attempted for "' . $property->name . '"'
+                    . (empty($errors) ? ' — both succeeded' : ' — ' . implode('; ', $errors)),
+                $property,
+                ['shortcode' => $validated['mpesa_shortcode'], 'errors' => $errors]
+            );
+        } catch (\Exception $e) {
+            Log::error('AuditService::log failed: ' . $e->getMessage());
+        }
 
         if (!empty($errors)) {
             return back()->with('error', 'Some registrations failed: ' . implode(' | ', $errors));
@@ -177,18 +181,22 @@ class MpesaC2BController extends Controller
                 'is_allocated' => false,
             ]);
 
-            AuditService::log(
-                'payment.mpesa_unmatched',
-                'Unmatched M-Pesa payment of ' . currency($amount) . ' (ref: ' . $transId . ') for "'
-                    . $property->name . '" — needs manual assignment',
-                $property,
-                [
-                    'trans_id' => $transId,
-                    'bill_ref' => $billRef,
-                    'msisdn'   => $msisdn,
-                    'amount'   => $amount,
-                ]
-            );
+            try {
+                AuditService::log(
+                    'payment.mpesa_unmatched',
+                    'Unmatched M-Pesa payment of ' . currency($amount) . ' (ref: ' . $transId . ') for "'
+                        . $property->name . '" — needs manual assignment',
+                    $property,
+                    [
+                        'trans_id' => $transId,
+                        'bill_ref' => $billRef,
+                        'msisdn'   => $msisdn,
+                        'amount'   => $amount,
+                    ]
+                );
+            } catch (\Exception $e) {
+                Log::error('AuditService::log failed: ' . $e->getMessage());
+            }
 
             return 'unmatched';
         }
@@ -198,10 +206,11 @@ class MpesaC2BController extends Controller
 
         $fullyPaidInvoices = collect();
         $newBalance        = 0;
+        $creditCarried     = 0;
 
         $payment = DB::transaction(function () use (
             $property, $amount, $paymentDate, $transId, $billRef, $msisdn,
-            $tenant, $lease, &$fullyPaidInvoices, &$newBalance
+            $tenant, $lease, &$fullyPaidInvoices, &$newBalance, &$creditCarried
         ) {
             $payment = Payment::create([
                 'account_id'   => $property->account_id,
@@ -222,7 +231,25 @@ class MpesaC2BController extends Controller
                     ->orderBy('invoice_date')
                     ->get();
 
-                $remaining = $amount;
+                // Include any unallocated rent credits from previous overpayments
+                $existingCredit = floatval(
+                    $lease->payments()
+                        ->where('payment_type', 'rent')
+                        ->where('is_allocated', false)
+                        ->where('reference', 'like', '%-CR')
+                        ->sum('amount')
+                );
+
+                $remaining = $amount + $existingCredit;
+
+                // Mark those credit payments as allocated since we're absorbing them now
+                if ($existingCredit > 0) {
+                    $lease->payments()
+                        ->where('payment_type', 'rent')
+                        ->where('is_allocated', false)
+                        ->where('reference', 'like', '%-CR')
+                        ->update(['is_allocated' => true]);
+                }
 
                 foreach ($outstanding as $invoice) {
                     if ($remaining <= 0) break;
@@ -255,30 +282,57 @@ class MpesaC2BController extends Controller
 
                 $payment->update(['is_allocated' => true]);
 
-                $lease->load(['invoices', 'payments']);
-                $newBalance = floatval($lease->invoices->sum('total_amount'))
-                            - floatval($lease->payments->where('payment_type', '!=', 'deposit')->sum('amount'));
+                // Store any excess as a rent credit to apply against future invoices
+                if ($remaining > 0) {
+                    $creditCarried = $remaining;
+                    Payment::create([
+                        'account_id'   => $property->account_id,
+                        'tenant_id'    => $tenant?->id,
+                        'lease_id'     => $lease->id,
+                        'amount'       => $remaining,
+                        'payment_type' => 'rent',
+                        'payment_date' => $paymentDate,
+                        'method'       => 'mpesa',
+                        'reference'    => $transId . '-CR',
+                        'notes'        => 'Rent credit carried forward from M-Pesa payment ' . $transId . '. To be applied to next invoice.',
+                        'is_allocated' => false,
+                    ]);
+                }
+
+                $newBalance = floatval($lease->invoices()->sum('total_amount'))
+                            - floatval($lease->payments()
+                                ->where('payment_type', '!=', 'deposit')
+                                ->where(function ($q) {
+                                    $q->where('is_allocated', true)
+                                      ->orWhere('reference', 'not like', '%-CR');
+                                })
+                                ->sum('amount'));
             }
 
             return $payment;
         });
 
-        AuditService::log(
-            'payment.mpesa_reconciled',
-            'M-Pesa payment of ' . currency($amount) . ' auto-reconciled for '
-                . ($tenant?->full_name ?? 'unit ' . $unit->name)
-                . ' (ref: ' . $transId . ')',
-            $payment,
-            [
-                'trans_id' => $transId,
-                'bill_ref' => $billRef,
-                'unit_id'  => $unit->id,
-                'amount'   => $amount,
-            ]
-        );
+        try {
+            AuditService::log(
+                'payment.mpesa_reconciled',
+                'M-Pesa payment of ' . currency($amount) . ' auto-reconciled for '
+                    . ($tenant?->full_name ?? 'unit ' . $unit->name)
+                    . ' (ref: ' . $transId . ')',
+                $payment,
+                [
+                    'trans_id'       => $transId,
+                    'bill_ref'       => $billRef,
+                    'unit_id'        => $unit->id,
+                    'amount'         => $amount,
+                    'credit_carried' => $creditCarried,
+                ]
+            );
+        } catch (\Exception $e) {
+            Log::error('AuditService::log failed: ' . $e->getMessage());
+        }
 
         if ($tenant && $tenant->phone) {
-            $this->sendConfirmationSms($property, $tenant, $payment, $fullyPaidInvoices, $newBalance);
+            $this->sendConfirmationSms($property, $tenant, $payment, $fullyPaidInvoices, $newBalance, $creditCarried);
         }
 
         return 'matched';
@@ -365,7 +419,8 @@ class MpesaC2BController extends Controller
         Tenant $tenant,
         Payment $payment,
         $fullyPaidInvoices,
-        float $newBalance
+        float $newBalance,
+        float $creditCarried = 0
     ): void {
         $account = $property->account;
         $sms     = new SmsService($account);
@@ -381,9 +436,13 @@ class MpesaC2BController extends Controller
                 $invoice->period_year, $invoice->period_month, 1
             )->format('F Y');
 
+            $creditLine = $creditCarried > 0
+                ? "\n" . 'Credit carried forward: KES ' . number_format($creditCarried) . '.'
+                : '';
+
             $balanceLine = $newBalance <= 0
-                ? 'Balance: KES 0 - Fully paid.' . "\n" . 'Thank you for paying on time.'
-                : 'Outstanding balance: KES ' . number_format($newBalance) . "\n" . 'Thank you.';
+                ? 'Balance: KES 0 - Fully paid.' . $creditLine . "\n" . 'Thank you for paying on time.'
+                : 'Outstanding balance: KES ' . number_format($newBalance) . $creditLine . "\n" . 'Thank you.';
 
             $message =
                 'PAYMENT RECEIVED - ' . strtoupper($property->name) . "\n" .
@@ -396,6 +455,10 @@ class MpesaC2BController extends Controller
                 $balanceLine . "\n" .
                 'Powered by Nyumba.';
         } else {
+            $creditLine = $creditCarried > 0
+                ? "\n" . 'Credit carried forward: KES ' . number_format($creditCarried) . '.'
+                : '';
+
             $message =
                 'PAYMENT RECEIVED - ' . strtoupper($property->name) . "\n" .
                 'Tenant: ' . $tenant->full_name . "\n" .
@@ -403,7 +466,7 @@ class MpesaC2BController extends Controller
                 'Amount: KES ' . $amount . ' (MPESA)' . "\n" .
                 'Ref: ' . $payment->reference . "\n" .
                 'Date: ' . $datePaid . "\n" .
-                'Remaining balance: KES ' . number_format(max(0, $newBalance)) . "\n" .
+                'Remaining balance: KES ' . number_format(max(0, $newBalance)) . $creditLine . "\n" .
                 'Powered by Nyumba.';
         }
 
