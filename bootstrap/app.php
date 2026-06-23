@@ -20,6 +20,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'mpesa/stk/callback',
             'mpesa/c2b/*/confirmation',
             'mpesa/c2b/*/validation',
+            'payments/c2b/*/confirmation',
+            'payments/c2b/*/validation',
+            'payments/pull/*/callback',
         ]);
         $middleware->alias([
             'subscription'   => \App\Http\Middleware\CheckSubscription::class,
