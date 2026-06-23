@@ -2,12 +2,22 @@
 <style>
 .inv-wrap { padding: clamp(16px,4vw,34px); padding-bottom: 48px; }
 
-.inv-header {
+.inv-band {
+    position: relative;
+    background: #0e3f30;
+    border-radius: 12px;
+    overflow: hidden;
+    padding: 20px 24px;
+    margin-bottom: 20px;y
+}
+.inv-band-shards { position: absolute; inset: 0; pointer-events: none; }
+.inv-band-content {
+    position: relative;
+    z-index: 2;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 24px;
     flex-wrap: wrap;
 }
 
@@ -61,25 +71,34 @@
 @media (max-width: 640px) {
     .tbl-scroll { display: none; }
     .inv-cards  { display: block; }
+    .inv-band   { padding: 18px; }
 }
 </style>
 
 <div class="inv-wrap">
 
-    <div class="inv-header">
-        <div>
-            <div style="font-family:'DM Serif Display',serif;font-size:clamp(20px,5vw,25px);line-height:1.1">Invoices</div>
-            <div style="font-size:13px;color:#8a8880;margin-top:3px">{{ $invoices->count() }} total</div>
+    <div class="inv-band">
+        <div class="inv-band-shards">
+            <svg width="100%" height="100%" viewBox="0 0 1200 120" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+                <polygon points="-72,0 792,0 480,120 -72,120" fill="#ffffff" opacity="0.04"/>
+                <polygon points="96,0 756,0 360,120 -72,120" fill="#ffffff" opacity="0.05"/>
+            </svg>
         </div>
-        <div class="inv-actions">
-            <a href="{{ route('invoices.bulk') }}"
-               style="display:inline-flex;align-items:center;gap:6px;padding:7px 15px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;text-decoration:none;white-space:nowrap">
-                Bulk generate
-            </a>
-            <a href="{{ route('invoices.create') }}"
-               style="display:inline-flex;align-items:center;gap:6px;padding:7px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;text-decoration:none;white-space:nowrap">
-                + New invoice
-            </a>
+        <div class="inv-band-content">
+            <div>
+                <div style="font-family:'DM Serif Display',serif;font-size:clamp(20px,5vw,25px);line-height:1.1;color:#fff">Invoices</div>
+                <div style="font-size:13px;color:rgba(244,242,236,.6);margin-top:3px">{{ $invoices->count() }} total</div>
+            </div>
+            <div class="inv-actions">
+                <a href="{{ route('invoices.bulk') }}"
+                   style="display:inline-flex;align-items:center;gap:6px;padding:8px 15px;background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:7px;font-size:13px;text-decoration:none;white-space:nowrap">
+                    Bulk generate
+                </a>
+                <a href="{{ route('invoices.create') }}"
+                   style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#fff;color:#0e3f30;border:none;border-radius:7px;font-size:13px;font-weight:500;text-decoration:none;white-space:nowrap">
+                    + New invoice
+                </a>
+            </div>
         </div>
     </div>
 
