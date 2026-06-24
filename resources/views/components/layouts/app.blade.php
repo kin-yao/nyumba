@@ -164,12 +164,13 @@
             $filterPropertyId = session('filter_property_id');
             $filterProperty   = $filterPropertyId ? $allProperties->firstWhere('id', $filterPropertyId) : null;
 
-            $isOwner     = $authUser->isOwner()     || $authUser->is_admin;
-            $isManager   = $authUser->isManager();
-            $isCaretaker = $authUser->isCaretaker();
+            $isOwner       = $authUser->isOwner()            || $authUser->is_admin;
+            $isManager     = $authUser->isManager();
+            $isCaretaker   = $authUser->isCaretaker();
             $canFinancials = $authUser->canAccessFinancials() || $authUser->is_admin;
             $canSettings   = $authUser->canManageSettings()   || $authUser->is_admin;
             $canTenants    = $authUser->canManageTenants()    || $authUser->is_admin;
+            $canUtilities  = $authUser->canAccessUtilities()  || $authUser->is_admin;
 
             $activeGroup = 'overview';
             if (request()->routeIs('properties.*') || request()->routeIs('tenants.*') || request()->routeIs('maintenance.*')) {
@@ -205,6 +206,7 @@
 
         <nav style="padding:6px 0;flex:1;overflow-y:auto">
 
+            {{-- Dashboard — owner and manager only --}}
             @if($canFinancials)
                 @php $active = request()->routeIs('dashboard'); @endphp
                 <a href="{{ route('dashboard') }}" onclick="closeSidebar()"
@@ -224,7 +226,7 @@
                 </a>
             @endif
 
-            {{-- Properties group --}}
+            {{-- Properties group — all roles --}}
             <div id="group-properties">
                 <button onclick="toggleGroup('properties')"
                         style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:8px 18px;background:{{ $activeGroup==='properties' ? 'rgba(255,255,255,0.04)' : 'transparent' }};border:none;cursor:pointer;font-family:'DM Sans',sans-serif">
@@ -269,7 +271,7 @@
                 </div>
             </div>
 
-            {{-- Financials group --}}
+            {{-- Financials group — owner and manager only --}}
             @if($canFinancials)
                 <div id="group-financials">
                     <button onclick="toggleGroup('financials')"
@@ -306,7 +308,24 @@
                 </div>
             @endif
 
-            {{-- Communication group --}}
+            {{-- Utilities standalone — caretaker only (owners/managers see it inside Financials) --}}
+            @if($isCaretaker)
+                @php $active = request()->routeIs('utilities.*'); @endphp
+                <a href="{{ route('utilities.index') }}" onclick="closeSidebar()"
+                   style="display:flex;align-items:center;gap:9px;padding:8px 18px;font-size:13px;text-decoration:none;white-space:nowrap;
+                   color:{{ $active ? '#fff' : 'rgba(255,255,255,0.55)' }};
+                   border-left:2px solid {{ $active ? '#1a6b52' : 'transparent' }};
+                   background:{{ $active ? 'rgba(255,255,255,0.06)' : 'transparent' }}">
+                    <span style="flex-shrink:0;opacity:{{ $active ? '1' : '0.6' }};display:flex">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                            <path d="M4 13V7M7 13V1M10 13V4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                        </svg>
+                    </span>
+                    Utilities
+                </a>
+            @endif
+
+            {{-- Communication group — owner and manager only --}}
             @if($canFinancials)
                 <div id="group-communication">
                     <button onclick="toggleGroup('communication')"
@@ -540,25 +559,30 @@
         document.getElementById('nyumba-loader').style.display = 'none';
     }
 
-    // Show loader on all internal link navigations
+    // Show loader on internal link navigations only
     document.addEventListener('click', function(e) {
         const link = e.target.closest('a[href]');
         if (!link) return;
         const href = link.getAttribute('href');
         if (!href || href.startsWith('#') || href.startsWith('javascript') || href.startsWith('mailto') || link.target === '_blank') return;
         showLoader();
+        // Safety net — hide loader after 8 seconds in case navigation stalls
+        setTimeout(hideLoader, 8000);
     });
 
-    // Show loader on form submissions (skip filter and sign out — those are instant)
+    // Show loader on form submissions (skip filter and logout)
     document.addEventListener('submit', function(e) {
         const form = e.target;
-        if (form.action && (form.action.includes('filter') || form.action.includes('logout'))) return;
+        if (!form.action) return;
+        if (form.action.includes('filter') || form.action.includes('logout')) return;
         showLoader();
+        setTimeout(hideLoader, 8000);
     });
 
     // Hide loader when page is fully ready
     window.addEventListener('pageshow', hideLoader);
     window.addEventListener('load', hideLoader);
+    window.addEventListener('popstate', hideLoader);
 </script>
 
 @livewireScripts
