@@ -12,13 +12,16 @@
     @livewireStyles
     <style>
         *, *::before, *::after { box-sizing: border-box; }
-        html { overflow-x: hidden; }
-        body {
+        html, body {
+            height: 100%;
+            overflow: hidden;
             overflow-x: hidden;
-            -webkit-transform: translateZ(0);
-            transform: translateZ(0);
         }
-        .nyumba-shell { display: block; }
+        .nyumba-shell {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
         .nyumba-sidebar {
             position: fixed;
             top: 0; left: 0; bottom: 0;
@@ -35,7 +38,9 @@
         .nyumba-main {
             margin-left: 220px;
             background: #f5f4f0;
-            min-height: 100vh;
+            flex: 1;
+            height: 100vh;
+            overflow-y: auto;
             min-width: 0;
             isolation: isolate;
             position: relative;
@@ -52,6 +57,7 @@
             backface-visibility: hidden;
         }
         @media (max-width: 768px) {
+            html, body { overflow: hidden; }
             .nyumba-sidebar      { transform: translateX(-100%); }
             .nyumba-sidebar.open { transform: translateX(0); }
             .nyumba-overlay.open { display: block; }
@@ -91,9 +97,36 @@
             .stat-grid   { grid-template-columns: 1fr !important; }
             .stat-grid-3 { grid-template-columns: 1fr !important; }
         }
+        @keyframes nyumba-spin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body style="font-family:'DM Sans',sans-serif;margin:0;padding:0">
+
+{{-- Page loading indicator --}}
+<div id="nyumba-loader" style="
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(245,244,240,0.75);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"
+             style="animation:nyumba-spin 0.9s linear infinite">
+            <circle cx="20" cy="20" r="16" stroke="#e5e3de" stroke-width="3"/>
+            <path d="M20 4a16 16 0 0116 16" stroke="#1a6b52" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        <span style="font-size:13px;color:#1a6b52;font-family:'DM Sans',sans-serif;font-weight:500;letter-spacing:0.01em">
+            Loading...
+        </span>
+    </div>
+</div>
 
 <div class="nyumba-overlay" id="mob-overlay" onclick="closeSidebar()"></div>
 
@@ -131,7 +164,6 @@
             $filterPropertyId = session('filter_property_id');
             $filterProperty   = $filterPropertyId ? $allProperties->firstWhere('id', $filterPropertyId) : null;
 
-            // Role flags — used throughout the sidebar to hide/show items
             $isOwner     = $authUser->isOwner()     || $authUser->is_admin;
             $isManager   = $authUser->isManager();
             $isCaretaker = $authUser->isCaretaker();
@@ -173,7 +205,6 @@
 
         <nav style="padding:6px 0;flex:1;overflow-y:auto">
 
-            {{-- Dashboard — hidden from caretaker --}}
             @if($canFinancials)
                 @php $active = request()->routeIs('dashboard'); @endphp
                 <a href="{{ route('dashboard') }}" onclick="closeSidebar()"
@@ -193,7 +224,7 @@
                 </a>
             @endif
 
-            {{-- Properties group — all roles see this --}}
+            {{-- Properties group --}}
             <div id="group-properties">
                 <button onclick="toggleGroup('properties')"
                         style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:8px 18px;background:{{ $activeGroup==='properties' ? 'rgba(255,255,255,0.04)' : 'transparent' }};border:none;cursor:pointer;font-family:'DM Sans',sans-serif">
@@ -209,7 +240,6 @@
                     </svg>
                 </button>
                 <div id="items-properties" style="display:{{ $activeGroup==='properties' ? 'block' : 'none' }}">
-                    {{-- Properties — all roles --}}
                     @php $a = request()->routeIs('properties.*'); @endphp
                     <a href="{{ route('properties.index') }}" onclick="closeSidebar()"
                        style="display:flex;align-items:center;padding:7px 18px 7px 40px;font-size:12.5px;text-decoration:none;
@@ -218,8 +248,6 @@
                        background:{{ $a ? 'rgba(255,255,255,0.06)' : 'transparent' }}">
                         Properties
                     </a>
-
-                    {{-- Tenants — owner and manager only --}}
                     @if($canTenants)
                         @php $a = request()->routeIs('tenants.*'); @endphp
                         <a href="{{ route('tenants.index') }}" onclick="closeSidebar()"
@@ -230,8 +258,6 @@
                             Tenants
                         </a>
                     @endif
-
-                    {{-- Maintenance — all roles --}}
                     @php $a = request()->routeIs('maintenance.*'); @endphp
                     <a href="{{ route('maintenance.index') }}" onclick="closeSidebar()"
                        style="display:flex;align-items:center;padding:7px 18px 7px 40px;font-size:12.5px;text-decoration:none;
@@ -243,7 +269,7 @@
                 </div>
             </div>
 
-            {{-- Financials group — owner and manager only --}}
+            {{-- Financials group --}}
             @if($canFinancials)
                 <div id="group-financials">
                     <button onclick="toggleGroup('financials')"
@@ -280,7 +306,7 @@
                 </div>
             @endif
 
-            {{-- Communication group — owner and manager only --}}
+            {{-- Communication group --}}
             @if($canFinancials)
                 <div id="group-communication">
                     <button onclick="toggleGroup('communication')"
@@ -325,8 +351,6 @@
                     </svg>
                 </button>
                 <div id="items-system" style="display:{{ $activeGroup==='system' ? 'block' : 'none' }}">
-
-                    {{-- Notifications — all roles --}}
                     @php $a = request()->routeIs('notifications.*'); @endphp
                     <a href="{{ route('notifications.index') }}" onclick="closeSidebar()"
                        style="display:flex;align-items:center;justify-content:space-between;padding:7px 18px 7px 40px;font-size:12.5px;text-decoration:none;
@@ -338,8 +362,6 @@
                             <span style="background:#b91c1c;color:#fff;font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px;min-width:18px;text-align:center;flex-shrink:0">{{ $unreadCount }}</span>
                         @endif
                     </a>
-
-                    {{-- Audit trail — owner only --}}
                     @if($canSettings)
                         @php $a = request()->routeIs('audit.*'); @endphp
                         <a href="{{ route('audit.index') }}" onclick="closeSidebar()"
@@ -350,8 +372,6 @@
                             Audit trail
                         </a>
                     @endif
-
-                    {{-- Settings — owner only --}}
                     @if($canSettings)
                         @php $a = request()->routeIs('settings.*'); @endphp
                         <a href="{{ route('settings.index') }}" onclick="closeSidebar()"
@@ -362,13 +382,12 @@
                             Settings
                         </a>
                     @endif
-
                 </div>
             </div>
 
         </nav>
 
-        {{-- Low SMS credits warning — owner and manager only --}}
+        {{-- Low SMS credits warning --}}
         @if($canFinancials && $account && $smsCredits <= 20)
             <div style="margin:0 10px 10px;background:#fee2e2;border-radius:8px;padding:10px 12px">
                 <div style="font-size:11px;font-weight:500;color:#991b1b;margin-bottom:2px">SMS credits low</div>
@@ -513,6 +532,33 @@
         items.style.display     = isOpen ? 'none' : 'block';
         chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
     }
+
+    function showLoader() {
+        document.getElementById('nyumba-loader').style.display = 'flex';
+    }
+    function hideLoader() {
+        document.getElementById('nyumba-loader').style.display = 'none';
+    }
+
+    // Show loader on all internal link navigations
+    document.addEventListener('click', function(e) {
+        const link = e.target.closest('a[href]');
+        if (!link) return;
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('javascript') || href.startsWith('mailto') || link.target === '_blank') return;
+        showLoader();
+    });
+
+    // Show loader on form submissions (skip filter and sign out — those are instant)
+    document.addEventListener('submit', function(e) {
+        const form = e.target;
+        if (form.action && (form.action.includes('filter') || form.action.includes('logout'))) return;
+        showLoader();
+    });
+
+    // Hide loader when page is fully ready
+    window.addEventListener('pageshow', hideLoader);
+    window.addEventListener('load', hideLoader);
 </script>
 
 @livewireScripts
