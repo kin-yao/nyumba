@@ -31,9 +31,50 @@
         .start-over{display:block;text-align:center;margin-top:18px;font-size:12px;color:#c4c2be;text-decoration:none}
         .start-over:hover{color:#8a8880}
         .countdown{font-size:12px;color:#c4c2be;margin-left:4px}
+        @keyframes nyumba-spin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+        #nyumba-loader {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(245,244,240,0.85);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(2px);
+        }
     </style>
 </head>
 <body>
+
+<div id="nyumba-loader">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none"
+             style="animation:nyumba-spin 0.9s linear infinite">
+            <circle cx="20" cy="20" r="16" stroke="#e5e3de" stroke-width="3"/>
+            <path d="M20 4a16 16 0 0116 16" stroke="#1a6b52" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        <span id="nyumba-loader-text" style="font-size:13px;color:#1a6b52;font-family:'DM Sans',sans-serif;font-weight:500">
+            Loading...
+        </span>
+    </div>
+</div>
+
+<script>
+    window.showLoader = function(text) {
+        const el    = document.getElementById('nyumba-loader');
+        const label = document.getElementById('nyumba-loader-text');
+        if (label && text) label.textContent = text;
+        el.style.display = 'flex';
+    };
+    window.hideLoader = function() {
+        document.getElementById('nyumba-loader').style.display = 'none';
+    };
+    window.addEventListener('pageshow', hideLoader);
+</script>
+
 <div class="card">
     <img src="/images/logo.png" alt="Nyumba" class="logo">
     <div class="steps">
@@ -94,15 +135,29 @@ window.checkManually = async function() {
     const btn=document.getElementById('btn-check');
     if(!fbUser){showErr('Session expired. Please go back and register again.');return;}
     btn.disabled=true; btn.textContent='Checking...';
+    showLoader('Verifying your email...');
     try {
         await fbUser.reload();
-        if(!fbUser.emailVerified){showErr('Email not verified yet. Please click the link in your inbox first.');btn.disabled=false;btn.textContent='Continue';return;}
+        if(!fbUser.emailVerified){
+            hideLoader();
+            showErr('Email not verified yet. Please click the link in your inbox first.');
+            btn.disabled=false; btn.textContent='Continue';
+            return;
+        }
         const token=await fbUser.getIdToken(true);
         const r=await fetch('/auth/mark-verified',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':csrf()},body:JSON.stringify({id_token:token})});
         const d=await r.json();
         if(d.redirect){window.location.href=d.redirect;}
-        else{showErr(d.error||'Something went wrong.');btn.disabled=false;btn.textContent='Continue';}
-    } catch(e){showErr('Something went wrong. Please try again.');btn.disabled=false;btn.textContent='Continue';}
+        else{
+            hideLoader();
+            showErr(d.error||'Something went wrong.');
+            btn.disabled=false; btn.textContent='Continue';
+        }
+    } catch(e){
+        hideLoader();
+        showErr('Something went wrong. Please try again.');
+        btn.disabled=false; btn.textContent='Continue';
+    }
 };
 
 function countdown(){

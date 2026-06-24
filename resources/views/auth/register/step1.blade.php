@@ -34,9 +34,50 @@
         .err{display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:9px 13px;font-size:13px;color:#dc2626;margin-bottom:14px}
         .footer{text-align:center;font-size:13px;color:#8a8880;margin-top:20px}
         .footer a{color:#1a6b52;text-decoration:none;font-weight:500}
+        @keyframes nyumba-spin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+        #nyumba-loader {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(245,244,240,0.85);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(2px);
+        }
     </style>
 </head>
 <body>
+
+<div id="nyumba-loader">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none"
+             style="animation:nyumba-spin 0.9s linear infinite">
+            <circle cx="20" cy="20" r="16" stroke="#e5e3de" stroke-width="3"/>
+            <path d="M20 4a16 16 0 0116 16" stroke="#1a6b52" stroke-width="3" stroke-linecap="round"/>
+        </svg>
+        <span id="nyumba-loader-text" style="font-size:13px;color:#1a6b52;font-family:'DM Sans',sans-serif;font-weight:500">
+            Creating your account...
+        </span>
+    </div>
+</div>
+
+<script>
+    window.showLoader = function(text) {
+        const el    = document.getElementById('nyumba-loader');
+        const label = document.getElementById('nyumba-loader-text');
+        if (label && text) label.textContent = text;
+        el.style.display = 'flex';
+    };
+    window.hideLoader = function() {
+        document.getElementById('nyumba-loader').style.display = 'none';
+    };
+    window.addEventListener('pageshow', hideLoader);
+</script>
+
 <div class="card">
     <img src="/images/logo.png" alt="Nyumba" class="logo">
     <div class="steps">
@@ -103,7 +144,6 @@ const gp   = new GoogleAuthProvider();
 const CONTINUE_URL = window.location.origin + '/auth/verified-callback';
 
 const ERR = {
-    // Email / password
     'auth/email-already-in-use':   'An account with this email already exists. Please sign in instead.',
     'auth/invalid-email':          'Please enter a valid email address.',
     'auth/missing-email':          'Please enter your email address.',
@@ -116,33 +156,23 @@ const ERR = {
     'auth/user-not-found':         'No account found with this email address.',
     'auth/user-disabled':          'This account has been disabled. Please contact support.',
     'auth/operation-not-allowed':  'This sign-in method is currently unavailable. Please try Google or contact support.',
-
-    // Rate limit / network
     'auth/too-many-requests':      'Too many attempts. Please wait a few minutes and try again.',
     'auth/network-request-failed': 'Network error. Please check your connection and try again.',
     'auth/timeout':                'The request timed out. Please try again.',
     'auth/quota-exceeded':         'Service is busy right now. Please try again shortly.',
-
-    // Google / popup
     'auth/popup-closed-by-user':   'Sign-in was cancelled.',
     'auth/cancelled-popup-request':'Sign-in was cancelled.',
     'auth/popup-blocked':          'Your browser blocked the popup. Please allow popups for this site and try again.',
-    'auth/unauthorized-domain':    'This domain isn’t authorized for sign-in. Please contact support.',
+    'auth/unauthorized-domain':    'This domain isn\'t authorized for sign-in. Please contact support.',
     'auth/account-exists-with-different-credential': 'An account already exists with this email using a different sign-in method.',
     'auth/credential-already-in-use': 'These credentials are already linked to another account.',
-    'auth/operation-not-supported-in-this-environment': 'Sign-in isn’t supported in this browser. Please try another browser.',
+    'auth/operation-not-supported-in-this-environment': 'Sign-in isn\'t supported in this browser. Please try another browser.',
     'auth/web-storage-unsupported':'Your browser has cookies/storage disabled. Please enable them and try again.',
-
-    // Session / tokens
     'auth/requires-recent-login':  'Please sign in again to continue.',
     'auth/user-token-expired':     'Your session has expired. Please sign in again.',
     'auth/invalid-user-token':     'Your session is invalid. Please sign in again.',
-
-    // Email links
     'auth/expired-action-code':    'This link has expired. Please request a new one.',
     'auth/invalid-action-code':    'This link is invalid or has already been used.',
-
-    // Config / internal
     'auth/invalid-api-key':        'Configuration error. Please contact support.',
     'auth/api-key-not-valid':      'Configuration error. Please contact support.',
     'auth/app-deleted':            'Configuration error. Please contact support.',
@@ -174,6 +204,8 @@ async function callVerify(token,provider,intent,extra={}){
     return data;
 }
 
+const googleIconHtml = `<svg width="16" height="16" viewBox="0 0 18 18" fill="none"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/><path d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg> Continue with Google`;
+
 window.createAccount = async function() {
     clearErr();
     const name=document.getElementById('name').value.trim();
@@ -191,15 +223,18 @@ window.createAccount = async function() {
 
     const btn=document.getElementById('btn-create');
     btn.disabled=true; btn.textContent='Creating account...';
+    showLoader('Creating your account...');
     try {
         const cred=await createUserWithEmailAndPassword(auth,email,pass);
         await sendEmailVerification(cred.user,{url:CONTINUE_URL});
         const token=await cred.user.getIdToken();
         const d=await callVerify(token,'email','register',{name,phone});
         if(d.redirect){window.location.href=d.redirect;return;}
+        hideLoader();
         showErr(d.error||'Registration failed. Please try again.');
         btn.disabled=false; btn.textContent='Create account';
     } catch(e){
+        hideLoader();
         if(e.code==='auth/email-already-in-use'){document.getElementById('e-email').textContent=fe(e.code);}
         else{showErr(fe(e.code));}
         btn.disabled=false; btn.textContent='Create account';
@@ -210,14 +245,20 @@ window.googleSignUp = async function() {
     clearErr();
     const btn=document.getElementById('btn-google');
     btn.disabled=true; btn.textContent='Connecting...';
+    showLoader('Connecting with Google...');
     try {
         const r=await signInWithPopup(auth,gp);
         const t=await r.user.getIdToken();
         const d=await callVerify(t,'google','register');
         if(d.redirect){window.location.href=d.redirect;return;}
+        hideLoader();
         showErr(d.error||'Something went wrong.');
-        btn.disabled=false; btn.textContent='Continue with Google';
-    } catch(e){showErr(fe(e.code)); btn.disabled=false; btn.textContent='Continue with Google';}
+        btn.disabled=false; btn.innerHTML=googleIconHtml;
+    } catch(e){
+        hideLoader();
+        showErr(fe(e.code));
+        btn.disabled=false; btn.innerHTML=googleIconHtml;
+    }
 };
 </script>
 </body>

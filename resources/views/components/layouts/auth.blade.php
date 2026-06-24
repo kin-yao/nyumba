@@ -5,15 +5,54 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <title>{{ config('app.name', 'Nyumba') }}</title>
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
         @vite(['resources/css/app.css', 'resources/js/app.js'])
+        <style>
+            @keyframes nyumba-spin {
+                from { transform: rotate(0deg); }
+                to   { transform: rotate(360deg); }
+            }
+            #nyumba-loader {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(245,244,240,0.85);
+                z-index: 9999;
+                align-items: center;
+                justify-content: center;
+                backdrop-filter: blur(2px);
+            }
+        </style>
     </head>
-    <body class="font-sans text-gray-900 antialiased">
-        <div class="min-h-screen flex flex-col sm:justify-center items-center pt-6 sm:pt-0 bg-gray-100">
-            <div class="w-full sm:max-w-md mt-6 px-6 py-4 bg-white shadow-md overflow-hidden sm:rounded-lg">
-                {{ $slot }}
+    <body style="font-family:'DM Sans',sans-serif;margin:0;padding:0;background:#f5f4f0;min-height:100vh">
+
+        <div id="nyumba-loader">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none"
+                     style="animation:nyumba-spin 0.9s linear infinite">
+                    <circle cx="20" cy="20" r="16" stroke="#e5e3de" stroke-width="3"/>
+                    <path d="M20 4a16 16 0 0116 16" stroke="#1a6b52" stroke-width="3" stroke-linecap="round"/>
+                </svg>
+                <span id="nyumba-loader-text" style="font-size:13px;color:#1a6b52;font-family:'DM Sans',sans-serif;font-weight:500">
+                    Loading...
+                </span>
             </div>
         </div>
+
+        {{ $slot }}
+
+        <script>
+            window.showLoader = function(text) {
+                const el    = document.getElementById('nyumba-loader');
+                const label = document.getElementById('nyumba-loader-text');
+                if (label && text) label.textContent = text;
+                el.style.display = 'flex';
+            };
+            window.hideLoader = function() {
+                document.getElementById('nyumba-loader').style.display = 'none';
+            };
+            window.addEventListener('pageshow', hideLoader);
+        </script>
     </body>
 </html>

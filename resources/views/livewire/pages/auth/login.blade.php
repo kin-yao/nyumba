@@ -95,7 +95,6 @@ const gp    = new GoogleAuthProvider();
 let fbUser  = null;
 
 const ERR = {
-    // Email / password
     'auth/email-already-in-use':   'An account with this email already exists. Please sign in instead.',
     'auth/invalid-email':          'Please enter a valid email address.',
     'auth/missing-email':          'Please enter your email address.',
@@ -108,33 +107,23 @@ const ERR = {
     'auth/user-not-found':         'No account found with this email address.',
     'auth/user-disabled':          'This account has been disabled. Please contact support.',
     'auth/operation-not-allowed':  'This sign-in method is currently unavailable. Please try Google or contact support.',
-
-    // Rate limit / network
     'auth/too-many-requests':      'Too many attempts. Please wait a few minutes and try again.',
     'auth/network-request-failed': 'Network error. Please check your connection and try again.',
     'auth/timeout':                'The request timed out. Please try again.',
     'auth/quota-exceeded':         'Service is busy right now. Please try again shortly.',
-
-    // Google / popup
     'auth/popup-closed-by-user':   'Sign-in was cancelled.',
     'auth/cancelled-popup-request':'Sign-in was cancelled.',
     'auth/popup-blocked':          'Your browser blocked the popup. Please allow popups for this site and try again.',
-    'auth/unauthorized-domain':    'This domain isn’t authorized for sign-in. Please contact support.',
+    'auth/unauthorized-domain':    'This domain isn\'t authorized for sign-in. Please contact support.',
     'auth/account-exists-with-different-credential': 'An account already exists with this email using a different sign-in method.',
     'auth/credential-already-in-use': 'These credentials are already linked to another account.',
-    'auth/operation-not-supported-in-this-environment': 'Sign-in isn’t supported in this browser. Please try another browser.',
+    'auth/operation-not-supported-in-this-environment': 'Sign-in isn\'t supported in this browser. Please try another browser.',
     'auth/web-storage-unsupported':'Your browser has cookies/storage disabled. Please enable them and try again.',
-
-    // Session / tokens
     'auth/requires-recent-login':  'Please sign in again to continue.',
     'auth/user-token-expired':     'Your session has expired. Please sign in again.',
     'auth/invalid-user-token':     'Your session is invalid. Please sign in again.',
-
-    // Email links
     'auth/expired-action-code':    'This link has expired. Please request a new one.',
     'auth/invalid-action-code':    'This link is invalid or has already been used.',
-
-    // Config / internal
     'auth/invalid-api-key':        'Configuration error. Please contact support.',
     'auth/api-key-not-valid':      'Configuration error. Please contact support.',
     'auth/app-deleted':            'Configuration error. Please contact support.',
@@ -178,6 +167,8 @@ async function callVerify(token, provider, intent, extra={}){
     return data;
 }
 
+const googleIconHtml = `<svg width="16" height="16" viewBox="0 0 18 18" fill="none"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/><path d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg> Continue with Google`;
+
 window.signInEmail = async function() {
     const email = document.getElementById('e-email').value.trim();
     const pass  = document.getElementById('e-pass').value;
@@ -185,12 +176,14 @@ window.signInEmail = async function() {
     clearMsg();
     if (!email || !pass) { showErr('Please enter your email and password.'); return; }
     btn.disabled=true; btn.textContent='Signing in...';
+    showLoader('Signing you in...');
     try {
         const cred = await signInWithEmailAndPassword(auth, email, pass);
         fbUser     = cred.user;
         const token = await cred.user.getIdToken();
         const data  = await callVerify(token, 'email', 'login');
         if (data.redirect) { window.location.href = data.redirect; return; }
+        hideLoader();
         if (data.error === 'verify_email') {
             document.getElementById('warn-box').style.display = 'block';
         } else {
@@ -198,6 +191,7 @@ window.signInEmail = async function() {
         }
         btn.disabled=false; btn.textContent='Sign in';
     } catch(e) {
+        hideLoader();
         showErr(fe(e.code));
         btn.disabled=false; btn.textContent='Sign in';
     }
@@ -215,19 +209,23 @@ window.resendVerification = async function() {
 
 window.signInGoogle = async function() {
     const btn = document.getElementById('btn-google');
-    clearMsg(); btn.disabled=true; btn.textContent='Signing in...';
+    clearMsg();
+    btn.disabled=true; btn.textContent='Signing in...';
+    showLoader('Signing you in...');
     try {
         const result = await signInWithPopup(auth, gp);
         const token  = await result.user.getIdToken();
         const data   = await callVerify(token, 'google', 'login');
         if (data.redirect) { window.location.href = data.redirect; return; }
+        hideLoader();
         showErr(data.error || 'No account found. Please register first.');
         btn.disabled=false;
-        btn.innerHTML=`<svg width="16" height="16" viewBox="0 0 18 18" fill="none"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/><path d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg> Continue with Google`;
+        btn.innerHTML=googleIconHtml;
     } catch(e) {
+        hideLoader();
         showErr(fe(e.code));
         btn.disabled=false;
-        btn.innerHTML=`<svg width="16" height="16" viewBox="0 0 18 18" fill="none"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/><path d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg> Continue with Google`;
+        btn.innerHTML=googleIconHtml;
     }
 };
 </script>
