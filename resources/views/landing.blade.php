@@ -197,9 +197,6 @@ a{color:inherit;text-decoration:none}
 .demo.open{display:flex}
 .demo-box{background:var(--ink);border-radius:10px;width:100%;max-width:840px;overflow:hidden;position:relative}
 .demo-x{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;background:rgba(244,242,236,.12);border:none;color:var(--paper);font-size:18px;cursor:pointer;z-index:2}
-.demo-ph{aspect-ratio:16/9;background:var(--green-deep);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
-.demo-ph .play{width:64px;height:64px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--ink)}
-.demo-ph p{font-family:'Clash Display',serif;font-size:18px;color:rgba(244,242,236,.5)}
 
 @media(max-width:1040px){.fcards{grid-template-columns:repeat(3,1fr)}.svc-grid{grid-template-columns:repeat(2,1fr)}.pricing-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:980px){.foot-grid{grid-template-columns:1fr 1fr;gap:30px}.util-left .it.hide-sm{display:none}.contact-inner{grid-template-columns:1fr;gap:36px}}
@@ -210,6 +207,7 @@ a{color:inherit;text-decoration:none}
 </style>
 </head>
 <body>
+
 <!-- Nav -->
 <nav class="nav">
   <div class="nav-inner">
@@ -228,6 +226,7 @@ a{color:inherit;text-decoration:none}
     <button class="nav-burger" id="navBurger" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
   </div>
 </nav>
+
 <!-- HERO -->
 <section class="hero">
   <div class="hero-photo">
@@ -239,7 +238,7 @@ a{color:inherit;text-decoration:none}
     <p class="hero-sub">Invoicing, M-Pesa reconciliation, utility billing and SMS reminders — running automatically for every unit in the portfolio.</p>
     <div class="hero-actions">
       <a href="/register/step1" class="btn btn-gold">Start free trial <span class="arr" style="background:rgba(20,17,15,.15)">&rarr;</span></a>
-      <button class="btn btn-light" onclick="document.getElementById('demo').classList.add('open')"><span class="arr" style="background:var(--green)">&#9654;</span> Watch demo</button>
+      <button class="btn btn-light" onclick="openDemo()"><span class="arr" style="background:var(--green)">&#9654;</span> Watch demo</button>
     </div>
   </div>
 </section>
@@ -284,7 +283,7 @@ a{color:inherit;text-decoration:none}
       <div class="about-visual rv">
         <div class="deco">@for($i=0;$i<9;$i++)<i></i>@endfor</div>
         <div class="about-photo"><img src="/images/about.jpg" alt="Reviewing a rental portfolio"></div>
-        <button class="about-play" onclick="document.getElementById('demo').classList.add('open')">&#9654;</button>
+        <button class="about-play" onclick="openDemo()">&#9654;</button>
       </div>
       <div class="rv">
         <div class="eyebrow">Why Nyumba</div>
@@ -432,44 +431,74 @@ a{color:inherit;text-decoration:none}
       </div>
     </div>
     <div class="foot-bottom">
-      <span>© {{ date('Y') }} Nyumba. All rights reserved.</span>
+      <span>&copy; {{ date('Y') }} Nyumba. All rights reserved.</span>
       <span>Built in Nairobi.</span>
     </div>
   </div>
 </footer>
 
 <!-- Demo modal -->
-<div class="demo" id="demo" onclick="if(event.target===this)this.classList.remove('open')">
+<div class="demo" id="demo" onclick="if(event.target===this)closeDemo()">
   <div class="demo-box">
-    <button class="demo-x" onclick="document.getElementById('demo').classList.remove('open')">&times;</button>
-    <div class="demo-ph"><div class="play">&#9654;</div><p>Product walkthrough coming soon.</p></div>
+    <button class="demo-x" onclick="closeDemo()">&times;</button>
+    <div class="yt-wrap" style="position:relative;width:100%;aspect-ratio:16/9"></div>
   </div>
 </div>
 
 <script>
+  function openDemo() {
+    var box  = document.getElementById('demo');
+    var wrap = box.querySelector('.yt-wrap');
+    box.classList.add('open');
+    if (!wrap.querySelector('iframe')) {
+      var f = document.createElement('iframe');
+      f.src = 'https://www.youtube.com/embed/vjpOAJsPHL8?autoplay=1';
+      f.title = 'Nyumba product walkthrough';
+      f.frameBorder = '0';
+      f.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+      f.allowFullscreen = true;
+      f.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
+      wrap.appendChild(f);
+    }
+  }
+
+  function closeDemo() {
+    var box  = document.getElementById('demo');
+    var wrap = box.querySelector('.yt-wrap');
+    box.classList.remove('open');
+    wrap.innerHTML = '';
+  }
+
   // Mobile menu toggle
   (function(){
-    var burger=document.getElementById('navBurger');
-    var links=document.getElementById('navLinks');
-    if(burger&&links){
-      burger.addEventListener('click',function(){
-        var open=links.classList.toggle('open');
-        burger.classList.toggle('open',open);
-        burger.setAttribute('aria-expanded',open?'true':'false');
+    var burger = document.getElementById('navBurger');
+    var links  = document.getElementById('navLinks');
+    if (burger && links) {
+      burger.addEventListener('click', function() {
+        var open = links.classList.toggle('open');
+        burger.classList.toggle('open', open);
+        burger.setAttribute('aria-expanded', open ? 'true' : 'false');
       });
-      links.querySelectorAll('a').forEach(function(a){
-        a.addEventListener('click',function(){
+      links.querySelectorAll('a').forEach(function(a) {
+        a.addEventListener('click', function() {
           links.classList.remove('open');
           burger.classList.remove('open');
-          burger.setAttribute('aria-expanded','false');
+          burger.setAttribute('aria-expanded', 'false');
         });
       });
     }
   })();
+
   // Scroll reveal
-  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.12});
-  document.querySelectorAll('.rv').forEach((el,i)=>{el.style.transitionDelay=(i%4*70)+'ms';io.observe(el)});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('demo').classList.remove('open')});
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+  }), { threshold: .12 });
+  document.querySelectorAll('.rv').forEach((el, i) => {
+    el.style.transitionDelay = (i % 4 * 70) + 'ms';
+    io.observe(el);
+  });
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDemo(); });
 </script>
 </body>
 </html>
