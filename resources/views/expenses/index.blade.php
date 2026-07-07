@@ -263,7 +263,7 @@
                 </div>
                 <div>
                     <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Amount ({{ currency_symbol() }})</label>
-                    <input name="amount" type="number" required min="1"
+                    <input name="amount" type="number" required min="1" step="0.01"
                            style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
                 </div>
             </div>

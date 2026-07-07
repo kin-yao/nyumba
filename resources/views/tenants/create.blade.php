@@ -148,7 +148,7 @@
                 </div>
                 <div class="field">
                     <label>Monthly rent ({{ currency_symbol() }})</label>
-                    <input name="monthly_rent" type="number" required id="monthly-rent" value="{{ old('monthly_rent') }}">
+                    <input name="monthly_rent" type="number" required step="0.01" id="monthly-rent" value="{{ old('monthly_rent') }}">
                 </div>
                 <div class="field">
                     <label>Annual escalation % (commercial)</label>
@@ -163,11 +163,11 @@
             <div class="form-3col">
                 <div class="field">
                     <label>Deposit required ({{ currency_symbol() }})</label>
-                    <input name="deposit_required" type="number" required id="deposit-required" value="{{ old('deposit_required') }}">
+                    <input name="deposit_required" type="number" required step="0.01" id="deposit-required" value="{{ old('deposit_required') }}">
                 </div>
                 <div class="field">
                     <label>Deposit paid ({{ currency_symbol() }})</label>
-                    <input name="deposit_paid" type="number" required value="{{ old('deposit_paid', '0') }}">
+                    <input name="deposit_paid" type="number" required step="0.01" value="{{ old('deposit_paid', '0') }}">
                 </div>
                 <div class="field">
                     <label>Payment method</label>
