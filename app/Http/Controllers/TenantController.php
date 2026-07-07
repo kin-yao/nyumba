@@ -271,7 +271,7 @@ class TenantController extends Controller
                     'method'       => 'bank', // internal transfer, no actual payment
                     'reference'    => null,
                     'notes'        => 'Deposit carried forward from Unit ' . $oldUnit->name,
-                    'is_allocated' => false,
+                    'is_allocated' => true,
                 ]);
             }
 

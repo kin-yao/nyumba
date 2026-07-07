@@ -212,7 +212,9 @@
                                 <td style="padding:11px 14px;font-size:12px;font-family:monospace;color:#8a8880">{{ $payment->reference ?? '-' }}</td>
                                 <td style="padding:11px 14px;font-size:13px;font-weight:500;text-align:right;color:#15803d">{{ currency($payment->amount) }}</td>
                                 <td style="padding:11px 14px">
-                                    @if($payment->is_allocated)
+                                    @if($payment->payment_type === 'deposit')
+                                        <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:#fef3c7;color:#92400e">Deposit held</span>
+                                    @elseif($payment->is_allocated)
                                         <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:#dcfce7;color:#166534">Allocated</span>
                                     @elseif(!$payment->tenant_id)
                                         <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:#fee2e2;color:#991b1b">Unmatched</span>
@@ -256,7 +258,9 @@
                             @if($payment->reference)
                                 <span class="pay-tag" style="font-family:monospace">{{ $payment->reference }}</span>
                             @endif
-                            @if($payment->is_allocated)
+                            @if($payment->payment_type === 'deposit')
+                                <span style="font-size:11px;color:#92400e;background:#fef3c7;padding:2px 8px;border-radius:20px">Deposit held</span>
+                            @elseif($payment->is_allocated)
                                 <span style="font-size:11px;color:#166534;background:#dcfce7;padding:2px 8px;border-radius:20px">Allocated</span>
                             @elseif(!$payment->tenant_id)
                                 <span style="font-size:11px;color:#991b1b;background:#fee2e2;padding:2px 8px;border-radius:20px">Unmatched</span>

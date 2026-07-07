@@ -95,7 +95,7 @@ class PaymentController extends Controller
                 'method'       => $validated['method'],
                 'reference'    => $validated['reference'] ?? null,
                 'notes'        => $validated['notes'] ?? null,
-                'is_allocated' => false,
+                'is_allocated' => $isDeposit,
             ]);
 
             if (!$isDeposit && $activeLease) {

@@ -391,7 +391,7 @@ class ImportController extends Controller
                                 'method'       => $depositMethod,
                                 'reference'    => null,
                                 'notes'        => 'Opening deposit — imported from CSV',
-                                'is_allocated' => false,
+                                'is_allocated' => true,
                             ]);
                         }
 
