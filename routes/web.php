@@ -159,6 +159,7 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
     Route::get('/invoices/bulk/preview', [InvoiceController::class, 'bulkPreviewShow'])->name('invoices.bulk.preview.show');
     Route::post('/invoices/bulk', [InvoiceController::class, 'bulkStore'])->name('invoices.bulk.store');
     Route::get('/invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('invoices.pdf');
+    Route::post('/invoices/send-all', [InvoiceController::class, 'sendAll'])->name('invoices.send-all');
     Route::resource('invoices', InvoiceController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
     Route::post('/invoices/{invoice}/send', [InvoiceController::class, 'send'])->name('invoices.send');
 
@@ -171,6 +172,8 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
     Route::get('/utilities/rates', [UtilityController::class, 'rates'])->name('utilities.rates');
     Route::post('/utilities/rates', [UtilityController::class, 'storeRate'])->name('utilities.rates.store');
     Route::delete('/utilities/rates/{utilityRate}', [UtilityController::class, 'destroyRate'])->name('utilities.rates.destroy');
+    Route::get('/utilities/readings/csv', [UtilityController::class, 'downloadReadingsCsv'])->name('utilities.readings.csv.download');
+    Route::post('/utilities/readings/csv', [UtilityController::class, 'uploadReadingsCsv'])->name('utilities.readings.csv.upload');
     Route::get('/utilities', [UtilityController::class, 'index'])->name('utilities.index');
     Route::post('/utilities', [UtilityController::class, 'store'])->name('utilities.store');
 

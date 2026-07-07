@@ -90,6 +90,17 @@
                 <div style="font-size:13px;color:rgba(244,242,236,.6);margin-top:3px">{{ $invoices->count() }} total</div>
             </div>
             <div class="inv-actions">
+                @php $draftCount = $invoices->where('status', 'draft')->count(); @endphp
+                @if($draftCount > 0)
+                    <form method="POST" action="{{ route('invoices.send-all') }}"
+                          onsubmit="return confirm('Send {{ $draftCount }} draft {{ Str::plural('invoice', $draftCount) }} to tenants via SMS now?')">
+                        @csrf
+                        <button type="submit"
+                                style="display:inline-flex;align-items:center;gap:6px;padding:8px 15px;background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
+                            Send all ({{ $draftCount }})
+                        </button>
+                    </form>
+                @endif
                 <a href="{{ route('invoices.bulk') }}"
                    style="display:inline-flex;align-items:center;gap:6px;padding:8px 15px;background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:7px;font-size:13px;text-decoration:none;white-space:nowrap">
                     Bulk generate

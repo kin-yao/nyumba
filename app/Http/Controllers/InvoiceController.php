@@ -139,19 +139,88 @@ class InvoiceController extends Controller
 
     public function send(Invoice $invoice)
     {
-        $invoice->load(['lease.tenant', 'lease.unit.property']);
+        $result = $this->attemptSend($invoice);
+
+        if (!$result['success']) {
+            return back()->with('error', $result['reason']);
+        }
+
+        return back()->with('success', 'Invoice sent to ' . $result['tenant_name'] . ' via SMS.');
+    }
+
+    /**
+     * Send every not-yet-sent invoice (drafts) for this account to their
+     * tenants. System-generated invoices are already sent automatically at
+     * creation time (see SendMonthlyInvoices) — this is for manually
+     * created / bulk-generated invoices still sitting as drafts.
+     */
+    public function sendAll()
+    {
+        $unitIds  = $this->filteredUnitIds();
+        $leaseIds = Lease::whereIn('unit_id', $unitIds)->pluck('id')->toArray();
+
+        $invoices = Invoice::with(['lease.tenant', 'lease.unit.property'])
+            ->whereIn('lease_id', $leaseIds)
+            ->where('status', 'draft')
+            ->get();
+
+        if ($invoices->isEmpty()) {
+            return back()->with('error', 'No draft invoices to send — everything has already been sent.');
+        }
+
+        $sent   = 0;
+        $failed = [];
+
+        foreach ($invoices as $invoice) {
+            $result = $this->attemptSend($invoice);
+
+            if ($result['success']) {
+                $sent++;
+            } else {
+                $failed[] = $result['tenant_name'] . ' (' . $result['reason'] . ')';
+            }
+        }
+
+        try {
+            AuditService::log(
+                'invoice.bulk_sent',
+                $sent . ' ' . Str::plural('invoice', $sent) . ' sent to tenants via SMS',
+                null,
+                ['sent' => $sent, 'failed' => count($failed)]
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Audit log failed: ' . $e->getMessage());
+        }
+
+        $message = $sent . ' ' . Str::plural('invoice', $sent) . ' sent successfully.';
+        if (!empty($failed)) {
+            $message .= ' ' . count($failed) . ' could not be sent: ' . implode(', ', $failed) . '.';
+            return back()->with('error', $message);
+        }
+
+        return back()->with('success', $message);
+    }
+
+    /**
+     * Shared send logic used by both the single "Send" action and "Send all".
+     * Never throws — always returns a structured result so bulk sending can
+     * keep going through failures.
+     */
+    private function attemptSend(Invoice $invoice): array
+    {
+        $invoice->loadMissing(['lease.tenant', 'lease.unit.property']);
 
         $tenant  = $invoice->lease->tenant;
         $account = auth()->user()->account;
 
         if (!$tenant->phone) {
-            return back()->with('error', 'This tenant has no phone number on file. Add one before sending.');
+            return ['success' => false, 'tenant_name' => $tenant->full_name, 'reason' => 'no phone number on file'];
         }
 
         $sms = new SmsService($account);
 
         if (!$sms->hasCredits()) {
-            return back()->with('error', 'No SMS credits remaining. Top up to send invoices.');
+            return ['success' => false, 'tenant_name' => $tenant->full_name, 'reason' => 'no SMS credits remaining'];
         }
 
         $pdfUrl = URL::signedRoute(
@@ -170,7 +239,7 @@ class InvoiceController extends Controller
         $result = $sms->send($tenant->phone, $message, $tenant->id);
 
         if (!$result['success']) {
-            return back()->with('error', 'SMS failed to send. Please try again.');
+            return ['success' => false, 'tenant_name' => $tenant->full_name, 'reason' => 'SMS failed to send'];
         }
 
         $invoice->update([
@@ -185,7 +254,7 @@ class InvoiceController extends Controller
             ['phone' => $tenant->phone, 'period' => $period]
         );
 
-        return back()->with('success', 'Invoice sent to ' . $tenant->full_name . ' via SMS.');
+        return ['success' => true, 'tenant_name' => $tenant->full_name, 'reason' => null];
     }
 
     // ── Show / Destroy ────────────────────────────────────────────────────

@@ -161,7 +161,7 @@
                                     </select>
                                 </div>
                                 <div style="padding:7px 6px">
-                                    <input type="number" name="amounts[]" required min="0" id="first-amount"
+                                    <input type="number" name="amounts[]" required min="0" step="0.01" id="first-amount"
                                            oninput="updateTotal()"
                                            style="width:100%;border:none;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;background:transparent">
                                 </div>
@@ -284,7 +284,7 @@ function buildItemHTML(desc, type, amount) {
     }).join('');
     return '<div style="padding:7px 10px"><input type="text" name="descriptions[]" required value="' + (desc||'') + '" placeholder="Description" style="width:100%;border:none;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none;background:transparent"></div>' +
         '<div style="padding:7px 6px"><select name="types[]" style="width:100%;border:none;font-size:12px;font-family:\'DM Sans\',sans-serif;outline:none;background:transparent">' + opts + '</select></div>' +
-        '<div style="padding:7px 6px"><input type="number" name="amounts[]" required min="0" value="' + (amount||'') + '" oninput="updateTotal()" style="width:100%;border:none;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none;background:transparent"></div>' +
+        '<div style="padding:7px 6px"><input type="number" name="amounts[]" required min="0" step="0.01" value="' + (amount||'') + '" oninput="updateTotal()" style="width:100%;border:none;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none;background:transparent"></div>' +
         '<div style="padding:7px;text-align:center"><button type="button" onclick="this.closest(\'.line-item\').remove();updateTotal()" style="background:none;border:none;cursor:pointer;color:#8a8880;font-size:16px;line-height:1">&times;</button></div>';
 }
 
