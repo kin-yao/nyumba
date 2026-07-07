@@ -87,6 +87,14 @@
                     Go
                 </button>
             </form>
+            <a href="{{ route('utilities.readings.csv.download', ['month' => $month, 'year' => $year]) }}"
+               style="display:inline-flex;align-items:center;padding:7px 14px;background:transparent;color:#1a6b52;border:1px solid #1a6b52;border-radius:7px;font-size:13px;font-weight:500;text-decoration:none;white-space:nowrap">
+                ↓ Download CSV
+            </a>
+            <button onclick="document.getElementById('upload-csv-modal').style.display='flex'"
+                    style="display:inline-flex;align-items:center;padding:7px 14px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
+                ↑ Upload CSV
+            </button>
             <a href="{{ route('utilities.rates') }}"
                style="display:inline-flex;align-items:center;padding:7px 14px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;text-decoration:none;white-space:nowrap">
                 Configure rates
@@ -97,6 +105,19 @@
     @if(session('success'))
         <div style="background:#dcfce7;border:1px solid #86efac;border-radius:10px;padding:11px 15px;margin-bottom:16px;font-size:13px;color:#166534">
             {{ session('success') }}
+        </div>
+    @endif
+    @if(session('error'))
+        <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:10px;padding:11px 15px;margin-bottom:16px;font-size:13px;color:#991b1b">
+            {{ session('error') }}
+        </div>
+    @endif
+    @if(session('utility_csv_skipped'))
+        <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:11px 15px;margin-bottom:16px;font-size:12px;color:#92400e;line-height:1.6">
+            <div style="font-weight:600;margin-bottom:4px">Rows skipped:</div>
+            @foreach(session('utility_csv_skipped') as $line)
+                <div>&middot; {{ $line }}</div>
+            @endforeach
         </div>
     @endif
 
@@ -373,4 +394,61 @@ function filterByUnit(query) {
     document.getElementById('no-results').style.display = (!anyVisible && query !== '') ? 'block' : 'none';
 }
 </script>
+
+{{-- Upload readings CSV modal --}}
+<div id="upload-csv-modal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:50;align-items:center;justify-content:center;padding:16px">
+    <div style="background:#fff;border-radius:14px;padding:28px;width:100%;max-width:460px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.07)">
+            <div style="font-size:15px;font-weight:500">Upload readings CSV</div>
+            <button onclick="document.getElementById('upload-csv-modal').style.display='none'"
+                    style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;line-height:1">&times;</button>
+        </div>
+        <div style="background:#f5f4f0;border-radius:8px;padding:14px;margin-bottom:18px;font-size:13px;color:#8a8880;line-height:1.6">
+            Fill in the <strong>current_reading</strong> column on the CSV you downloaded and upload it here.
+            Rows left blank are skipped. The month/year below must match the period on the CSV you downloaded.
+        </div>
+        <form method="POST" action="{{ route('utilities.readings.csv.upload') }}" enctype="multipart/form-data">
+            @csrf
+            <div style="display:flex;gap:10px;margin-bottom:16px">
+                <div style="flex:1">
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Month</label>
+                    <select name="month" required
+                            style="width:100%;height:36px;padding:0 10px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                        @foreach(range(1,12) as $m)
+                            <option value="{{ $m }}" {{ $m==$month?'selected':'' }}>
+                                {{ \Carbon\Carbon::createFromDate($year,$m,1)->format('F') }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div style="flex:1">
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Year</label>
+                    <input name="year" type="number" required value="{{ $year }}"
+                           style="width:100%;height:36px;padding:0 10px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                </div>
+            </div>
+            <div style="margin-bottom:18px">
+                <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px">
+                    Select CSV file
+                </label>
+                <input type="file" name="csv_file" accept=".csv,.txt" required
+                       style="width:100%;font-size:13px;font-family:'DM Sans',sans-serif;color:#111110">
+                <div style="font-size:11px;color:#8a8880;margin-top:5px">Max 5MB. Must be a .csv file.</div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="submit"
+                        style="padding:7px 20px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                    Upload &amp; update readings
+                </button>
+                <button type="button"
+                        onclick="document.getElementById('upload-csv-modal').style.display='none'"
+                        style="padding:7px 15px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 </x-layouts.app>

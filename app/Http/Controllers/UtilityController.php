@@ -112,6 +112,209 @@ class UtilityController extends Controller
         ])->with('success', 'Reading saved successfully.');
     }
 
+    // ── Bulk readings via CSV ────────────────────────────────────────────
+
+    /**
+     * Download a CSV listing every unit with an active tenant, one row per
+     * configured meter-type utility, with last period's reading for
+     * reference and a blank column for the new reading to be filled in.
+     */
+    public function downloadReadingsCsv(Request $request)
+    {
+        $month = (int) $request->input('month', now()->month);
+        $year  = (int) $request->input('year', now()->year);
+
+        $lastMonth = $month === 1 ? 12 : $month - 1;
+        $lastYear  = $month === 1 ? $year - 1 : $year;
+
+        $propertyIds = $this->filteredPropertyIds();
+
+        $properties = Property::whereIn('id', $propertyIds)
+            ->with([
+                'units.activeLease.tenant',
+                'utilityRates' => fn($q) => $q->where('active', true)
+                    ->whereIn('billing_type', ['per_unit', 'per_meter_reading']),
+            ])->get();
+
+        $unitIds = Unit::whereIn('property_id', $propertyIds)->pluck('id')->toArray();
+
+        $lastReadings = UtilityReading::whereIn('unit_id', $unitIds)
+            ->where('reading_month', $lastMonth)
+            ->where('reading_year', $lastYear)
+            ->get()
+            ->groupBy(fn($r) => $r->unit_id . '_' . $r->utility_type);
+
+        $rows = [[
+            'unit_id', 'property', 'unit', 'tenant', 'utility_type', 'utility_name',
+            'previous_reading', 'current_reading',
+        ]];
+
+        foreach ($properties as $property) {
+            if ($property->utilityRates->isEmpty()) continue;
+
+            foreach ($property->units as $unit) {
+                if (!$unit->activeLease) continue;
+
+                $tenant = $unit->activeLease->tenant;
+
+                foreach ($property->utilityRates as $rate) {
+                    $last = $lastReadings->get($unit->id . '_' . $rate->type)?->first();
+
+                    $rows[] = [
+                        $unit->id,
+                        $property->name,
+                        $unit->name,
+                        $tenant->full_name,
+                        $rate->type,
+                        $rate->name,
+                        $last ? floatval($last->current_reading) : 0,
+                        '', // to be filled in
+                    ];
+                }
+            }
+        }
+
+        $filename = 'utility-readings-' . $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT) . '.csv';
+
+        $headers = [
+            'Content-Type'        => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        $callback = function () use ($rows) {
+            $handle = fopen('php://output', 'w');
+            foreach ($rows as $row) {
+                fputcsv($handle, $row);
+            }
+            fclose($handle);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Upload the filled-in CSV back — updates a UtilityReading per row that
+     * has a current_reading value, using the same charge calculation as the
+     * single-reading form.
+     */
+    public function uploadReadingsCsv(Request $request)
+    {
+        $validated = $request->validate([
+            'month'    => ['required', 'integer', 'min:1', 'max:12'],
+            'year'     => ['required', 'integer'],
+            'csv_file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
+        ]);
+
+        $month     = (int) $validated['month'];
+        $year      = (int) $validated['year'];
+        $accountId = auth()->user()->account_id;
+        $unitIds   = $this->filteredUnitIds();
+
+        $handle = fopen($validated['csv_file']->getRealPath(), 'r');
+        $header = fgetcsv($handle);
+        $header = array_map(fn($h) => strtolower(trim($h)), $header);
+
+        $updated = 0;
+        $skipped = [];
+        $rowNum  = 1;
+
+        // Cache units + their property's active rates to avoid N+1 lookups
+        $units = Unit::whereIn('id', $unitIds)
+            ->with('property.utilityRates')
+            ->get()
+            ->keyBy('id');
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $rowNum++;
+            $data = array_combine($header, $row);
+
+            $currentReading = trim($data['current_reading'] ?? '');
+            if ($currentReading === '') continue; // nothing entered for this row, skip silently
+
+            $unitId = (int) ($data['unit_id'] ?? 0);
+            $type   = trim($data['utility_type'] ?? '');
+            $unit   = $units->get($unitId);
+
+            if (!$unit) {
+                $skipped[] = "Row {$rowNum}: unit not found or not accessible";
+                continue;
+            }
+
+            if (!is_numeric($currentReading)) {
+                $skipped[] = "Row {$rowNum} ({$unit->name}, {$type}): current reading is not a number";
+                continue;
+            }
+
+            $rate = $unit->property->utilityRates
+                ->where('type', $type)
+                ->where('active', true)
+                ->first();
+
+            if (!$rate) {
+                $skipped[] = "Row {$rowNum} ({$unit->name}, {$type}): no active rate configured for this utility";
+                continue;
+            }
+
+            $previousReading = is_numeric($data['previous_reading'] ?? null)
+                ? floatval($data['previous_reading'])
+                : 0;
+
+            $currentReading = floatval($currentReading);
+
+            if ($currentReading < $previousReading) {
+                $skipped[] = "Row {$rowNum} ({$unit->name}, {$type}): current reading is less than previous reading";
+                continue;
+            }
+
+            $unitsConsumed = $currentReading - $previousReading;
+            $chargeAmount  = $unitsConsumed * floatval($rate->amount);
+
+            UtilityReading::updateOrCreate(
+                [
+                    'unit_id'       => $unit->id,
+                    'utility_type'  => $type,
+                    'reading_month' => $month,
+                    'reading_year'  => $year,
+                    'account_id'    => $accountId,
+                ],
+                [
+                    'previous_reading' => $previousReading,
+                    'current_reading'  => $currentReading,
+                    'units_consumed'   => $unitsConsumed,
+                    'rate_per_unit'    => $rate->amount,
+                    'charge_amount'    => $chargeAmount,
+                ]
+            );
+
+            $updated++;
+        }
+
+        fclose($handle);
+
+        $period = \Carbon\Carbon::createFromDate($year, $month, 1)->format('M Y');
+
+        try {
+            AuditService::log(
+                'utility.readings_bulk_uploaded',
+                $updated . ' utility ' . \Illuminate\Support\Str::plural('reading', $updated) . ' updated via CSV for ' . $period,
+                null,
+                ['updated' => $updated, 'skipped' => count($skipped), 'period' => $period]
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Audit log failed: ' . $e->getMessage());
+        }
+
+        $message = $updated . ' ' . \Illuminate\Support\Str::plural('reading', $updated) . ' updated for ' . $period . '.';
+
+        if (!empty($skipped)) {
+            session()->flash('utility_csv_skipped', $skipped);
+            $message .= ' ' . count($skipped) . ' row(s) skipped — see details below.';
+        }
+
+        return redirect()->route('utilities.index', ['month' => $month, 'year' => $year])
+            ->with($updated > 0 ? 'success' : 'error', $message);
+    }
+
     public function rates()
     {
         $propertyIds = $this->filteredPropertyIds();
