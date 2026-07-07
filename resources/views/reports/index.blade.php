@@ -24,6 +24,51 @@
         <div style="font-size:13px;color:#8a8880;margin-top:3px">Generate and export data</div>
     </div>
 
+    {{-- ── Combined PDF download ── --}}
+    <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:20px;margin-bottom:24px">
+        <div style="font-size:14px;font-weight:500;margin-bottom:3px">Download a report</div>
+        <div style="font-size:12px;color:#8a8880;margin-bottom:16px;line-height:1.5">
+            Pick a property and a period.
+        </div>
+
+        @if($properties->isEmpty())
+            <div style="font-size:13px;color:#8a8880">Add a property first to generate its report.</div>
+        @else
+            <form method="GET" action="{{ route('reports.download') }}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <select name="property_id" required
+                        style="height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;min-width:180px">
+                    @foreach($properties as $property)
+                        <option value="{{ $property->id }}">{{ $property->name }}</option>
+                    @endforeach
+                </select>
+
+                <select name="month"
+                        style="height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                    <option value="">Full year summary</option>
+                    @foreach(range(1,12) as $m)
+                        <option value="{{ $m }}" {{ $m == now()->month ? 'selected' : '' }}>
+                            {{ \Carbon\Carbon::createFromDate(now()->year, $m, 1)->format('F') }}
+                        </option>
+                    @endforeach
+                </select>
+
+                <select name="year" required
+                        style="height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                    @foreach(range(now()->year, now()->year - 5) as $y)
+                        <option value="{{ $y }}" {{ $y == now()->year ? 'selected' : '' }}>{{ $y }}</option>
+                    @endforeach
+                </select>
+
+                <button type="submit"
+                        style="height:36px;padding:0 18px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer">
+                    Download PDF
+                </button>
+            </form>
+        @endif
+    </div>
+
+    <div style="font-size:12px;color:#8a8880;margin-bottom:10px">Or browse a report in your browser:</div>
+
     <div class="rep-grid">
         @foreach([
             [route('reports.rent-roll'),        'Rent roll',            'Units, tenants, expected vs collected per month',         '#e6f2ed', '#1a6b52', '<rect x="2" y="2" width="12" height="12" rx="2" stroke="#1a6b52" stroke-width="1.3"/><path d="M5 6h6M5 9h4" stroke="#1a6b52" stroke-width="1.2" stroke-linecap="round"/>'],

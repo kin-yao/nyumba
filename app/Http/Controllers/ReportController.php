@@ -15,7 +15,249 @@ class ReportController extends Controller
 {
     public function index()
     {
-        return view('reports.index');
+        $propertyIds = $this->filteredPropertyIds();
+        $properties  = Property::whereIn('id', $propertyIds)->orderBy('name')->get();
+
+        return view('reports.index', compact('properties'));
+    }
+
+    /**
+     * Generate one combined PDF report for a single property.
+     * With a month: full detailed report for that month.
+     * Without a month: a high-level yearly summary (no month-by-month breakdown).
+     */
+    public function download(Request $request)
+    {
+        $validated = $request->validate([
+            'property_id' => ['required', 'integer'],
+            'year'        => ['required', 'integer', 'min:2000', 'max:2100'],
+            'month'       => ['nullable', 'integer', 'min:1', 'max:12'],
+        ]);
+
+        $property = Property::where('id', $validated['property_id'])
+            ->whereIn('id', $this->filteredPropertyIds())
+            ->firstOrFail();
+
+        $account = auth()->user()->account;
+        $year    = (int) $validated['year'];
+        $month   = $validated['month'] ?? null;
+        $month   = $month ? (int) $month : null;
+
+        $unitIds  = Unit::where('property_id', $property->id)->pluck('id')->toArray();
+        $leaseIds = Lease::whereIn('unit_id', $unitIds)->pluck('id')->toArray();
+
+        $data = [
+            'account'     => $account,
+            'property'    => $property,
+            'occupancy'   => $this->occupancySnapshot($property),
+            'deposits'    => $this->depositsSnapshot($unitIds),
+            'outstanding' => $this->outstandingSnapshot($unitIds),
+        ];
+
+        if ($month) {
+            $data['mode']           = 'monthly';
+            $data['periodLabel']    = \Carbon\Carbon::createFromDate($year, $month, 1)->format('F Y');
+            $data['rentRoll']       = $this->rentRollForPeriod($property, $month, $year);
+            $data['collections']    = $this->collectionsForPeriod($leaseIds, $month, $year);
+            $data['incomeExpenses'] = $this->incomeExpensesForPeriod($property, $leaseIds, $month, $year);
+
+            $filename = 'Report-' . \Illuminate\Support\Str::slug($property->name) . '-' . $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT) . '.pdf';
+        } else {
+            $data['mode']        = 'yearly';
+            $data['periodLabel'] = (string) $year;
+            $data['yearly']      = $this->yearlySummary($property, $leaseIds, $year);
+
+            $filename = 'Report-' . \Illuminate\Support\Str::slug($property->name) . '-' . $year . '.pdf';
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.pdf.general', $data);
+
+        return $pdf->download($filename);
+    }
+
+    // ─── Combined-PDF helpers ───────────────────────────────────────────────
+
+    private function occupancySnapshot(Property $property): array
+    {
+        $units    = Unit::where('property_id', $property->id)->get();
+        $total    = $units->count();
+        $occupied = $units->where('status', 'occupied')->count();
+        $vacant   = $total - $occupied;
+        $rate     = $total > 0 ? round(($occupied / $total) * 100) : 0;
+
+        return compact('total', 'occupied', 'vacant', 'rate');
+    }
+
+    private function depositsSnapshot(array $unitIds): array
+    {
+        $leases = Lease::where('status', 'active')
+            ->whereIn('unit_id', $unitIds)
+            ->get();
+
+        $totalRequired    = floatval($leases->sum(fn($l) => floatval($l->deposit_required ?? 0)));
+        $totalHeld        = floatval($leases->sum(fn($l) => floatval($l->deposit_paid ?? 0)));
+        $totalOutstanding = floatval($leases->sum(
+            fn($l) => max(0, floatval($l->deposit_required ?? 0) - floatval($l->deposit_paid ?? 0))
+        ));
+
+        return compact('totalRequired', 'totalHeld', 'totalOutstanding');
+    }
+
+    private function outstandingSnapshot(array $unitIds): array
+    {
+        $leases = Lease::with(['tenant', 'invoices', 'payments'])
+            ->where('status', 'active')
+            ->whereIn('unit_id', $unitIds)
+            ->get()
+            ->map(function ($lease) {
+                $totalCharged = floatval($lease->invoices->sum('total_amount'));
+                $totalPaid    = floatval(
+                    $lease->payments->where('payment_type', '!=', 'deposit')->sum('amount')
+                );
+
+                return [
+                    'tenant'  => $lease->tenant,
+                    'balance' => $totalCharged - $totalPaid,
+                ];
+            })
+            ->filter(fn($l) => $l['balance'] > 0)
+            ->sortByDesc('balance')
+            ->values();
+
+        return [
+            'leases' => $leases,
+            'total'  => $leases->sum('balance'),
+        ];
+    }
+
+    private function rentRollForPeriod(Property $property, int $month, int $year): array
+    {
+        $property->load([
+            'units.activeLease.tenant',
+            'units.activeLease.invoices' => fn($q) =>
+                $q->where('period_month', $month)->where('period_year', $year),
+        ]);
+
+        $rows           = [];
+        $totalExpected  = 0;
+        $totalCollected = 0;
+
+        foreach ($property->units as $unit) {
+            if (!$unit->activeLease) continue;
+
+            $invoice   = $unit->activeLease->invoices->first();
+            $expected  = $invoice ? floatval($invoice->total_amount) : floatval($unit->activeLease->monthly_rent);
+            $collected = $invoice ? floatval($invoice->amount_paid) : 0;
+
+            $totalExpected  += $expected;
+            $totalCollected += $collected;
+
+            $rows[] = [
+                'unit'      => $unit,
+                'tenant'    => $unit->activeLease->tenant,
+                'expected'  => $expected,
+                'collected' => $collected,
+            ];
+        }
+
+        $totalOutstanding = $totalExpected - $totalCollected;
+        $collectionRate   = $totalExpected > 0 ? round(($totalCollected / $totalExpected) * 100, 1) : 0;
+
+        return compact('rows', 'totalExpected', 'totalCollected', 'totalOutstanding', 'collectionRate');
+    }
+
+    private function collectionsForPeriod(array $leaseIds, int $month, int $year): array
+    {
+        $payments = Payment::with('tenant')
+            ->whereIn('lease_id', $leaseIds)
+            ->where('payment_type', '!=', 'deposit')
+            ->whereMonth('payment_date', $month)
+            ->whereYear('payment_date', $year)
+            ->get();
+
+        $totalCollected = floatval($payments->sum('amount'));
+
+        $byMethod = $payments->groupBy('method')
+            ->map(fn($g) => [
+                'count'  => $g->count(),
+                'amount' => floatval($g->sum('amount')),
+            ]);
+
+        return compact('payments', 'totalCollected', 'byMethod');
+    }
+
+    private function incomeExpensesForPeriod(Property $property, array $leaseIds, int $month, int $year): array
+    {
+        $totalIncome = floatval(
+            Payment::whereIn('lease_id', $leaseIds)
+                ->where('payment_type', '!=', 'deposit')
+                ->whereMonth('payment_date', $month)
+                ->whereYear('payment_date', $year)
+                ->sum('amount')
+        );
+
+        $expenses = Expense::where('property_id', $property->id)
+            ->whereMonth('expense_date', $month)
+            ->whereYear('expense_date', $year)
+            ->get();
+
+        $totalExpenses = floatval($expenses->sum('amount'));
+        $netProfit     = $totalIncome - $totalExpenses;
+
+        $byCategory = $expenses->groupBy('category')
+            ->map(fn($g) => floatval($g->sum('amount')))
+            ->sortByDesc(fn($v) => $v);
+
+        return compact('totalIncome', 'totalExpenses', 'netProfit', 'byCategory');
+    }
+
+    private function yearlySummary(Property $property, array $leaseIds, int $year): array
+    {
+        $invoices = Invoice::whereIn('lease_id', $leaseIds)
+            ->whereYear('invoice_date', $year)
+            ->get();
+
+        $expected       = floatval($invoices->sum('total_amount'));
+        $collected      = floatval($invoices->sum('amount_paid'));
+        $collectionRate = $expected > 0 ? round(($collected / $expected) * 100) : 0;
+
+        $totalIncome = floatval(
+            Payment::whereIn('lease_id', $leaseIds)
+                ->where('payment_type', '!=', 'deposit')
+                ->whereYear('payment_date', $year)
+                ->sum('amount')
+        );
+
+        $totalExpenses = floatval(
+            Expense::where('property_id', $property->id)
+                ->whereYear('expense_date', $year)
+                ->sum('amount')
+        );
+
+        $netProfit = $totalIncome - $totalExpenses;
+
+        $bestMonth  = null;
+        $bestIncome = 0;
+
+        for ($m = 1; $m <= 12; $m++) {
+            $monthIncome = floatval(
+                Payment::whereIn('lease_id', $leaseIds)
+                    ->where('payment_type', '!=', 'deposit')
+                    ->whereYear('payment_date', $year)
+                    ->whereMonth('payment_date', $m)
+                    ->sum('amount')
+            );
+            if ($monthIncome > $bestIncome) {
+                $bestIncome = $monthIncome;
+                $bestMonth  = \Carbon\Carbon::createFromDate($year, $m, 1)->format('F');
+            }
+        }
+
+        return compact(
+            'expected', 'collected', 'collectionRate',
+            'totalIncome', 'totalExpenses', 'netProfit',
+            'bestMonth', 'bestIncome'
+        );
     }
 
     public function rentRoll(Request $request)

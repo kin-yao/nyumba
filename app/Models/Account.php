@@ -23,21 +23,9 @@ class Account extends Model
         'grace_period_ends_at',
         'trial_ends_at',
         'subscribed_at',
-        'invoice_send_day',
-        'auto_invoice_enabled',
         'sms_credits',
         'sms_credits_monthly',
         'notes',
-        'weekly_report_enabled',
-        'weekly_report_day',
-        'weekly_report_time',
-        'monthly_report_enabled',
-        'monthly_report_day',
-        'monthly_report_time',
-        'yearly_report_enabled',
-        'yearly_report_month',
-        'yearly_report_day',
-        'yearly_report_time',
         'use_case',
         'unit_count_range',
         'recommended_plan',
@@ -50,18 +38,9 @@ class Account extends Model
         'grace_period_ends_at'   => 'datetime',
         'trial_ends_at'          => 'datetime',
         'subscribed_at'          => 'datetime',
-        'auto_invoice_enabled'   => 'boolean',
-        'invoice_send_day'       => 'integer',
         'sms_credits'            => 'integer',
         'sms_credits_monthly'    => 'integer',
         'unit_limit'             => 'integer',
-        'weekly_report_enabled'  => 'boolean',
-        'weekly_report_day'      => 'integer',
-        'monthly_report_enabled' => 'boolean',
-        'monthly_report_day'     => 'integer',
-        'yearly_report_enabled'  => 'boolean',
-        'yearly_report_month'    => 'integer',
-        'yearly_report_day'      => 'integer',
     ];
 
     const PLANS = [
@@ -201,36 +180,6 @@ class Account extends Model
         if ($monthly > 0) {
             $this->increment('sms_credits', $monthly);
         }
-    }
-
-    // ─── Report schedule helpers ───────────────────────────────────────────
-
-    public function weeklyReportDayName(): string
-    {
-        $days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-        return $days[$this->weekly_report_day ?? 0] ?? 'Monday';
-    }
-
-    public function monthlyReportDayLabel(): string
-    {
-        $day    = $this->monthly_report_day ?? 1;
-        $suffix = match(true) {
-            $day === 1  => 'st',
-            $day === 2  => 'nd',
-            $day === 3  => 'rd',
-            default     => 'th',
-        };
-        return $day . $suffix;
-    }
-
-    public function yearlyReportMonthName(): string
-    {
-        $months = [
-            1  => 'January',  2 => 'February', 3  => 'March',    4  => 'April',
-            5  => 'May',      6 => 'June',      7  => 'July',     8  => 'August',
-            9  => 'September',10 => 'October',  11 => 'November', 12 => 'December',
-        ];
-        return $months[$this->yearly_report_month ?? 1] ?? 'January';
     }
 
     // ─── Relationships ─────────────────────────────────────────────────────
