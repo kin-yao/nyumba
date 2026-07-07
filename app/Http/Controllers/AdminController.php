@@ -167,8 +167,6 @@ class AdminController extends Controller
                 'sms_credits'         => $planConfig['sms_credits_monthly'],
                 'sms_credits_monthly' => $planConfig['sms_credits_monthly'],
                 'plan_expires_at'     => $validated['plan_expires_at'] ?? null,
-                'auto_invoice_enabled'=> false,
-                'invoice_send_day'    => 1,
             ]);
 
             User::create([

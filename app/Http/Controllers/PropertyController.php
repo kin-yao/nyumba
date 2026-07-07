@@ -84,6 +84,31 @@ class PropertyController extends Controller
         ));
     }
 
+    public function updateInvoiceSchedule(Request $request, Property $property)
+    {
+        $validated = $request->validate([
+            'auto_invoice_enabled' => ['nullable', 'boolean'],
+            'invoice_send_day'     => ['required', 'integer', 'min:1', 'max:28'],
+        ]);
+
+        $enabled = $request->boolean('auto_invoice_enabled');
+
+        $property->update([
+            'auto_invoice_enabled' => $enabled,
+            'invoice_send_day'     => $validated['invoice_send_day'],
+        ]);
+
+        AuditService::log(
+            'property.invoice_schedule_updated',
+            'Invoice schedule updated for "' . $property->name . '" — day: ' . $validated['invoice_send_day'] . ', auto: ' . ($enabled ? 'yes' : 'no'),
+            $property,
+            ['send_day' => $validated['invoice_send_day'], 'auto_enabled' => $enabled]
+        );
+
+        return redirect()->route('properties.show', $property)
+            ->with('success', 'Invoice schedule saved.');
+    }
+
     public function destroy(Property $property)
     {
         $name = $property->name;

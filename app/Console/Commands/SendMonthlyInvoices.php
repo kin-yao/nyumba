@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\Invoice;
 use App\Models\InvoiceLineItem;
 use App\Models\Lease;
+use App\Models\Property;
 use App\Models\UtilityReading;
 use AfricasTalking\SDK\AfricasTalking;
 use Illuminate\Console\Command;
@@ -27,34 +28,39 @@ class SendMonthlyInvoices extends Command
 
         $this->info('Running monthly invoice command for ' . $monthName);
 
-        $accounts = Account::where('auto_invoice_enabled', true)->get();
+        $properties = Property::where('auto_invoice_enabled', true)->with('account')->get();
 
-        if ($accounts->isEmpty()) {
-            $this->info('No accounts have auto invoicing enabled.');
+        if ($properties->isEmpty()) {
+            $this->info('No properties have auto invoicing enabled.');
             return;
         }
 
-        foreach ($accounts as $account) {
+        foreach ($properties as $property) {
 
-            if (!$this->option('force') && $account->invoice_send_day != $today) {
-                $this->info('Account ' . $account->name . ': send day is ' . $account->invoice_send_day . ', today is ' . $today . '. Skipping.');
+            $account = $property->account;
+            if (!$account) {
+                $this->warn('Property ' . $property->name . ': no account found. Skipping.');
                 continue;
             }
 
-            $this->info('Processing account: ' . $account->name);
+            if (!$this->option('force') && $property->invoice_send_day != $today) {
+                $this->info('Property ' . $property->name . ': send day is ' . $property->invoice_send_day . ', today is ' . $today . '. Skipping.');
+                continue;
+            }
+
+            $this->info('Processing property: ' . $property->name);
 
             $generated = 0;
             $omitted   = [];
 
             $leases = Lease::with(['unit.property.utilityRates', 'tenant'])
                 ->where('status', 'active')
-                ->whereHas('unit.property', fn($q) => $q->where('account_id', $account->id))
+                ->whereHas('unit', fn($q) => $q->where('property_id', $property->id))
                 ->get();
 
             foreach ($leases as $lease) {
-                $unit     = $lease->unit;
-                $property = $unit->property;
-                $tenant   = $lease->tenant;
+                $unit   = $lease->unit;
+                $tenant = $lease->tenant;
 
                 $exists = Invoice::where('lease_id', $lease->id)
                     ->where('period_month', $month)
@@ -161,9 +167,9 @@ class SendMonthlyInvoices extends Command
                 $this->sendInvoiceSms($invoice, $tenant, $account);
             }
 
-            $this->sendLandlordSummary($account, $generated, $omitted, $monthName);
+            $this->sendLandlordSummary($account, $property, $generated, $omitted, $monthName);
 
-            $this->info('Account ' . $account->name . ': ' . $generated . ' invoices generated, '
+            $this->info('Property ' . $property->name . ': ' . $generated . ' invoices generated, '
                 . count($omitted) . ' with omitted charges.');
         }
 
@@ -205,9 +211,10 @@ class SendMonthlyInvoices extends Command
         $this->info('    SMS ' . ($result['success'] ? 'sent' : 'failed') . ' to ' . $tenant->full_name);
     }
 
-    private function sendLandlordSummary(Account $account, int $generated, array $omitted, string $monthName): void
+    private function sendLandlordSummary(Account $account, Property $property, int $generated, array $omitted, string $monthName): void
     {
-        $body = $generated . ' ' . Str::plural('invoice', $generated) . ' generated and sent for ' . $monthName . '.';
+        $body = $generated . ' ' . Str::plural('invoice', $generated) . ' generated and sent for '
+            . $property->name . ' — ' . $monthName . '.';
 
         if (!empty($omitted)) {
             $body .= ' ' . count($omitted) . ' ' . Str::plural('invoice', count($omitted))
@@ -221,9 +228,10 @@ class SendMonthlyInvoices extends Command
         \App\Models\Notification::create([
             'account_id' => $account->id,
             'type'       => 'invoice_generated',
-            'title'      => $generated . ' invoices generated for ' . $monthName,
+            'title'      => $generated . ' invoices generated for ' . $property->name . ' (' . $monthName . ')',
             'body'       => $body,
             'data'       => [
+                'property'  => $property->name,
                 'generated' => $generated,
                 'omitted'   => $omitted,
                 'month'     => $monthName,
@@ -236,7 +244,7 @@ class SendMonthlyInvoices extends Command
 
         if (!$owner || !$owner->phone) return;
 
-        $smsBody = $account->name . ': ' . $generated . ' invoices generated for ' . $monthName . '.';
+        $smsBody = $property->name . ': ' . $generated . ' invoices generated for ' . $monthName . '.';
 
         if (!empty($omitted)) {
             $smsBody .= ' ' . count($omitted) . ' billed without some charges (missing readings): ';

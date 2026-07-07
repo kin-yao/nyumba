@@ -40,8 +40,6 @@ new #[Layout('components.layouts.auth')] class extends Component
             'plan_expires_at'      => now()->addDays(7),
             'sms_credits'          => 10,
             'sms_credits_monthly'  => 10,
-            'auto_invoice_enabled' => false,
-            'invoice_send_day'     => 1,
         ]);
 
         // Create the user linked to the account

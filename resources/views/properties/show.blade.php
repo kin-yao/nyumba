@@ -149,6 +149,38 @@
         @endforeach
     </div>
 
+    {{-- Automatic invoicing ── per property ── --}}
+    <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:20px;margin-bottom:24px">
+        <div style="font-size:14px;font-weight:500;margin-bottom:14px">Automatic invoice schedule</div>
+        <form method="POST" action="{{ route('properties.invoice-schedule', $property) }}" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            @csrf
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;padding:10px 14px;background:#faf9f7;border:1px solid rgba(0,0,0,0.07);border-radius:8px">
+                <input type="checkbox" name="auto_invoice_enabled" value="1"
+                       {{ $property->auto_invoice_enabled ? 'checked' : '' }}
+                       style="width:16px;height:16px;accent-color:#1a6b52;flex-shrink:0">
+                <span style="font-weight:500">Enable automatic invoice generation</span>
+            </label>
+
+            <div style="display:flex;align-items:center;gap:10px">
+                <span style="font-size:13px;color:#8a8880">Send invoices on day</span>
+                <select name="invoice_send_day" required
+                        style="width:100px;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                    @foreach(range(1,28) as $day)
+                        <option value="{{ $day }}" {{ $property->invoice_send_day == $day ? 'selected' : '' }}>
+                            {{ $day }}{{ $day==1?'st':($day==2?'nd':($day==3?'rd':'th')) }}
+                        </option>
+                    @endforeach
+                </select>
+                <span style="font-size:13px;color:#8a8880">of every month</span>
+            </div>
+
+            <button type="submit"
+                    style="padding:8px 16px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                Save schedule
+            </button>
+        </form>
+    </div>
+
     <div style="font-size:10px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#8a8880;margin-bottom:11px">Units</div>
 
     @if($units->isEmpty())

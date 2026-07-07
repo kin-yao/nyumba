@@ -320,8 +320,6 @@ class FirebaseAuthController extends Controller
                     // plan_expires_at = null until a paid plan is purchased via M-Pesa
                     'trial_ends_at'        => now()->addDays(30),
                     'plan_expires_at'      => null,
-                    'auto_invoice_enabled' => false,
-                    'invoice_send_day'     => 1,
                     'use_case'             => session('reg.use_case', 'own_rental'),
                     'unit_count_range'     => $validated['unit_range'],
                     'recommended_plan'     => $planMap[$validated['unit_range']],
