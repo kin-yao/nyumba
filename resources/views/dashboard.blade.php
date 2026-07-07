@@ -407,6 +407,90 @@
     margin-bottom: 8px;
 }
 
+/* ── Expiry lockout overlay ── */
+.db-content-blur {
+    filter: blur(6px);
+    pointer-events: none;
+    user-select: none;
+}
+.db-expiry-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(245,246,248,0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    overflow-y: auto;
+}
+.db-expiry-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    padding: 28px 26px;
+    width: 100%;
+    max-width: 380px;
+    text-align: center;
+}
+.db-expiry-plans {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+}
+.db-expiry-plan {
+    border: 2px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 6px;
+    background: #fff;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    text-align: center;
+}
+.db-expiry-plan.on {
+    border-color: var(--brand-mid);
+    background: var(--brand-light);
+}
+.db-expiry-plan-name { font-size: 11px; font-weight: 600; color: var(--ink); }
+.db-expiry-plan-price { font-size: 10px; color: var(--mute); margin-top: 2px; }
+
+.cycle-toggle {
+    display: inline-flex;
+    background: var(--paper);
+    border-radius: 8px;
+    padding: 3px;
+}
+.cycle-toggle button {
+    padding: 6px 16px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--mute);
+    transition: all .15s;
+}
+.cycle-toggle button.active {
+    background: #fff;
+    color: var(--brand-mid);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.stk-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgba(26,107,82,0.15);
+    border-top-color: var(--brand-mid);
+    border-radius: 50%;
+    animation: dexpspin 0.8s linear infinite;
+    margin: 0 auto 14px;
+}
+@keyframes dexpspin { to { transform: rotate(360deg); } }
+
 /* ── Responsive ── */
 @media (max-width: 960px) {
     .db-metric-strip { grid-template-columns: 1fr 1fr; }
@@ -439,25 +523,95 @@
 
 <div class="db">
 
-@php $account = auth()->user()->account; @endphp
+@php
+    $account   = auth()->user()->account;
+    $isExpired = $account && $account->isExpired();
+@endphp
 
-{{-- ── Expired banner ── --}}
-@if($account && $account->isExpired())
-<div class="db-expired">
-    <div style="font-size:30px;margin-bottom:10px">🔒</div>
-    <div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--ink);margin-bottom:6px">
-        @if($account->plan==='explore') Free trial ended
-        @else {{ ucfirst($account->plan) }} plan expired
-        @endif
+{{-- ── Expiry lockout overlay ── --}}
+@if($isExpired)
+<div class="db-expiry-overlay">
+    <div class="db-expiry-card">
+        <div style="font-size:30px;margin-bottom:10px">🔒</div>
+        <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--ink);margin-bottom:6px">
+            @if($account->plan==='explore') Free trial ended
+            @else {{ ucfirst($account->plan) }} plan expired
+            @endif
+        </div>
+        <div style="font-size:13px;color:var(--mute);margin-bottom:18px">
+            Your data is safe. Pick a plan and pay via M-Pesa to restore access.
+        </div>
+
+        <div id="dexp-step-form">
+            <div class="cycle-toggle" style="margin-bottom:12px">
+                <button type="button" class="active" id="dexp-cycle-monthly" onclick="dexpSetCycle('monthly')">Monthly</button>
+                <button type="button" id="dexp-cycle-yearly" onclick="dexpSetCycle('yearly')">Yearly</button>
+            </div>
+
+            <div class="db-expiry-plans">
+                @foreach(['starter','growth','pro'] as $planKey)
+                    @php $plan = \App\Models\Account::PLANS[$planKey]; @endphp
+                    <div class="db-expiry-plan" id="dexp-plan-{{ $planKey }}" onclick="dexpSelectPlan('{{ $planKey }}')">
+                        <div class="db-expiry-plan-name">{{ $plan['name'] }}</div>
+                        <div class="db-expiry-plan-price price-monthly">{{ currency($plan['price_monthly']) }}/mo</div>
+                        <div class="db-expiry-plan-price price-yearly" style="display:none">{{ currency($plan['price_yearly']) }}/yr</div>
+                    </div>
+                @endforeach
+            </div>
+
+            <div style="text-align:left;margin-bottom:14px">
+                <label style="display:block;font-size:10px;font-weight:500;color:var(--mute);letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">M-Pesa phone number</label>
+                <input type="text" id="dexp-phone" placeholder="07XXXXXXXX"
+                       style="width:100%;height:38px;padding:0 12px;border:1px solid var(--line);border-radius:7px;font-size:14px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box">
+                <div id="dexp-error" style="display:none;color:var(--red);font-size:12px;margin-top:6px"></div>
+            </div>
+
+            <button type="button" id="dexp-pay-btn" onclick="dexpInitiateStkPush()"
+                    style="width:100%;padding:11px;background:var(--brand-mid);color:#fff;border:none;border-radius:var(--radius-md);font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;margin-bottom:12px">
+                Pay with M-Pesa
+            </button>
+
+            <a href="tel:+254705056343"
+               style="display:block;font-size:13px;color:var(--mute);text-decoration:underline">
+                Or call us to upgrade — 0705 056 343
+            </a>
+        </div>
+
+        <div id="dexp-step-waiting" style="display:none;text-align:center;padding:10px 0">
+            <div class="stk-spinner"></div>
+            <div style="font-size:14px;font-weight:500;margin-bottom:6px">Check your phone</div>
+            <div style="font-size:13px;color:var(--mute);line-height:1.6">
+                Enter your M-Pesa PIN sent to <strong id="dexp-phone-display"></strong>.
+            </div>
+            <div style="font-size:12px;color:var(--mute);margin-top:14px" id="dexp-waiting-status">Waiting for confirmation...</div>
+        </div>
+
+        <div id="dexp-step-success" style="display:none;text-align:center;padding:10px 0">
+            <div style="font-size:36px;margin-bottom:10px">✅</div>
+            <div style="font-size:14px;font-weight:500;margin-bottom:14px">Payment successful</div>
+            <button type="button" onclick="window.location.reload()"
+                    style="padding:9px 22px;background:var(--brand-mid);color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                Continue
+            </button>
+        </div>
+
+        <div id="dexp-step-failed" style="display:none;text-align:center;padding:10px 0">
+            <div style="font-size:36px;margin-bottom:10px">⚠️</div>
+            <div style="font-size:14px;font-weight:500;margin-bottom:6px">Payment not completed</div>
+            <div style="font-size:13px;color:var(--mute);line-height:1.6;margin-bottom:16px" id="dexp-failed-desc">
+                The payment was cancelled or did not go through.
+            </div>
+            <button type="button" onclick="dexpResetForm()"
+                    style="padding:9px 22px;background:var(--brand-mid);color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                Try again
+            </button>
+        </div>
     </div>
-    <div style="font-size:13px;color:var(--mute);margin-bottom:20px">Your data is safe. Upgrade to restore access.</div>
-    <a href="https://wa.me/254705056343?text=Hi%2C%20I%20would%20like%20to%20upgrade%20my%20Nyumba%20subscription%20for%20account%3A%20{{ urlencode($account->name) }}"
-       target="_blank"
-       style="display:inline-flex;align-items:center;gap:8px;padding:11px 24px;background:#25D366;color:#fff;border-radius:var(--radius-md);font-size:14px;font-weight:600;text-decoration:none">
-        WhatsApp us to upgrade
-    </a>
 </div>
 @endif
+
+<div class="{{ $isExpired ? 'db-content-blur' : '' }}">
+
 
 {{-- ── Flash messages ── --}}
 @if(session('success'))
@@ -856,4 +1010,123 @@
 </div>
 
 </div>
+
+</div>
+
+@if($isExpired)
+<script>
+var dexpCycle = 'monthly';
+var dexpPlan  = null;
+var dexpPollTimer = null;
+
+function dexpSetCycle(cycle) {
+    dexpCycle = cycle;
+    document.getElementById('dexp-cycle-monthly').classList.toggle('active', cycle === 'monthly');
+    document.getElementById('dexp-cycle-yearly').classList.toggle('active', cycle === 'yearly');
+    document.querySelectorAll('.db-expiry-plan .price-monthly').forEach(el => el.style.display = cycle === 'monthly' ? 'block' : 'none');
+    document.querySelectorAll('.db-expiry-plan .price-yearly').forEach(el => el.style.display = cycle === 'yearly' ? 'block' : 'none');
+}
+
+function dexpSelectPlan(planKey) {
+    dexpPlan = planKey;
+    document.querySelectorAll('.db-expiry-plan').forEach(el => el.classList.remove('on'));
+    document.getElementById('dexp-plan-' + planKey).classList.add('on');
+    document.getElementById('dexp-error').style.display = 'none';
+}
+
+function dexpInitiateStkPush() {
+    var errEl = document.getElementById('dexp-error');
+
+    if (!dexpPlan) {
+        errEl.textContent = 'Please choose a plan first.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    var phone = document.getElementById('dexp-phone').value.trim();
+    if (!/^(0[71][0-9]{8}|254[71][0-9]{8}|\+254[71][0-9]{8})$/.test(phone)) {
+        errEl.textContent = 'Enter a valid M-Pesa number, e.g. 0712345678';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    errEl.style.display = 'none';
+    var btn = document.getElementById('dexp-pay-btn');
+    btn.disabled = true;
+    btn.textContent = 'Sending request...';
+
+    fetch('{{ route('subscription.upgrade') }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+        body: JSON.stringify({ plan: dexpPlan, billing_cycle: dexpCycle, phone: phone }),
+    })
+    .then(r => r.json().then(data => ({ ok: r.ok, data })))
+    .then(({ ok, data }) => {
+        if (!ok || !data.success) {
+            errEl.textContent = data.error || data.message || 'Could not start payment. Please try again.';
+            errEl.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Pay with M-Pesa';
+            return;
+        }
+        document.getElementById('dexp-step-form').style.display    = 'none';
+        document.getElementById('dexp-step-waiting').style.display = 'block';
+        document.getElementById('dexp-phone-display').textContent  = phone;
+        dexpPollStkStatus(data.checkout_request_id);
+    })
+    .catch(() => {
+        errEl.textContent = 'Network error. Please try again.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Pay with M-Pesa';
+    });
+}
+
+function dexpPollStkStatus(checkoutRequestId) {
+    var attempts = 0;
+    var statusEl = document.getElementById('dexp-waiting-status');
+    dexpPollTimer = setInterval(function () {
+        attempts++;
+        if (attempts > 40) {
+            clearInterval(dexpPollTimer);
+            dexpShowFailed('Payment timed out. If you completed it on your phone, refresh the page in a moment.');
+            return;
+        }
+        fetch('{{ url('/subscription/status') }}/' + checkoutRequestId)
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    clearInterval(dexpPollTimer);
+                    document.getElementById('dexp-step-waiting').style.display = 'none';
+                    document.getElementById('dexp-step-success').style.display = 'block';
+                } else if (data.status === 'failed' || data.status === 'cancelled') {
+                    clearInterval(dexpPollTimer);
+                    dexpShowFailed(data.desc || 'The payment was cancelled or did not go through.');
+                } else {
+                    statusEl.textContent = 'Waiting for confirmation' + '.'.repeat((attempts % 3) + 1);
+                }
+            })
+            .catch(() => {});
+    }, 3000);
+}
+
+function dexpShowFailed(message) {
+    document.getElementById('dexp-step-waiting').style.display = 'none';
+    document.getElementById('dexp-step-failed').style.display  = 'block';
+    document.getElementById('dexp-failed-desc').textContent    = message;
+}
+
+function dexpResetForm() {
+    document.getElementById('dexp-step-form').style.display    = 'block';
+    document.getElementById('dexp-step-waiting').style.display = 'none';
+    document.getElementById('dexp-step-success').style.display = 'none';
+    document.getElementById('dexp-step-failed').style.display  = 'none';
+    var btn = document.getElementById('dexp-pay-btn');
+    btn.disabled    = false;
+    btn.textContent = 'Pay with M-Pesa';
+    if (dexpPollTimer) { clearInterval(dexpPollTimer); dexpPollTimer = null; }
+}
+</script>
+@endif
+
 </x-layouts.app>

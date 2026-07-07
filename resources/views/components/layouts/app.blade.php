@@ -148,6 +148,7 @@
             $account     = auth()->user()->account;
             $authUser    = auth()->user();
             $smsCredits  = $account->sms_credits ?? 0;
+            $isExpired   = $account && $account->isExpired();
 
             $unreadCount = cache()->remember(
                 'notif_count_' . $authUser->account_id, 60,
@@ -183,6 +184,8 @@
                 $activeGroup = 'system';
             }
         @endphp
+
+        <div style="{{ $isExpired ? 'pointer-events:none;opacity:0.35;user-select:none' : '' }}">
 
         {{-- Property filter --}}
         @if($allProperties->count() > 1)
@@ -406,6 +409,8 @@
 
         </nav>
 
+        </div>
+
         {{-- Low SMS credits warning --}}
         @if($canFinancials && $account && $smsCredits <= 20)
             <div style="margin:0 10px 10px;background:#fee2e2;border-radius:8px;padding:10px 12px">
@@ -449,7 +454,8 @@
             <div style="background:#fff;border-radius:8px;padding:6px 10px">
                 <img src="/images/logo.png" alt="Nyumba" style="height:28px;width:auto;object-fit:contain;display:block">
             </div>
-            <a href="{{ route('notifications.index') }}" style="position:relative;padding:4px;display:flex">
+            <a href="{{ route('notifications.index') }}"
+               style="position:relative;padding:4px;display:flex;{{ $isExpired ? 'pointer-events:none;opacity:0.35' : '' }}">
                 <svg width="20" height="20" viewBox="0 0 14 14" fill="none">
                     <path d="M7 1a4 4 0 014 4v3l1 1.5H2L3 8V5a4 4 0 014-4z" stroke="white" stroke-width="1.2" stroke-linejoin="round"/>
                     <path d="M5.5 11.5a1.5 1.5 0 003 0" stroke="white" stroke-width="1.2"/>

@@ -8,21 +8,29 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CheckSubscription
 {
-    // Always accessible regardless of subscription status
-    protected array $always = [
+    // Reachable even when the account is fully expired — just enough to see
+    // the dashboard lockout screen and pay via M-Pesa to restore access.
+    protected array $alwaysDuringExpiry = [
         'dashboard',
         'logout',
-        'notifications.index',
-        'notifications.read',
-        'notifications.read-all',
-        'filter.property',
         'subscription.expired',
+        'subscription.upgrade',
+        'subscription.status',
         'admin.*',
         'verify.*',
         'verify-email',
         'collect.phone',
         'collect.phone.post',
         'invoices.pdf.public',
+    ];
+
+    // Reachable whenever the account is active/on trial/in grace period
+    // (used only for the explore-plan feature restrictions below)
+    protected array $always = [
+        'notifications.index',
+        'notifications.read',
+        'notifications.read-all',
+        'filter.property',
         'audit.index',
     ];
 
@@ -59,20 +67,32 @@ class CheckSubscription
             return $next($request);
         }
 
-        // Check always-allowed routes first
+        // Expired — nothing is reachable except the dashboard lockout screen
+        // and the M-Pesa upgrade flow used to restore access.
+        if ($account->isExpired()) {
+            foreach ($this->alwaysDuringExpiry as $pattern) {
+                if (fnmatch($pattern, $routeName)) {
+                    return $next($request);
+                }
+            }
+
+            $msg = 'Your subscription has expired. Pay via M-Pesa on the dashboard to restore access.';
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $msg], 402);
+            }
+            return redirect()->route('dashboard')->with('subscription_notice', $msg);
+        }
+
+        // Not expired — always-allowed utility routes
         foreach ($this->always as $pattern) {
             if (fnmatch($pattern, $routeName)) {
                 return $next($request);
             }
         }
-
-        // Expired — dashboard only, with a clear notice
-        if ($account->isExpired()) {
-            $msg = 'Your subscription has expired. Upgrade to restore access to this feature.';
-            if ($request->expectsJson()) {
-                return response()->json(['message' => $msg], 402);
+        foreach ($this->alwaysDuringExpiry as $pattern) {
+            if (fnmatch($pattern, $routeName)) {
+                return $next($request);
             }
-            return redirect()->route('dashboard')->with('subscription_notice', $msg);
         }
 
         // Explore (free trial) feature restrictions
