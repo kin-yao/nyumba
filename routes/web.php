@@ -140,6 +140,7 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
 
     // Properties + Units + Import
     Route::resource('properties', PropertyController::class)->only(['index', 'store', 'show', 'destroy']);
+    Route::post('/properties/{property}/invoice-schedule', [PropertyController::class, 'updateInvoiceSchedule'])->name('properties.invoice-schedule');
     Route::post('/properties/{property}/units', [UnitController::class, 'store'])->name('units.store');
     Route::get('/properties/{property}/import/sample',   [App\Http\Controllers\ImportController::class, 'sampleCsv'])->name('properties.import.sample');
     Route::post('/properties/{property}/import/preview', [App\Http\Controllers\ImportController::class, 'preview'])->name('properties.import.preview');
@@ -186,6 +187,7 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
 
     // Reports
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/download', [ReportController::class, 'download'])->name('reports.download');
     Route::get('/reports/rent-roll', [ReportController::class, 'rentRoll'])->name('reports.rent-roll');
     Route::get('/reports/outstanding', [ReportController::class, 'outstanding'])->name('reports.outstanding');
     Route::get('/reports/collections', [ReportController::class, 'collections'])->name('reports.collections');
@@ -205,10 +207,8 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
     Route::post('/settings/account', [SettingsController::class, 'updateAccount'])->name('settings.account');
     Route::post('/settings/mpesa', [SettingsController::class, 'updateMpesa'])->name('settings.mpesa');
     Route::post('/settings/password', [SettingsController::class, 'updatePassword'])->name('settings.password');
-    Route::post('/settings/invoice-schedule', [SettingsController::class, 'updateInvoiceSettings'])->name('settings.invoice-schedule');
     Route::post('/settings/users', [SettingsController::class, 'inviteUser'])->name('settings.users.invite');
     Route::delete('/settings/users/{user}', [SettingsController::class, 'removeUser'])->name('settings.users.remove');
-    Route::post('/settings/report-alerts', [SettingsController::class, 'updateReportAlerts'])->name('settings.report-alerts');
     Route::post('/settings/reset-account', [SettingsController::class, 'resetAccount'])->name('settings.reset-account');
 
     // Notifications
