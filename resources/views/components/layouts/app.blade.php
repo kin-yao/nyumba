@@ -174,7 +174,7 @@
             $canUtilities  = $authUser->canAccessUtilities()  || $authUser->is_admin;
 
             $activeGroup = 'overview';
-            if (request()->routeIs('properties.*') || request()->routeIs('tenants.*') || request()->routeIs('maintenance.*')) {
+            if (request()->routeIs('properties.*') || request()->routeIs('tenants.*') || request()->routeIs('maintenance.*') || request()->routeIs('move-out-requests.*')) {
                 $activeGroup = 'properties';
             } elseif (request()->routeIs('invoices.*') || request()->routeIs('payments.*') || request()->routeIs('expenses.*') || request()->routeIs('utilities.*') || request()->routeIs('reports.*')) {
                 $activeGroup = 'financials';
@@ -270,6 +270,25 @@
                        border-left:2px solid {{ $a ? '#1a6b52' : 'transparent' }};
                        background:{{ $a ? 'rgba(255,255,255,0.06)' : 'transparent' }}">
                         Maintenance
+                    </a>
+                    @php
+                        $a = request()->routeIs('move-out-requests.*');
+                        $pendingMoveOuts = cache()->remember(
+                            'pending_moveouts_' . $authUser->account_id, 30,
+                            fn() => \App\Models\MoveOutRequest::whereIn('unit_id', \App\Models\Unit::whereIn('property_id', $allProperties->pluck('id'))->pluck('id'))
+                                ->whereIn('status', ['pending', 'acknowledged'])
+                                ->count()
+                        );
+                    @endphp
+                    <a href="{{ route('move-out-requests.index') }}" onclick="closeSidebar()"
+                       style="display:flex;align-items:center;justify-content:space-between;padding:7px 18px 7px 40px;font-size:12.5px;text-decoration:none;
+                       color:{{ $a ? '#fff' : 'rgba(255,255,255,0.45)' }};
+                       border-left:2px solid {{ $a ? '#1a6b52' : 'transparent' }};
+                       background:{{ $a ? 'rgba(255,255,255,0.06)' : 'transparent' }}">
+                        Move-out requests
+                        @if($pendingMoveOuts > 0)
+                            <span style="background:#b91c1c;color:#fff;font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px;min-width:18px;text-align:center;flex-shrink:0">{{ $pendingMoveOuts }}</span>
+                        @endif
                     </a>
                 </div>
             </div>

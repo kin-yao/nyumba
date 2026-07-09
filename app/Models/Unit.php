@@ -57,4 +57,9 @@ class Unit extends Model
     {
         return $this->status === 'vacant';
     }
+
+    public function isReserved(): bool
+    {
+        return $this->status === 'reserved';
+    }
 }

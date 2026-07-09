@@ -17,6 +17,7 @@ class CheckRole
         'properties.*',
         'units.*',
         'maintenance.*',
+        'move-out-requests.*',
         'notifications.*',
         'filter.property',
         'health',

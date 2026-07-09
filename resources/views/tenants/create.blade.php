@@ -88,15 +88,15 @@
             <div class="form-2col">
                 <div class="field">
                     <label>First name</label>
-                    <input name="first_name" type="text" required value="{{ old('first_name') }}">
+                    <input name="first_name" type="text" required id="tenant-first-name" value="{{ old('first_name') }}">
                 </div>
                 <div class="field">
                     <label>Last name</label>
-                    <input name="last_name" type="text" required value="{{ old('last_name') }}">
+                    <input name="last_name" type="text" required id="tenant-last-name" value="{{ old('last_name') }}">
                 </div>
                 <div class="field">
                     <label>Phone number</label>
-                    <input name="phone" type="text" required value="{{ old('phone') }}" placeholder="07XX or 01XX">
+                    <input name="phone" type="text" required id="tenant-phone" value="{{ old('phone') }}" placeholder="07XX or 01XX">
                 </div>
                 <div class="field">
                     <label>Alternative phone</label>
@@ -124,11 +124,17 @@
                         @if($property->units->isNotEmpty())
                             <optgroup label="{{ $property->name }}">
                                 @foreach($property->units as $unit)
+                                    @php $booking = $reservedBookings->get($unit->id); @endphp
                                     <option value="{{ $unit->id }}"
                                             data-rent="{{ $unit->rent_amount }}"
                                             data-deposit="{{ $unit->deposit_amount }}"
+                                            data-referral-name="{{ $booking->referral_name ?? '' }}"
+                                            data-referral-phone="{{ $booking->referral_phone ?? '' }}"
                                             {{ old('unit_id')==$unit->id?'selected':'' }}>
                                         {{ $unit->name }} &ndash; {{ $unit->type }} &ndash; {{ currency($unit->rent_amount) }}
+                                        @if($unit->status === 'reserved' && $booking)
+                                            &mdash; Reserved for {{ $booking->referral_name }}
+                                        @endif
                                     </option>
                                 @endforeach
                             </optgroup>
@@ -208,6 +214,17 @@ function fillRent(select) {
     var deposit = option.getAttribute('data-deposit');
     if (rent)    document.getElementById('monthly-rent').value      = rent;
     if (deposit) document.getElementById('deposit-required').value  = deposit;
+
+    var referralName  = option.getAttribute('data-referral-name');
+    var referralPhone = option.getAttribute('data-referral-phone');
+    if (referralName) {
+        var parts = referralName.trim().split(' ');
+        document.getElementById('tenant-first-name').value = parts.shift() || '';
+        document.getElementById('tenant-last-name').value  = parts.join(' ');
+    }
+    if (referralPhone) {
+        document.getElementById('tenant-phone').value = referralPhone;
+    }
 }
 </script>
 </x-layouts.app>

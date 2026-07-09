@@ -118,10 +118,18 @@ class TenantController extends Controller
     {
         $propertyIds = $this->filteredPropertyIds();
         $properties  = Property::whereIn('id', $propertyIds)
-            ->with(['units' => fn($q) => $q->where('status', 'vacant')])
+            ->with(['units' => fn($q) => $q->whereIn('status', ['vacant', 'reserved'])])
             ->get();
 
-        return view('tenants.create', compact('properties'));
+        // Surface any accepted referral bookings so the form can pre-fill
+        // the new tenant's name/phone when moving them into a reserved unit.
+        $reservedBookings = \App\Models\MoveOutRequest::with('unit')
+            ->whereIn('unit_id', $properties->flatMap(fn($p) => $p->units->pluck('id')))
+            ->where('referral_status', 'accepted')
+            ->get()
+            ->keyBy('unit_id');
+
+        return view('tenants.create', compact('properties', 'reservedBookings'));
     }
 
     public function store(Request $request)
@@ -170,6 +178,13 @@ class TenantController extends Controller
         ]);
 
         $unit->update(['status' => 'occupied']);
+
+        // If this unit was being held for an accepted referral booking,
+        // close out that request now that someone has moved in.
+        \App\Models\MoveOutRequest::where('unit_id', $unit->id)
+            ->where('referral_status', 'accepted')
+            ->where('status', '!=', 'completed')
+            ->update(['status' => 'completed']);
 
         AuditService::log(
             'tenant.moved_in',
@@ -368,11 +383,21 @@ class TenantController extends Controller
                 'notes'         => $validated['notes'] ?? $activeLease->notes,
             ]);
 
-            $activeLease->unit->update(['status' => 'vacant']);
+            // If a referral booking was accepted for this lease, hold the unit
+            // for that referral instead of leaving it plain vacant.
+            $acceptedBooking = \App\Models\MoveOutRequest::where('lease_id', $activeLease->id)
+                ->where('referral_status', 'accepted')
+                ->latest()
+                ->first();
+
+            $activeLease->unit->update([
+                'status' => $acceptedBooking ? 'reserved' : 'vacant',
+            ]);
 
             AuditService::log(
                 'tenant.moved_out',
-                $tenant->full_name . ' moved out of Unit ' . $unitName,
+                $tenant->full_name . ' moved out of Unit ' . $unitName
+                    . ($acceptedBooking ? ' — held as reserved for ' . $acceptedBooking->referral_name : ''),
                 $tenant,
                 ['move_out_date' => $validated['move_out_date'], 'deposit_action' => $validated['deposit_action']]
             );

@@ -180,6 +180,11 @@
                                 <div style="font-size:11px;color:#8a8880">{{ $req->unit->property->name }}</div>
                             </td>
                             <td style="padding:11px 14px;font-size:13px;max-width:240px">
+                                @if($req->isTenantSubmitted())
+                                    <span style="display:inline-flex;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600;background:#e0f2fe;color:#0369a1;margin-bottom:3px">
+                                        From {{ $req->tenant->full_name ?? 'tenant' }}
+                                    </span><br>
+                                @endif
                                 {{ $req->description }}
                                 @if($req->resolution_notes)
                                     <div style="font-size:11px;color:#15803d;margin-top:2px">✓ {{ $req->resolution_notes }}</div>
@@ -235,6 +240,11 @@
                             <div style="font-weight:500;font-size:13px;margin-bottom:2px">
                                 Unit {{ $req->unit->name }} &middot; {{ $req->unit->property->name }}
                             </div>
+                            @if($req->isTenantSubmitted())
+                                <span style="display:inline-flex;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600;background:#e0f2fe;color:#0369a1;margin-bottom:3px">
+                                    From {{ $req->tenant->full_name ?? 'tenant' }}
+                                </span>
+                            @endif
                             <div style="font-size:12px;color:#8a8880">{{ $req->description }}</div>
                             @if($req->resolution_notes)
                                 <div style="font-size:11px;color:#15803d;margin-top:3px">✓ {{ $req->resolution_notes }}</div>

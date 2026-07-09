@@ -21,6 +21,23 @@ Route::get('/health', function () {
     return response('ok', 200);
 });
 
+// ─── Tenant Portal — separate auth from the landlord/staff app ───────────────
+Route::prefix('portal')->name('portal.')->group(function () {
+    Route::get('/login', [App\Http\Controllers\Portal\AuthController::class, 'showLogin'])->name('login');
+    Route::post('/login', [App\Http\Controllers\Portal\AuthController::class, 'sendOtp'])->name('login.send');
+    Route::get('/verify', [App\Http\Controllers\Portal\AuthController::class, 'showVerify'])->name('verify');
+    Route::post('/verify', [App\Http\Controllers\Portal\AuthController::class, 'verifyOtp'])->name('verify.submit');
+    Route::post('/logout', [App\Http\Controllers\Portal\AuthController::class, 'logout'])->name('logout');
+
+    Route::middleware('tenant.auth')->group(function () {
+        Route::get('/dashboard', [App\Http\Controllers\Portal\DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/payment', [App\Http\Controllers\Portal\PaymentController::class, 'index'])->name('payment');
+        Route::get('/communications', [App\Http\Controllers\Portal\CommunicationController::class, 'index'])->name('communications');
+        Route::post('/communications/maintenance', [App\Http\Controllers\Portal\CommunicationController::class, 'storeMaintenance'])->name('communications.maintenance');
+        Route::post('/communications/move-out', [App\Http\Controllers\Portal\CommunicationController::class, 'storeMoveOut'])->name('communications.move-out');
+    });
+});
+
 // ─── Root ──────────────────────────────────────────────────────────────────────
 Route::get('/', function () {
     if (auth()->check()) return redirect()->route('dashboard');
@@ -189,6 +206,13 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
     Route::post('/maintenance', [MaintenanceController::class, 'store'])->name('maintenance.store');
     Route::patch('/maintenance/{maintenance}', [MaintenanceController::class, 'update'])->name('maintenance.update');
     Route::delete('/maintenance/{maintenance}', [MaintenanceController::class, 'destroy'])->name('maintenance.destroy');
+
+    // Move-out requests (submitted by tenants via the portal)
+    Route::get('/move-out-requests', [App\Http\Controllers\MoveOutRequestController::class, 'index'])->name('move-out-requests.index');
+    Route::get('/move-out-requests/{moveOutRequest}', [App\Http\Controllers\MoveOutRequestController::class, 'show'])->name('move-out-requests.show');
+    Route::post('/move-out-requests/{moveOutRequest}/accept-booking', [App\Http\Controllers\MoveOutRequestController::class, 'acceptBooking'])->name('move-out-requests.accept-booking');
+    Route::post('/move-out-requests/{moveOutRequest}/decline-booking', [App\Http\Controllers\MoveOutRequestController::class, 'declineBooking'])->name('move-out-requests.decline-booking');
+    Route::post('/move-out-requests/{moveOutRequest}/notes', [App\Http\Controllers\MoveOutRequestController::class, 'updateNotes'])->name('move-out-requests.notes');
 
     // Reports
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');

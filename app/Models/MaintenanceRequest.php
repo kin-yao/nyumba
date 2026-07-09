@@ -13,6 +13,7 @@ class MaintenanceRequest extends Model
     protected $fillable = [
         'account_id',
         'unit_id',
+        'tenant_id',
         'description',
         'priority',
         'status',
@@ -27,5 +28,15 @@ class MaintenanceRequest extends Model
     public function unit()
     {
         return $this->belongsTo(Unit::class);
+    }
+
+    public function tenant()
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
+    public function isTenantSubmitted(): bool
+    {
+        return $this->tenant_id !== null;
     }
 }

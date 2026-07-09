@@ -28,6 +28,11 @@ class Tenant extends Model
         return $this->first_name . ' ' . $this->last_name;
     }
 
+    public function account()
+    {
+        return $this->belongsTo(Account::class);
+    }
+
     public function leases()
     {
         return $this->hasMany(Lease::class);
@@ -46,5 +51,15 @@ class Tenant extends Model
     public function messages()
     {
         return $this->hasMany(Message::class);
+    }
+
+    public function devices()
+    {
+        return $this->hasMany(TenantDevice::class);
+    }
+
+    public function moveOutRequests()
+    {
+        return $this->hasMany(MoveOutRequest::class);
     }
 }

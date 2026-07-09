@@ -15,7 +15,7 @@ class MaintenanceController extends Controller
     {
         $unitIds = $this->filteredUnitIds();
 
-        $requests = MaintenanceRequest::with('unit.property')
+        $requests = MaintenanceRequest::with(['unit.property', 'tenant'])
             ->whereIn('unit_id', $unitIds)
             ->latest()
             ->get();

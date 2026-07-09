@@ -30,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'firebase.check' => \App\Http\Middleware\CheckFirebaseAccount::class,
             'admin'          => \App\Http\Middleware\AdminMiddleware::class,
             'role'           => \App\Http\Middleware\CheckRole::class,
+            'tenant.auth'    => \App\Http\Middleware\EnsureTenantAuthenticated::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
