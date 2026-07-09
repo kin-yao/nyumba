@@ -97,6 +97,14 @@
             </div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0">
+            <button onclick="document.getElementById('edit-property-modal').style.display='flex'"
+                    style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
+                Edit property
+            </button>
+            <button onclick="document.getElementById('delete-property-modal').style.display='flex'"
+                    style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:transparent;color:#b91c1c;border:1px solid #fca5a5;border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
+                Delete property
+            </button>
             <a href="{{ route('properties.import.sample', $property) }}"
                style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;text-decoration:none;white-space:nowrap">
                 ↓ Sample CSV
@@ -403,4 +411,183 @@
         </form>
     </div>
 </div>
+
+{{-- Edit Property Modal --}}
+<div id="edit-property-modal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:50;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto">
+    <div class="modal-inner" style="max-width:520px;max-height:calc(100vh - 32px);overflow-y:auto;margin:16px 0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.07)">
+            <div style="font-size:15px;font-weight:500">Edit property</div>
+            <button onclick="document.getElementById('edit-property-modal').style.display='none'"
+                    style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;line-height:1">&times;</button>
+        </div>
+        <form method="POST" action="{{ route('properties.update', $property) }}">
+            @csrf
+            @method('PUT')
+            <div class="modal-grid" style="margin-bottom:14px">
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Property name</label>
+                    <input name="name" type="text" required value="{{ $property->name }}"
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                </div>
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Type</label>
+                    <select name="type" required style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                        <option value="residential" {{ $property->type=='residential'?'selected':'' }}>Residential</option>
+                        <option value="commercial" {{ $property->type=='commercial'?'selected':'' }}>Commercial</option>
+                        <option value="mixed" {{ $property->type=='mixed'?'selected':'' }}>Mixed</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">County</label>
+                    <input name="county" type="text" value="{{ $property->county }}"
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                </div>
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Area</label>
+                    <input name="area" type="text" value="{{ $property->area }}"
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                </div>
+                <div style="grid-column:1/-1">
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Address</label>
+                    <input name="address" type="text" value="{{ $property->address }}"
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                </div>
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Caretaker name</label>
+                    <input name="caretaker_name" type="text" value="{{ $property->caretaker_name }}"
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                </div>
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Caretaker phone</label>
+                    <input name="caretaker_phone" type="text" value="{{ $property->caretaker_phone }}"
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                </div>
+            </div>
+
+            <div style="border-top:1px solid rgba(0,0,0,0.07);padding-top:14px;margin-bottom:14px">
+                <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px">Payment collection</label>
+                <div style="display:flex;gap:16px;margin-bottom:10px">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                        <input type="radio" name="payment_type" value="paybill" {{ $property->payment_type=='paybill'?'checked':'' }} onchange="document.getElementById('edit-paybill-fields').style.display='block';document.getElementById('edit-till-fields').style.display='none'">
+                        Paybill
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                        <input type="radio" name="payment_type" value="till" {{ $property->payment_type=='till'?'checked':'' }} onchange="document.getElementById('edit-paybill-fields').style.display='none';document.getElementById('edit-till-fields').style.display='block'">
+                        Till number
+                    </label>
+                </div>
+                <div id="edit-paybill-fields" style="display:{{ $property->payment_type=='paybill'?'block':'none' }}">
+                    <div class="modal-grid">
+                        <div>
+                            <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Business number</label>
+                            <input name="business_number" type="text" value="{{ $property->business_number }}"
+                                   style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Account format</label>
+                            <select name="account_format" style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                                <option value="unit_number" {{ $property->account_format=='unit_number'?'selected':'' }}>Unit number</option>
+                                <option value="tenant_name" {{ $property->account_format=='tenant_name'?'selected':'' }}>Tenant name</option>
+                                <option value="phone_number" {{ $property->account_format=='phone_number'?'selected':'' }}>Phone number</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div id="edit-till-fields" style="display:{{ $property->payment_type=='till'?'block':'none' }}">
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Till number</label>
+                    <input name="till_number" type="text" value="{{ $property->till_number }}"
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                </div>
+            </div>
+
+            <div style="margin-bottom:18px">
+                <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Notes</label>
+                <textarea name="notes" rows="2" style="width:100%;padding:9px 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;resize:vertical">{{ $property->notes }}</textarea>
+            </div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="submit"
+                        style="padding:7px 20px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                    Save changes
+                </button>
+                <button type="button" onclick="document.getElementById('edit-property-modal').style.display='none'"
+                        style="padding:7px 15px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Delete Property Modal — strong warning, type-to-confirm --}}
+<div id="delete-property-modal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:50;align-items:center;justify-content:center;padding:16px">
+    <div class="modal-inner" style="max-width:460px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.07)">
+            <div style="font-size:15px;font-weight:600;color:#991b1b">Delete "{{ $property->name }}"</div>
+            <button onclick="closeDeleteModal()"
+                    style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;line-height:1">&times;</button>
+        </div>
+
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px;margin-bottom:18px;font-size:13px;color:#7f1d1d;line-height:1.7">
+            <strong>This cannot be undone.</strong> Deleting this property will permanently delete:
+            <ul style="margin:8px 0 0 18px;padding:0">
+                <li>{{ $totalUnits }} {{ Str::plural('unit', $totalUnits) }}</li>
+                <li>{{ $invoiceCount }} {{ Str::plural('invoice', $invoiceCount) }}</li>
+                <li>{{ $paymentCount }} payment {{ Str::plural('record', $paymentCount) }}</li>
+            </ul>
+            @if($activeTenantCount > 0)
+                <div style="margin-top:10px;font-weight:600">
+                    ⚠ {{ $activeTenantCount }} active {{ Str::plural('tenancy', $activeTenantCount) }} currently living here will lose their entire rent, invoice and payment history.
+                </div>
+            @endif
+            @if($expenseCount > 0)
+                <div style="margin-top:8px">{{ $expenseCount }} recorded {{ Str::plural('expense', $expenseCount) }} will be kept but unlinked from this property.</div>
+            @endif
+        </div>
+
+        <form method="POST" action="{{ route('properties.destroy', $property) }}" id="delete-property-form">
+            @csrf
+            @method('DELETE')
+            <div style="margin-bottom:20px">
+                <label style="display:block;font-size:12px;font-weight:500;color:#991b1b;margin-bottom:8px">
+                    Type <strong>{{ $property->name }}</strong> to confirm:
+                </label>
+                <input type="text" name="confirmation" id="delete-property-confirmation" autocomplete="off"
+                       oninput="checkDeletePropertyInput(this)"
+                       style="width:100%;height:40px;padding:0 14px;border:2px solid #fca5a5;border-radius:7px;font-size:15px;font-family:'DM Sans',sans-serif;outline:none">
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="submit" id="delete-property-submit-btn" disabled
+                        style="padding:8px 20px;background:#e5e7eb;color:#9ca3af;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:not-allowed;font-family:'DM Sans',sans-serif;transition:all .15s"
+                        onclick="return confirm('Last chance — this will permanently delete this property and its history. Are you absolutely sure?')">
+                    Yes, delete this property
+                </button>
+                <button type="button" onclick="closeDeleteModal()"
+                        style="padding:8px 15px;background:transparent;color:#6b7280;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function closeDeleteModal() {
+    document.getElementById('delete-property-modal').style.display = 'none';
+    document.getElementById('delete-property-confirmation').value = '';
+    checkDeletePropertyInput(document.getElementById('delete-property-confirmation'));
+}
+
+function checkDeletePropertyInput(input) {
+    var btn   = document.getElementById('delete-property-submit-btn');
+    var valid = input.value.trim() === @json($property->name);
+    btn.disabled         = !valid;
+    btn.style.background = valid ? '#b91c1c' : '#e5e7eb';
+    btn.style.color      = valid ? '#fff'    : '#9ca3af';
+    btn.style.cursor     = valid ? 'pointer' : 'not-allowed';
+}
+</script>
+
 </x-layouts.app>
