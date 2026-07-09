@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\Property;
 use App\Models\Tenant;
 use App\Models\Unit;
+use App\Models\UtilityReading;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
@@ -19,6 +20,67 @@ class ReportController extends Controller
         $properties  = Property::whereIn('id', $propertyIds)->orderBy('name')->get();
 
         return view('reports.index', compact('properties'));
+    }
+
+    public function utilities(Request $request)
+    {
+        $month = (int) $request->input('month', now()->month);
+        $year  = (int) $request->input('year', now()->year);
+
+        $propertyIds = $this->filteredPropertyIds();
+
+        $properties = Property::whereIn('id', $propertyIds)
+            ->with([
+                'units.activeLease.tenant',
+                'utilityRates' => fn($q) => $q->where('active', true)
+                    ->whereIn('billing_type', ['per_unit', 'per_meter_reading']),
+            ])->get();
+
+        $rows         = [];
+        $totalsByType = [];
+        $grandTotal   = 0;
+
+        foreach ($properties as $property) {
+            if ($property->utilityRates->isEmpty()) continue;
+
+            $unitIds  = $property->units->pluck('id')->toArray();
+            $readings = UtilityReading::whereIn('unit_id', $unitIds)
+                ->where('reading_month', $month)
+                ->where('reading_year', $year)
+                ->get()
+                ->groupBy(fn($r) => $r->unit_id . '_' . $r->utility_type);
+
+            foreach ($property->units as $unit) {
+                if (!$unit->activeLease) continue;
+
+                foreach ($property->utilityRates as $rate) {
+                    $reading = $readings->get($unit->id . '_' . $rate->type)?->first();
+                    $charge  = $reading ? floatval($reading->charge_amount) : 0;
+
+                    $rows[] = [
+                        'property'     => $property->name,
+                        'unit'         => $unit->name,
+                        'tenant'       => $unit->activeLease->tenant->full_name,
+                        'utility_name' => $rate->name,
+                        'utility_type' => $rate->type,
+                        'previous'     => $reading ? floatval($reading->previous_reading) : null,
+                        'current'      => $reading ? floatval($reading->current_reading) : null,
+                        'consumed'     => $reading ? floatval($reading->units_consumed) : null,
+                        'charge'       => $charge,
+                        'has_reading'  => (bool) $reading,
+                    ];
+
+                    $totalsByType[$rate->name] = ($totalsByType[$rate->name] ?? 0) + $charge;
+                    $grandTotal += $charge;
+                }
+            }
+        }
+
+        $missingCount = collect($rows)->where('has_reading', false)->count();
+
+        return view('reports.utilities', compact(
+            'rows', 'totalsByType', 'grandTotal', 'missingCount', 'month', 'year'
+        ));
     }
 
     /**
@@ -60,12 +122,13 @@ class ReportController extends Controller
             $data['rentRoll']       = $this->rentRollForPeriod($property, $month, $year);
             $data['collections']    = $this->collectionsForPeriod($leaseIds, $month, $year);
             $data['incomeExpenses'] = $this->incomeExpensesForPeriod($property, $leaseIds, $month, $year);
+            $data['utilities']      = $this->utilitiesForPeriod($property, $unitIds, $month, $year);
 
             $filename = 'Report-' . \Illuminate\Support\Str::slug($property->name) . '-' . $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT) . '.pdf';
         } else {
             $data['mode']        = 'yearly';
             $data['periodLabel'] = (string) $year;
-            $data['yearly']      = $this->yearlySummary($property, $leaseIds, $year);
+            $data['yearly']      = $this->yearlySummary($property, $leaseIds, $unitIds, $year);
 
             $filename = 'Report-' . \Illuminate\Support\Str::slug($property->name) . '-' . $year . '.pdf';
         }
@@ -211,53 +274,114 @@ class ReportController extends Controller
         return compact('totalIncome', 'totalExpenses', 'netProfit', 'byCategory');
     }
 
-    private function yearlySummary(Property $property, array $leaseIds, int $year): array
+    private function utilitiesForPeriod(Property $property, array $unitIds, int $month, int $year): array
     {
-        $invoices = Invoice::whereIn('lease_id', $leaseIds)
-            ->whereYear('invoice_date', $year)
+        $meterRates = $property->utilityRates()->where('active', true)
+            ->whereIn('billing_type', ['per_unit', 'per_meter_reading'])
             ->get();
 
-        $expected       = floatval($invoices->sum('total_amount'));
-        $collected      = floatval($invoices->sum('amount_paid'));
-        $collectionRate = $expected > 0 ? round(($collected / $expected) * 100) : 0;
+        $readings = UtilityReading::whereIn('unit_id', $unitIds)
+            ->where('reading_month', $month)
+            ->where('reading_year', $year)
+            ->get()
+            ->groupBy(fn($r) => $r->unit_id . '_' . $r->utility_type);
 
-        $totalIncome = floatval(
-            Payment::whereIn('lease_id', $leaseIds)
-                ->where('payment_type', '!=', 'deposit')
-                ->whereYear('payment_date', $year)
-                ->sum('amount')
-        );
+        $units = Unit::where('property_id', $property->id)
+            ->with('activeLease.tenant')
+            ->get();
 
-        $totalExpenses = floatval(
-            Expense::where('property_id', $property->id)
-                ->whereYear('expense_date', $year)
-                ->sum('amount')
-        );
+        $rows       = [];
+        $totalCharge = 0;
+        $missing    = 0;
 
-        $netProfit = $totalIncome - $totalExpenses;
+        foreach ($units as $unit) {
+            if (!$unit->activeLease) continue;
 
-        $bestMonth  = null;
-        $bestIncome = 0;
+            foreach ($meterRates as $rate) {
+                $reading = $readings->get($unit->id . '_' . $rate->type)?->first();
+                $charge  = $reading ? floatval($reading->charge_amount) : 0;
 
-        for ($m = 1; $m <= 12; $m++) {
-            $monthIncome = floatval(
-                Payment::whereIn('lease_id', $leaseIds)
-                    ->where('payment_type', '!=', 'deposit')
-                    ->whereYear('payment_date', $year)
-                    ->whereMonth('payment_date', $m)
-                    ->sum('amount')
-            );
-            if ($monthIncome > $bestIncome) {
-                $bestIncome = $monthIncome;
-                $bestMonth  = \Carbon\Carbon::createFromDate($year, $m, 1)->format('F');
+                if (!$reading) {
+                    $missing++;
+                    continue;
+                }
+
+                $rows[] = [
+                    'unit'         => $unit->name,
+                    'tenant'       => $unit->activeLease->tenant->full_name,
+                    'utility_name' => $rate->name,
+                    'consumed'     => floatval($reading->units_consumed),
+                    'charge'       => $charge,
+                ];
+
+                $totalCharge += $charge;
             }
         }
 
-        return compact(
-            'expected', 'collected', 'collectionRate',
-            'totalIncome', 'totalExpenses', 'netProfit',
-            'bestMonth', 'bestIncome'
-        );
+        return compact('rows', 'totalCharge', 'missing');
+    }
+
+    private function yearlySummary(Property $property, array $leaseIds, array $unitIds, int $year): array
+    {
+        $months = [];
+
+        for ($m = 1; $m <= 12; $m++) {
+            $invoices = Invoice::whereIn('lease_id', $leaseIds)
+                ->where('period_month', $m)
+                ->where('period_year', $year)
+                ->get();
+
+            $expected  = floatval($invoices->sum('total_amount'));
+            $collected = floatval($invoices->sum('amount_paid'));
+            $rate      = $expected > 0 ? round(($collected / $expected) * 100) : 0;
+
+            $income = floatval(
+                Payment::whereIn('lease_id', $leaseIds)
+                    ->where('payment_type', '!=', 'deposit')
+                    ->whereMonth('payment_date', $m)
+                    ->whereYear('payment_date', $year)
+                    ->sum('amount')
+            );
+
+            $expenses = floatval(
+                Expense::where('property_id', $property->id)
+                    ->whereMonth('expense_date', $m)
+                    ->whereYear('expense_date', $year)
+                    ->sum('amount')
+            );
+
+            $utilityCharge = floatval(
+                UtilityReading::whereIn('unit_id', $unitIds)
+                    ->where('reading_month', $m)
+                    ->where('reading_year', $year)
+                    ->sum('charge_amount')
+            );
+
+            $months[] = [
+                'label'     => \Carbon\Carbon::createFromDate($year, $m, 1)->format('M'),
+                'expected'  => $expected,
+                'collected' => $collected,
+                'rate'      => $rate,
+                'income'    => $income,
+                'expenses'  => $expenses,
+                'net'       => $income - $expenses,
+                'utilities' => $utilityCharge,
+            ];
+        }
+
+        $totals = [
+            'expected'  => array_sum(array_column($months, 'expected')),
+            'collected' => array_sum(array_column($months, 'collected')),
+            'income'    => array_sum(array_column($months, 'income')),
+            'expenses'  => array_sum(array_column($months, 'expenses')),
+            'net'       => array_sum(array_column($months, 'net')),
+            'utilities' => array_sum(array_column($months, 'utilities')),
+        ];
+        $totals['rate'] = $totals['expected'] > 0
+            ? round(($totals['collected'] / $totals['expected']) * 100)
+            : 0;
+
+        return compact('months', 'totals');
     }
 
     public function rentRoll(Request $request)

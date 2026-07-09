@@ -140,6 +140,7 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
 
     // Properties + Units + Import
     Route::resource('properties', PropertyController::class)->only(['index', 'store', 'show', 'destroy']);
+    Route::put('/properties/{property}', [PropertyController::class, 'update'])->name('properties.update');
     Route::post('/properties/{property}/invoice-schedule', [PropertyController::class, 'updateInvoiceSchedule'])->name('properties.invoice-schedule');
     Route::post('/properties/{property}/units', [UnitController::class, 'store'])->name('units.store');
     Route::get('/properties/{property}/import/sample',   [App\Http\Controllers\ImportController::class, 'sampleCsv'])->name('properties.import.sample');
@@ -198,6 +199,7 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
     Route::get('/reports/tenant-statement', [ReportController::class, 'tenantStatement'])->name('reports.tenant-statement');
     Route::get('/reports/occupancy', [ReportController::class, 'occupancy'])->name('reports.occupancy');
     Route::get('/reports/deposits', [ReportController::class, 'deposits'])->name('reports.deposits');
+    Route::get('/reports/utilities', [ReportController::class, 'utilities'])->name('reports.utilities');
 
     // Communications
     Route::get('/communications', [CommunicationController::class, 'index'])->name('communications.index');

@@ -109,21 +109,70 @@
 
     @if($mode === 'yearly')
 
-        {{-- ── Yearly summary ── --}}
-        <div class="section-title">Income &amp; Collections — {{ $periodLabel }}</div>
-        <div class="kpi-row">
-            <div class="kpi"><div class="kpi-value">{{ currency($yearly['expected']) }}</div><div class="kpi-label">Expected (invoiced)</div></div>
-            <div class="kpi kpi-green"><div class="kpi-value">{{ currency($yearly['collected']) }}</div><div class="kpi-label">Collected</div></div>
-            <div class="kpi"><div class="kpi-value">{{ $yearly['collectionRate'] }}%</div><div class="kpi-label">Collection rate</div></div>
-            <div class="kpi"><div class="kpi-value">{{ $yearly['bestMonth'] ?? 'N/A' }}</div><div class="kpi-label">Best month</div></div>
-        </div>
+        {{-- ── Rent roll & collections, month by month ── --}}
+        <div class="section-title">Rent Roll &amp; Collections — {{ $periodLabel }}</div>
+        <table class="data">
+            <thead><tr><th>Month</th><th class="right">Expected</th><th class="right">Collected</th><th class="right">Rate</th></tr></thead>
+            <tbody>
+                @foreach($yearly['months'] as $m)
+                <tr>
+                    <td>{{ $m['label'] }}</td>
+                    <td class="right">{{ currency($m['expected']) }}</td>
+                    <td class="right">{{ currency($m['collected']) }}</td>
+                    <td class="right">{{ $m['rate'] }}%</td>
+                </tr>
+                @endforeach
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td>Total for the year</td>
+                    <td class="right">{{ currency($yearly['totals']['expected']) }}</td>
+                    <td class="right">{{ currency($yearly['totals']['collected']) }}</td>
+                    <td class="right">{{ $yearly['totals']['rate'] }}%</td>
+                </tr>
+            </tfoot>
+        </table>
 
-        <div class="section-title">Profit &amp; Loss — {{ $periodLabel }}</div>
-        <div class="kpi-row">
-            <div class="kpi kpi-green"><div class="kpi-value">{{ currency($yearly['totalIncome']) }}</div><div class="kpi-label">Total income</div></div>
-            <div class="kpi kpi-red"><div class="kpi-value">{{ currency($yearly['totalExpenses']) }}</div><div class="kpi-label">Total expenses</div></div>
-            <div class="kpi"><div class="kpi-value">{{ currency($yearly['netProfit']) }}</div><div class="kpi-label">Net profit</div></div>
-        </div>
+        {{-- ── Income vs expenses, month by month ── --}}
+        <div class="section-title">Income vs Expenses — {{ $periodLabel }}</div>
+        <table class="data">
+            <thead><tr><th>Month</th><th class="right">Income</th><th class="right">Expenses</th><th class="right">Net</th></tr></thead>
+            <tbody>
+                @foreach($yearly['months'] as $m)
+                <tr>
+                    <td>{{ $m['label'] }}</td>
+                    <td class="right">{{ currency($m['income']) }}</td>
+                    <td class="right">{{ currency($m['expenses']) }}</td>
+                    <td class="right">{{ currency($m['net']) }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td>Total for the year</td>
+                    <td class="right">{{ currency($yearly['totals']['income']) }}</td>
+                    <td class="right">{{ currency($yearly['totals']['expenses']) }}</td>
+                    <td class="right">{{ currency($yearly['totals']['net']) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        {{-- ── Utilities billed, month by month ── --}}
+        <div class="section-title">Utilities Billed — {{ $periodLabel }}</div>
+        <table class="data">
+            <thead><tr><th>Month</th><th class="right">Charges billed</th></tr></thead>
+            <tbody>
+                @foreach($yearly['months'] as $m)
+                <tr>
+                    <td>{{ $m['label'] }}</td>
+                    <td class="right">{{ currency($m['utilities']) }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+            <tfoot>
+                <tr><td>Total for the year</td><td class="right">{{ currency($yearly['totals']['utilities']) }}</td></tr>
+            </tfoot>
+        </table>
 
     @else
 
@@ -200,6 +249,34 @@
         </table>
         @else
         <div class="empty-note">No expenses recorded in this period.</div>
+        @endif
+
+        {{-- ── Utilities ── --}}
+        <div class="section-title">Utilities — {{ $periodLabel }}</div>
+        <div class="kpi-row">
+            <div class="kpi kpi-green"><div class="kpi-value">{{ currency($utilities['totalCharge']) }}</div><div class="kpi-label">Total billed</div></div>
+            @if($utilities['missing'] > 0)
+            <div class="kpi kpi-red"><div class="kpi-value">{{ $utilities['missing'] }}</div><div class="kpi-label">Missing readings</div></div>
+            @endif
+        </div>
+
+        @if(count($utilities['rows']))
+        <table class="data">
+            <thead><tr><th>Unit</th><th>Tenant</th><th>Utility</th><th class="right">Consumed</th><th class="right">Charge</th></tr></thead>
+            <tbody>
+                @foreach($utilities['rows'] as $row)
+                <tr>
+                    <td>{{ $row['unit'] }}</td>
+                    <td>{{ $row['tenant'] }}</td>
+                    <td>{{ $row['utility_name'] }}</td>
+                    <td class="right">{{ number_format($row['consumed'], 1) }}</td>
+                    <td class="right">{{ currency($row['charge']) }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+        @else
+        <div class="empty-note">No utility readings recorded in this period.</div>
         @endif
 
     @endif
