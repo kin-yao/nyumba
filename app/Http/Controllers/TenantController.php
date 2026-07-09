@@ -182,6 +182,58 @@ class TenantController extends Controller
             ->with('success', $tenant->first_name . ' ' . $tenant->last_name . ' has been moved in successfully.');
     }
 
+    public function update(Request $request, Tenant $tenant)
+    {
+        $validated = $request->validate([
+            'first_name' => ['required', 'string', 'max:255'],
+            'last_name'  => ['required', 'string', 'max:255'],
+            'phone'      => ['required', 'string', 'max:20'],
+            'alt_phone'  => ['nullable', 'string', 'max:20'],
+            'id_number'  => ['nullable', 'string', 'max:50'],
+            'email'      => ['nullable', 'email', 'max:255'],
+        ]);
+
+        $labels = [
+            'first_name' => 'First name',
+            'last_name'  => 'Last name',
+            'phone'      => 'Phone',
+            'alt_phone'  => 'Alt phone',
+            'id_number'  => 'ID number',
+            'email'      => 'Email',
+        ];
+
+        $changes = [];
+        foreach ($validated as $field => $newValue) {
+            $oldValue = $tenant->{$field};
+            $newValue = $newValue === '' ? null : $newValue;
+
+            if ((string) $oldValue !== (string) $newValue) {
+                $changes[$labels[$field]] = [
+                    'from' => $oldValue ?: '(empty)',
+                    'to'   => $newValue ?: '(empty)',
+                ];
+            }
+        }
+
+        $tenant->update($validated);
+
+        if (!empty($changes)) {
+            $summary = collect($changes)
+                ->map(fn($c, $field) => $field . ': "' . $c['from'] . '" → "' . $c['to'] . '"')
+                ->implode('; ');
+
+            AuditService::log(
+                'tenant.updated',
+                'Tenant details updated for ' . $tenant->full_name . ' — ' . $summary,
+                $tenant,
+                ['changes' => $changes]
+            );
+        }
+
+        return redirect()->route('tenants.show', $tenant)
+            ->with('success', 'Tenant details updated successfully.');
+    }
+
     // ── Transfer tenant to another unit in the same property ─────────────
     public function transfer(Request $request, Tenant $tenant)
     {

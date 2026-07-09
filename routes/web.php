@@ -149,6 +149,7 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
 
     // Tenants
     Route::resource('tenants', TenantController::class)->only(['index', 'show', 'create', 'store']);
+    Route::put('/tenants/{tenant}', [TenantController::class, 'update'])->name('tenants.update');
     Route::post('/tenants/{tenant}/move-out', [TenantController::class, 'moveOut'])->name('tenants.move-out');
     Route::delete('/tenants/{tenant}', [TenantController::class, 'destroy'])->name('tenants.destroy');
     Route::post('/tenants/{id}/restore', [TenantController::class, 'restore'])->name('tenants.restore');

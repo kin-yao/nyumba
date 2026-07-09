@@ -159,6 +159,11 @@
 
                 {{-- Actions --}}
                 <div style="display:grid;gap:8px">
+                    <button onclick="document.getElementById('edit-tenant-modal').style.display='flex'"
+                            style="width:100%;padding:8px 15px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
+                        Edit details
+                    </button>
+
                     @if($activeLease && $vacantUnits->isNotEmpty())
                         <button onclick="document.getElementById('transfer-modal').style.display='flex'"
                                 style="width:100%;padding:8px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
@@ -225,6 +230,69 @@
                 @endif
             </div>
         </div>
+    </div>
+</div>
+
+{{-- Edit Tenant Modal --}}
+<div id="edit-tenant-modal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:50;align-items:center;justify-content:center;padding:16px">
+    <div class="modal-inner">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.07)">
+            <div style="font-size:15px;font-weight:500">Edit details &ndash; {{ $tenant->full_name }}</div>
+            <button onclick="document.getElementById('edit-tenant-modal').style.display='none'"
+                    style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;line-height:1">&times;</button>
+        </div>
+        <form method="POST" action="{{ route('tenants.update', $tenant) }}">
+            @csrf
+            @method('PUT')
+            <div class="modal-grid" style="margin-bottom:16px">
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">First name</label>
+                    <input name="first_name" type="text" required value="{{ $tenant->first_name }}"
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                </div>
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Last name</label>
+                    <input name="last_name" type="text" required value="{{ $tenant->last_name }}"
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                </div>
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Phone</label>
+                    <input name="phone" type="text" required value="{{ $tenant->phone }}"
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                </div>
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Alt phone</label>
+                    <input name="alt_phone" type="text" value="{{ $tenant->alt_phone }}"
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                </div>
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">ID number</label>
+                    <input name="id_number" type="text" value="{{ $tenant->id_number }}"
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                </div>
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Email</label>
+                    <input name="email" type="email" value="{{ $tenant->email }}"
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                </div>
+            </div>
+
+            <div style="font-size:11px;color:#8a8880;margin-bottom:16px">
+                This only updates the tenant's personal details. Rent, deposit and lease dates are changed via Transfer or the lease itself.
+            </div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="submit"
+                        style="padding:7px 20px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                    Save changes
+                </button>
+                <button type="button" onclick="document.getElementById('edit-tenant-modal').style.display='none'"
+                        style="padding:7px 15px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
+                    Cancel
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
