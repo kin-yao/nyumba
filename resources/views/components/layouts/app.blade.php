@@ -185,7 +185,7 @@
             }
         @endphp
 
-        <div style="{{ $isExpired ? 'pointer-events:none;opacity:0.35;user-select:none' : '' }}">
+        <div style="display:flex;flex-direction:column;flex:1;min-height:0;{{ $isExpired ? 'pointer-events:none;opacity:0.35;user-select:none' : '' }}">
 
         {{-- Property filter --}}
         @if($allProperties->count() > 1)
