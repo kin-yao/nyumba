@@ -276,7 +276,7 @@
                         $pendingMoveOuts = cache()->remember(
                             'pending_moveouts_' . $authUser->account_id, 30,
                             fn() => \App\Models\MoveOutRequest::whereIn('unit_id', \App\Models\Unit::whereIn('property_id', $allProperties->pluck('id'))->pluck('id'))
-                                ->whereIn('status', ['pending', 'acknowledged'])
+                                ->where('status', 'pending')
                                 ->count()
                         );
                     @endphp

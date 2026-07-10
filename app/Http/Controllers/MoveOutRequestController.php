@@ -17,7 +17,7 @@ class MoveOutRequestController extends Controller
             ->latest()
             ->get();
 
-        $pendingCount = $requests->whereIn('status', ['pending', 'acknowledged'])->count();
+        $pendingCount = $requests->where('status', 'pending')->count();
 
         return view('move-out-requests.index', compact('requests', 'pendingCount'));
     }
@@ -37,6 +37,27 @@ class MoveOutRequestController extends Controller
         }
 
         return view('move-out-requests.show', compact('moveOutRequest'));
+    }
+
+    public function accept(MoveOutRequest $moveOutRequest)
+    {
+        abort_unless($moveOutRequest->account_id === auth()->user()->account_id, 403);
+
+        if (in_array($moveOutRequest->status, ['completed', 'cancelled'])) {
+            return back()->with('error', 'This request can no longer be accepted.');
+        }
+
+        $moveOutRequest->update(['status' => 'accepted']);
+
+        AuditService::log(
+            'move_out_request.accepted',
+            'Move-out accepted for ' . $moveOutRequest->tenant->full_name . ' — Unit ' . $moveOutRequest->unit->name
+                . ', date: ' . $moveOutRequest->requested_move_out_date->format('d M Y'),
+            $moveOutRequest,
+            ['move_out_date' => $moveOutRequest->requested_move_out_date->toDateString()]
+        );
+
+        return back()->with('success', 'Move-out approved. The tenant will be automatically moved out on ' . $moveOutRequest->requested_move_out_date->format('d M Y') . '.');
     }
 
     public function acceptBooking(MoveOutRequest $moveOutRequest)

@@ -24,6 +24,9 @@ Schedule::command('leases:send-expiry-alerts')->dailyAt('08:30')->withoutOverlap
 // Apply rent escalations on review date
 Schedule::command('leases:apply-escalations')->dailyAt('07:00')->withoutOverlapping();
 
+// Automatically move out tenants whose accepted move-out date has arrived
+Schedule::command('move-outs:process')->dailyAt('07:30')->withoutOverlapping();
+
 // Reconcile M-Pesa C2B transactions via Pull API for registered properties.
 // Runs every 3 hours — worst case a missed C2B callback is caught within 3hrs.
 // Reduce to ->hourly() if landlords report payment delays.

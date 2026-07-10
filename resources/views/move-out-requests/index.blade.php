@@ -42,7 +42,8 @@
         @php
             $statusColors = [
                 'pending'      => ['bg' => '#fef3c7', 'text' => '#92400e', 'label' => 'Pending'],
-                'acknowledged' => ['bg' => '#dbeafe', 'text' => '#1e40af', 'label' => 'Acknowledged'],
+                'acknowledged' => ['bg' => '#fef3c7', 'text' => '#92400e', 'label' => 'Pending'],
+                'accepted'     => ['bg' => '#e6f2ed', 'text' => '#166534', 'label' => 'Approved'],
                 'completed'    => ['bg' => '#dcfce7', 'text' => '#166534', 'label' => 'Completed'],
                 'cancelled'    => ['bg' => '#f3f4f6', 'text' => '#4b5563', 'label' => 'Cancelled'],
             ];

@@ -34,7 +34,7 @@ class CommunicationController extends Controller
             ->latest()
             ->get();
 
-        $hasPendingMoveOut = $moveOutRequests->whereIn('status', ['pending', 'acknowledged'])->isNotEmpty();
+        $hasPendingMoveOut = $moveOutRequests->whereIn('status', ['pending', 'acknowledged', 'accepted'])->isNotEmpty();
 
         return view('portal.communications', compact(
             'tenant', 'lease', 'unit', 'maintenanceRequests', 'moveOutRequests', 'hasPendingMoveOut'
@@ -120,5 +120,33 @@ class CommunicationController extends Controller
         ]);
 
         return back()->with('success', 'Your move-out request has been submitted. Your landlord will be notified.');
+    }
+
+    public function cancelMoveOut(MoveOutRequest $moveOutRequest)
+    {
+        $tenant = $this->tenant();
+
+        abort_unless($moveOutRequest->tenant_id === $tenant->id, 403);
+
+        if (in_array($moveOutRequest->status, ['completed', 'cancelled'])) {
+            return back()->with('error', 'This request can no longer be cancelled.');
+        }
+
+        $moveOutRequest->loadMissing('unit');
+
+        $moveOutRequest->update([
+            'status'          => 'cancelled',
+            'referral_status' => $moveOutRequest->referral_status === 'none' ? 'none' : 'declined',
+        ]);
+
+        Notification::create([
+            'account_id' => $moveOutRequest->account_id,
+            'type'       => 'move_out_request_cancelled',
+            'title'      => 'Move-out request cancelled by ' . $tenant->full_name,
+            'body'       => 'Unit ' . $moveOutRequest->unit->name . ' — the tenant has cancelled their move-out request.',
+            'data'       => ['unit' => $moveOutRequest->unit->name, 'move_out_request_id' => $moveOutRequest->id],
+        ]);
+
+        return back()->with('success', 'Your move-out request has been cancelled.');
     }
 }

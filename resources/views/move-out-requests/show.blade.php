@@ -42,7 +42,12 @@
             </div>
             <div style="display:flex;justify-content:space-between">
                 <span style="color:#8a8880">Status</span>
-                <span style="font-weight:500">{{ ucfirst($moveOutRequest->status) }}</span>
+                <span style="font-weight:500">
+                    @if(in_array($moveOutRequest->status, ['pending', 'acknowledged'])) Pending
+                    @elseif($moveOutRequest->status === 'accepted') Approved
+                    @else {{ ucfirst($moveOutRequest->status) }}
+                    @endif
+                </span>
             </div>
         </div>
 
@@ -50,6 +55,31 @@
             <div style="background:#f5f4f0;border-radius:8px;padding:12px 14px;margin-bottom:16px">
                 <div style="font-size:10px;color:#8a8880;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Reason given</div>
                 <div style="font-size:13px">{{ $moveOutRequest->reason }}</div>
+            </div>
+        @endif
+
+        @if(in_array($moveOutRequest->status, ['pending', 'acknowledged']))
+            <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#92400e">
+                Accepting will automatically move this tenant out on {{ $moveOutRequest->requested_move_out_date->format('d M Y') }} — no manual action needed on that day.
+            </div>
+            <form method="POST" action="{{ route('move-out-requests.accept', $moveOutRequest) }}" style="margin-bottom:12px">
+                @csrf
+                <button type="submit" onclick="return confirm('Approve this move-out date? The tenant will be moved out automatically on {{ $moveOutRequest->requested_move_out_date->format('d M Y') }}.')"
+                        style="padding:8px 18px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                    Approve move-out
+                </button>
+            </form>
+        @elseif($moveOutRequest->status === 'accepted')
+            <div style="background:#e6f2ed;border:1px solid #a7d7c5;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#166534">
+                ✓ Approved. This tenant will be automatically moved out on {{ $moveOutRequest->requested_move_out_date->format('d M Y') }}.
+            </div>
+        @elseif($moveOutRequest->status === 'completed')
+            <div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#4b5563">
+                This tenant has moved out.
+            </div>
+        @elseif($moveOutRequest->status === 'cancelled')
+            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#7f1d1d">
+                Cancelled by the tenant.
             </div>
         @endif
 

@@ -35,6 +35,7 @@ Route::prefix('portal')->name('portal.')->group(function () {
         Route::get('/communications', [App\Http\Controllers\Portal\CommunicationController::class, 'index'])->name('communications');
         Route::post('/communications/maintenance', [App\Http\Controllers\Portal\CommunicationController::class, 'storeMaintenance'])->name('communications.maintenance');
         Route::post('/communications/move-out', [App\Http\Controllers\Portal\CommunicationController::class, 'storeMoveOut'])->name('communications.move-out');
+        Route::post('/communications/move-out/{moveOutRequest}/cancel', [App\Http\Controllers\Portal\CommunicationController::class, 'cancelMoveOut'])->name('communications.move-out.cancel');
     });
 });
 
@@ -210,6 +211,7 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
     // Move-out requests (submitted by tenants via the portal)
     Route::get('/move-out-requests', [App\Http\Controllers\MoveOutRequestController::class, 'index'])->name('move-out-requests.index');
     Route::get('/move-out-requests/{moveOutRequest}', [App\Http\Controllers\MoveOutRequestController::class, 'show'])->name('move-out-requests.show');
+    Route::post('/move-out-requests/{moveOutRequest}/accept', [App\Http\Controllers\MoveOutRequestController::class, 'accept'])->name('move-out-requests.accept');
     Route::post('/move-out-requests/{moveOutRequest}/accept-booking', [App\Http\Controllers\MoveOutRequestController::class, 'acceptBooking'])->name('move-out-requests.accept-booking');
     Route::post('/move-out-requests/{moveOutRequest}/decline-booking', [App\Http\Controllers\MoveOutRequestController::class, 'declineBooking'])->name('move-out-requests.decline-booking');
     Route::post('/move-out-requests/{moveOutRequest}/notes', [App\Http\Controllers\MoveOutRequestController::class, 'updateNotes'])->name('move-out-requests.notes');

@@ -108,7 +108,7 @@
     @if($moveOutRequests->isNotEmpty())
         <div style="font-size:11px;color:#8a8880;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Your move-out requests</div>
         @php
-            $moStatus = ['pending' => ['#fef3c7','#92400e','Pending'], 'acknowledged' => ['#dbeafe','#1e40af','Acknowledged'], 'completed' => ['#dcfce7','#166534','Completed'], 'cancelled' => ['#f3f4f6','#4b5563','Cancelled']];
+            $moStatus = ['pending' => ['#fef3c7','#92400e','Pending'], 'acknowledged' => ['#fef3c7','#92400e','Pending'], 'accepted' => ['#e6f2ed','#166534','Approved'], 'completed' => ['#dcfce7','#166534','Completed'], 'cancelled' => ['#f3f4f6','#4b5563','Cancelled']];
         @endphp
         @foreach($moveOutRequests as $req)
             @php $sc = $moStatus[$req->status] ?? $moStatus['pending']; @endphp
@@ -117,13 +117,26 @@
                     <span style="font-size:12.5px;font-weight:500">Move out {{ $req->requested_move_out_date->format('d M Y') }}</span>
                     <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:{{ $sc[0] }};color:{{ $sc[1] }}">{{ $sc[2] }}</span>
                 </div>
+                @if($req->status === 'accepted')
+                    <div style="font-size:11.5px;color:#166534;margin-bottom:8px">Your landlord has approved this date.</div>
+                @endif
                 @if($req->hasReferral())
-                    <div style="font-size:11.5px;color:#8a8880">
+                    <div style="font-size:11.5px;color:#8a8880;margin-bottom:8px">
                         Booking for {{ $req->referral_name }}:
                         <strong style="color:{{ $req->referral_status === 'accepted' ? '#15803d' : ($req->referral_status === 'declined' ? '#b91c1c' : '#92400e') }}">
                             {{ ucfirst($req->referral_status) }}
                         </strong>
                     </div>
+                @endif
+                @if(in_array($req->status, ['pending', 'acknowledged', 'accepted']))
+                    <form method="POST" action="{{ route('portal.communications.move-out.cancel', $req) }}"
+                          onsubmit="return confirm('Cancel this move-out request?')">
+                        @csrf
+                        <button type="submit"
+                                style="padding:5px 12px;background:transparent;color:#b91c1c;border:1px solid rgba(185,28,28,0.25);border-radius:6px;font-size:11.5px;cursor:pointer;font-family:'DM Sans',sans-serif">
+                            Cancel request
+                        </button>
+                    </form>
                 @endif
             </div>
         @endforeach
