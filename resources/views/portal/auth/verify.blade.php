@@ -26,7 +26,19 @@
     </button>
 </form>
 
-<div style="text-align:center;margin-top:16px">
+@if(session('success'))
+    <div style="background:#dcfce7;border-left:4px solid #166534;padding:10px 14px;text-align:center;font-size:13px;color:#166534;margin-bottom:16px">
+        {{ session('success') }}
+    </div>
+@endif
+
+<div style="text-align:center;margin-top:16px;display:flex;flex-direction:column;gap:10px">
+    <form method="POST" action="{{ route('portal.verify.resend') }}">
+        @csrf
+        <button type="submit" style="background:none;border:none;font-size:12px;color:#0B6161;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">
+            Resend code
+        </button>
+    </form>
     <a href="{{ route('portal.login') }}" style="font-size:12px;color:#8a8880">Use a different number</a>
 </div>
 </x-layouts.portal>

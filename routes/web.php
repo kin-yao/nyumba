@@ -27,6 +27,9 @@ Route::prefix('portal')->name('portal.')->group(function () {
     Route::post('/login', [App\Http\Controllers\Portal\AuthController::class, 'sendOtp'])->name('login.send');
     Route::get('/verify', [App\Http\Controllers\Portal\AuthController::class, 'showVerify'])->name('verify');
     Route::post('/verify', [App\Http\Controllers\Portal\AuthController::class, 'verifyOtp'])->name('verify.submit');
+    Route::post('/verify/resend', [App\Http\Controllers\Portal\AuthController::class, 'resendOtp'])->name('verify.resend');
+    Route::get('/select-tenancy', [App\Http\Controllers\Portal\AuthController::class, 'showSelectTenancy'])->name('select-tenancy');
+    Route::post('/select-tenancy', [App\Http\Controllers\Portal\AuthController::class, 'selectTenancy'])->name('select-tenancy.submit');
     Route::post('/logout', [App\Http\Controllers\Portal\AuthController::class, 'logout'])->name('logout');
 
     Route::middleware('tenant.auth')->group(function () {

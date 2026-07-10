@@ -455,7 +455,7 @@ class ReportController extends Controller
                     'balance'      => $balance,
                     'last_payment' => $lastPayment,
                     'days_since'   => $lastPayment
-                        ? $lastPayment->payment_date->diffInDays(now())
+                        ? (int) floor($lastPayment->payment_date->diffInDays(now()))
                         : null,
                 ];
             })

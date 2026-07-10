@@ -13,6 +13,10 @@
         html, body { margin: 0; padding: 0; background: #f5f4f0; font-family: 'DM Sans', sans-serif; color: #111110; }
         .portal-shell { min-height: 100vh; display: flex; flex-direction: column; padding-bottom: 72px; }
         .portal-topbar {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            background: #f5f4f0;
             padding: 16px 18px;
             display: flex;
             align-items: center;

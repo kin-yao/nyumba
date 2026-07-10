@@ -171,7 +171,7 @@
                         @php
                             $pc = $priorityColors[$req->priority] ?? $priorityColors['normal'];
                             $sc = $statusColors[$req->status]    ?? $statusColors['open'];
-                            $daysOpen = $req->created_at->diffInDays(now());
+                            $daysOpen = (int) floor($req->created_at->diffInDays(now()));
                         @endphp
                         <tr style="border-bottom:1px solid rgba(0,0,0,0.05);{{ $req->priority==='urgent'&&$req->status!=='resolved'?'border-left:3px solid #b91c1c;':'' }}">
                             <td style="padding:11px 14px;font-size:13px;color:#8a8880;white-space:nowrap">{{ $req->created_at->format('d M Y') }}</td>
@@ -232,7 +232,7 @@
                 @php
                     $pc = $priorityColors[$req->priority] ?? $priorityColors['normal'];
                     $sc = $statusColors[$req->status]    ?? $statusColors['open'];
-                    $daysOpen = $req->created_at->diffInDays(now());
+                    $daysOpen = (int) floor($req->created_at->diffInDays(now()));
                 @endphp
                 <div class="maint-card {{ $req->priority==='urgent'&&$req->status!=='resolved'?'urgent':'' }}">
                     <div class="maint-card-top">

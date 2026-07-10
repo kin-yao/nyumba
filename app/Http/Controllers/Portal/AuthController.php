@@ -29,12 +29,9 @@ class AuthController extends Controller
         ]);
 
         $normalized = $this->normalizePhone($validated['phone']);
+        $tenants    = $this->findTenantsByPhone($normalized);
 
-        $tenant = Tenant::whereHas('leases', fn($q) => $q->where('status', 'active'))
-            ->get()
-            ->first(fn($t) => $this->normalizePhone($t->phone) === $normalized);
-
-        if (!$tenant) {
+        if ($tenants->isEmpty()) {
             return back()->withInput()->withErrors([
                 'phone' => 'We could not find an active tenancy for that phone number. Please contact your landlord if you believe this is a mistake.',
             ]);
@@ -51,7 +48,10 @@ class AuthController extends Controller
             ]);
         }
 
-        $account = $tenant->account;
+        // The OTP SMS itself only needs to go out once regardless of how many
+        // tenancies this phone matches — bill it to the first landlord found.
+        $billingTenant = $tenants->first();
+        $account       = $billingTenant->account;
 
         if (!$account) {
             return back()->withInput()->withErrors([
@@ -62,8 +62,8 @@ class AuthController extends Controller
         ['code' => $code] = TenantOtpVerification::createForPhone($normalized);
 
         if (app()->environment('local')) {
-            // No SMS provider hooked up yet in dev — skip sending, show the
-            // code directly instead so the OTP flow can still be tested.
+            // No SMS provider hooked up yet in dev — skip sending (and the
+            // SMS-credit check below) and show the code directly instead.
             session(['portal_login_phone' => $normalized, 'dev_otp_code' => $code]);
             return redirect()->route('portal.verify');
         }
@@ -76,7 +76,7 @@ class AuthController extends Controller
             ]);
         }
 
-        $sms->send($tenant->phone, 'Your Nyumba login code is ' . $code . '. It expires in 10 minutes. Do not share this code.', $tenant->id);
+        $sms->send($billingTenant->phone, 'Your Nyumba login code is ' . $code . '. It expires in 10 minutes. Do not share this code.', $billingTenant->id);
 
         session(['portal_login_phone' => $normalized]);
 
@@ -124,22 +124,147 @@ class AuthController extends Controller
 
         $otp->update(['verified_at' => now()]);
 
-        $tenant = Tenant::whereHas('leases', fn($q) => $q->where('status', 'active'))
-            ->get()
-            ->first(fn($t) => $this->normalizePhone($t->phone) === $normalized);
+        $tenants = $this->findTenantsByPhone($normalized);
 
-        if (!$tenant) {
+        if ($tenants->isEmpty()) {
             return redirect()->route('portal.login')->withErrors([
                 'phone' => 'We could not find your tenancy. Please contact your landlord.',
             ]);
         }
 
-        session(['portal_tenant_id' => $tenant->id]);
         session()->forget('portal_login_phone');
+
+        // Exactly one tenancy matched this phone — log straight in.
+        if ($tenants->count() === 1) {
+            return $this->finalizeLogin($tenants->first(), $request, $request->boolean('remember_device'));
+        }
+
+        // More than one active tenancy shares this phone number (e.g. the
+        // same person renting from two different landlords) — let them pick.
+        session([
+            'portal_tenant_candidates' => $tenants->pluck('id')->all(),
+            'portal_remember_device'   => $request->boolean('remember_device'),
+        ]);
+
+        return redirect()->route('portal.select-tenancy');
+    }
+
+    public function resendOtp(Request $request)
+    {
+        $normalized = session('portal_login_phone');
+
+        if (!$normalized) {
+            return redirect()->route('portal.login');
+        }
+
+        $recent = TenantOtpVerification::where('phone', $normalized)
+            ->where('created_at', '>', now()->subSeconds(60))
+            ->exists();
+
+        if ($recent) {
+            return back()->withErrors(['code' => 'Please wait a minute before requesting another code.']);
+        }
+
+        $tenants = $this->findTenantsByPhone($normalized);
+
+        if ($tenants->isEmpty()) {
+            return redirect()->route('portal.login')->withErrors([
+                'phone' => 'We could not find your tenancy. Please contact your landlord.',
+            ]);
+        }
+
+        $billingTenant = $tenants->first();
+        $account       = $billingTenant->account;
+
+        ['code' => $code] = TenantOtpVerification::createForPhone($normalized);
+
+        if (app()->environment('local')) {
+            session(['dev_otp_code' => $code]);
+            return redirect()->route('portal.verify')->with('success', 'New code generated.');
+        }
+
+        if (!$account) {
+            return back()->withErrors(['code' => 'Something went wrong. Please contact your landlord.']);
+        }
+
+        $sms = new SmsService($account);
+
+        if (!$sms->hasCredits()) {
+            return back()->withErrors(['code' => 'Login codes are temporarily unavailable. Please contact your landlord.']);
+        }
+
+        $sms->send($billingTenant->phone, 'Your Nyumba login code is ' . $code . '. It expires in 10 minutes. Do not share this code.', $billingTenant->id);
+
+        return redirect()->route('portal.verify')->with('success', 'A new code has been sent.');
+    }
+
+    public function showSelectTenancy()
+    {
+        $candidateIds = session('portal_tenant_candidates');
+
+        if (!$candidateIds) {
+            return redirect()->route('portal.login');
+        }
+
+        $tenants = Tenant::with(['activeLease.unit.property.account'])
+            ->whereIn('id', $candidateIds)
+            ->whereHas('leases', fn($q) => $q->where('status', 'active'))
+            ->get();
+
+        if ($tenants->isEmpty()) {
+            session()->forget(['portal_tenant_candidates', 'portal_remember_device']);
+            return redirect()->route('portal.login');
+        }
+
+        return view('portal.auth.select-tenancy', compact('tenants'));
+    }
+
+    public function selectTenancy(Request $request)
+    {
+        $validated = $request->validate([
+            'tenant_id' => ['required', 'integer'],
+        ]);
+
+        $candidateIds = session('portal_tenant_candidates', []);
+
+        // Only allow picking from the exact set that matched the verified
+        // phone number — never trust the posted tenant_id blindly.
+        if (!in_array((int) $validated['tenant_id'], $candidateIds, true)) {
+            return redirect()->route('portal.login')->withErrors([
+                'phone' => 'Something went wrong. Please sign in again.',
+            ]);
+        }
+
+        $tenant = Tenant::whereHas('leases', fn($q) => $q->where('status', 'active'))
+            ->find($validated['tenant_id']);
+
+        if (!$tenant) {
+            return redirect()->route('portal.login')->withErrors([
+                'phone' => 'That tenancy is no longer active. Please contact your landlord.',
+            ]);
+        }
+
+        $rememberDevice = session('portal_remember_device', false);
+        session()->forget(['portal_tenant_candidates', 'portal_remember_device']);
+
+        return $this->finalizeLogin($tenant, $request, $rememberDevice);
+    }
+
+    public function logout(Request $request)
+    {
+        session()->forget(['portal_tenant_id', 'portal_login_phone', 'portal_tenant_candidates', 'portal_remember_device']);
+
+        return redirect()->route('portal.login')
+            ->withCookie(cookie()->forget('nyumba_tenant_device'));
+    }
+
+    private function finalizeLogin(Tenant $tenant, Request $request, bool $rememberDevice)
+    {
+        session(['portal_tenant_id' => $tenant->id]);
 
         $response = redirect()->route('portal.dashboard');
 
-        if ($request->boolean('remember_device')) {
+        if ($rememberDevice) {
             $token     = Str::random(64);
             $tokenHash = Hash::make($token);
 
@@ -163,12 +288,17 @@ class AuthController extends Controller
         return $response;
     }
 
-    public function logout(Request $request)
+    /**
+     * All tenants (across every landlord account) with an active lease whose
+     * phone number matches. Normally this is one, but the same phone can
+     * legitimately be an active tenant under more than one landlord.
+     */
+    private function findTenantsByPhone(string $normalized)
     {
-        session()->forget(['portal_tenant_id', 'portal_login_phone']);
-
-        return redirect()->route('portal.login')
-            ->withCookie(cookie()->forget('nyumba_tenant_device'));
+        return Tenant::whereHas('leases', fn($q) => $q->where('status', 'active'))
+            ->get()
+            ->filter(fn($t) => $this->normalizePhone($t->phone) === $normalized)
+            ->values();
     }
 
     private function normalizePhone(string $phone): string
