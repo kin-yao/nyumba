@@ -23,6 +23,7 @@ Route::get('/health', function () {
 
 // ─── Tenant Portal — separate auth from the landlord/staff app ───────────────
 Route::prefix('portal')->name('portal.')->group(function () {
+    Route::get('/', fn() => redirect()->route('portal.login'));
     Route::get('/login', [App\Http\Controllers\Portal\AuthController::class, 'showLogin'])->name('login');
     Route::post('/login', [App\Http\Controllers\Portal\AuthController::class, 'sendOtp'])->name('login.send');
     Route::get('/verify', [App\Http\Controllers\Portal\AuthController::class, 'showVerify'])->name('verify');
