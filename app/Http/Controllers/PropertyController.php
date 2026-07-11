@@ -14,7 +14,8 @@ class PropertyController extends Controller
 {
     public function index()
     {
-        $properties = Property::withCount('units')
+        $properties = Property::whereIn('id', $this->filteredPropertyIds())
+            ->withCount('units')
             ->withCount(['units as occupied_units_count' => function ($query) {
                 $query->where('status', 'occupied');
             }])
@@ -71,6 +72,8 @@ class PropertyController extends Controller
 
     public function show(Property $property)
     {
+        abort_unless(in_array($property->id, $this->filteredPropertyIds()), 403);
+
         $property->load(['units.activeLease.tenant']);
 
         $units         = $property->units;
@@ -99,6 +102,8 @@ class PropertyController extends Controller
 
     public function update(Request $request, Property $property)
     {
+        abort_unless(in_array($property->id, $this->filteredPropertyIds()), 403);
+
         $validated = $request->validate([
             'name'            => ['required', 'string', 'max:255'],
             'type'            => ['required', 'in:residential,commercial,mixed'],
@@ -138,6 +143,8 @@ class PropertyController extends Controller
 
     public function updateInvoiceSchedule(Request $request, Property $property)
     {
+        abort_unless(in_array($property->id, $this->filteredPropertyIds()), 403);
+
         $validated = $request->validate([
             'auto_invoice_enabled' => ['nullable', 'boolean'],
             'invoice_send_day'     => ['required', 'integer', 'min:1', 'max:28'],
@@ -163,6 +170,8 @@ class PropertyController extends Controller
 
     public function destroy(Request $request, Property $property)
     {
+        abort_unless(in_array($property->id, $this->filteredPropertyIds()), 403);
+
         $request->validate([
             'confirmation' => ['required', 'string'],
         ]);

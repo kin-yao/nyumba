@@ -11,6 +11,8 @@ class UnitController extends Controller
 {
     public function store(Request $request, Property $property)
     {
+        abort_unless(in_array($property->id, $this->filteredPropertyIds()), 403);
+
         $validated = $request->validate([
             'name'           => ['required', 'string', 'max:100'],
             'type'           => ['required', 'string', 'max:100'],

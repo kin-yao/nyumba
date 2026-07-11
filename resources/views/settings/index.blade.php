@@ -236,7 +236,7 @@
             <div id="panel-users" class="sp" style="display:{{ $openPanel === 'users' ? 'block' : 'none' }}">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,0.07);flex-wrap:wrap;gap:8px">
                     <div style="font-size:15px;font-weight:500">Users and Roles</div>
-                    <button onclick="document.getElementById('invite-modal').style.display='flex'"
+                    <button onclick="document.getElementById('invite-modal').style.display='flex';toggleInviteProperties()"
                             style="padding:6px 14px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
                         + Add user
                     </button>
@@ -294,11 +294,23 @@
                                         <span style="display:inline-flex;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;background:{{ $roleBadge[0] }};color:{{ $roleBadge[1] }}">
                                             {{ $roleBadge[2] }}
                                         </span>
+                                        @if(!$user->isOwner())
+                                            <div style="font-size:11px;color:#8a8880;margin-top:3px">
+                                                {{ $user->assignedProperties->count() }} {{ Str::plural('property', $user->assignedProperties->count()) }}
+                                            </div>
+                                        @endif
                                     </td>
-                                    <td style="padding:11px 14px;text-align:right">
+                                    <td style="padding:11px 14px;text-align:right;white-space:nowrap">
+                                        @if(!$user->isOwner())
+                                            <button type="button"
+                                                    onclick="openPropertiesModal({{ $user->id }}, '{{ addslashes($user->name) }}', {{ $user->assignedProperties->pluck('id')->toJson() }})"
+                                                    style="display:inline-flex;align-items:center;padding:4px 10px;background:transparent;color:#1a6b52;border:1px solid rgba(26,107,82,0.2);border-radius:6px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;margin-right:6px">
+                                                Manage properties
+                                            </button>
+                                        @endif
                                         @if($user->id!==auth()->id())
                                             <form method="POST" action="{{ route('settings.users.remove',$user) }}"
-                                                  onsubmit="return confirm('Remove {{ $user->name }}?')">
+                                                  onsubmit="return confirm('Remove {{ $user->name }}?')" style="display:inline">
                                                 @csrf @method('DELETE')
                                                 <button type="submit" style="display:inline-flex;align-items:center;padding:4px 10px;background:transparent;color:#b91c1c;border:1px solid rgba(185,28,28,0.2);border-radius:6px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">
                                                     Remove
@@ -504,12 +516,31 @@
                 </div>
                 <div>
                     <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Role</label>
-                    <select name="role" required style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                    <select name="role" id="invite-role" required onchange="toggleInviteProperties()" style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
                         <option value="owner" {{ old('role')==='owner'?'selected':'' }}>Owner — full access</option>
                         <option value="manager" {{ old('role')==='manager'?'selected':'' }}>Manager — no settings</option>
                         <option value="caretaker" {{ old('role')==='caretaker'?'selected':'' }}>Caretaker — properties only</option>
                     </select>
                 </div>
+            </div>
+
+            <div id="invite-properties" style="display:{{ in_array(old('role'), ['manager','caretaker']) ? 'block' : 'none' }};margin-bottom:16px">
+                <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px">Assign to properties</label>
+                @if($properties->isEmpty())
+                    <div style="font-size:12px;color:#8a8880">Add a property first to assign one.</div>
+                @else
+                    <div style="display:grid;gap:6px;max-height:160px;overflow-y:auto;border:1px solid rgba(0,0,0,0.08);border-radius:7px;padding:10px">
+                        @foreach($properties as $property)
+                            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+                                <input type="checkbox" name="property_ids[]" value="{{ $property->id }}"
+                                       {{ in_array($property->id, old('property_ids', [])) ? 'checked' : '' }}
+                                       style="width:15px;height:15px;accent-color:#1a6b52">
+                                {{ $property->name }}
+                            </label>
+                        @endforeach
+                    </div>
+                @endif
+                <div style="font-size:11px;color:#8a8880;margin-top:6px">They'll only see the properties checked here. Leave unchecked and add access later from the Users list.</div>
             </div>
             <div style="background:#f5f4f0;border-radius:7px;padding:10px 12px;font-size:12px;color:#8a8880;margin-bottom:16px">
                 Temporary password: <strong>password123</strong>
@@ -519,6 +550,43 @@
                     Add user
                 </button>
                 <button type="button" onclick="document.getElementById('invite-modal').style.display='none'"
+                        style="padding:7px 15px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Manage Properties Modal --}}
+<div id="properties-modal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:50;align-items:center;justify-content:center;padding:16px">
+    <div class="modal-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.07)">
+            <div style="font-size:15px;font-weight:500">Properties for <span id="properties-modal-name"></span></div>
+            <button onclick="document.getElementById('properties-modal').style.display='none'"
+                    style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;line-height:1">&times;</button>
+        </div>
+        <form method="POST" id="properties-modal-form">
+            @csrf
+            @if($properties->isEmpty())
+                <div style="font-size:13px;color:#8a8880;margin-bottom:16px">No properties yet — add one first.</div>
+            @else
+                <div style="display:grid;gap:6px;max-height:280px;overflow-y:auto;border:1px solid rgba(0,0,0,0.08);border-radius:7px;padding:10px;margin-bottom:16px">
+                    @foreach($properties as $property)
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+                            <input type="checkbox" name="property_ids[]" value="{{ $property->id }}" class="properties-modal-checkbox"
+                                   style="width:15px;height:15px;accent-color:#1a6b52">
+                            {{ $property->name }}
+                        </label>
+                    @endforeach
+                </div>
+            @endif
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="submit" style="padding:7px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                    Save access
+                </button>
+                <button type="button" onclick="document.getElementById('properties-modal').style.display='none'"
                         style="padding:7px 15px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
                     Cancel
                 </button>
@@ -618,6 +686,20 @@
 </div>
 
 <script>
+function toggleInviteProperties() {
+    var role = document.getElementById('invite-role').value;
+    document.getElementById('invite-properties').style.display = (role === 'manager' || role === 'caretaker') ? 'block' : 'none';
+}
+
+function openPropertiesModal(userId, userName, assignedIds) {
+    document.getElementById('properties-modal-name').textContent = userName;
+    document.getElementById('properties-modal-form').action = '/settings/users/' + userId + '/properties';
+    document.querySelectorAll('.properties-modal-checkbox').forEach(function (cb) {
+        cb.checked = assignedIds.includes(parseInt(cb.value, 10));
+    });
+    document.getElementById('properties-modal').style.display = 'flex';
+}
+
 function showPanel(id, el) {
     document.querySelectorAll('.sp').forEach(p => p.style.display = 'none');
     document.getElementById('panel-' + id).style.display = 'block';

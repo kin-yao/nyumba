@@ -49,4 +49,11 @@ return [
         'env'            => env('MPESA_ENV', 'sandbox'), // or 'production'
     ],
 
+    'firebase' => [
+        // Firebase Web API keys are public by design (same one used
+        // client-side on the login page) — used server-side only to verify
+        // a "current password" via the Identity Toolkit REST API.
+        'web_api_key' => env('FIREBASE_WEB_API_KEY', 'AIzaSyCwVY3ZvJajNwF6KFOsENqnmwHUHjCUZ6U'),
+    ],
+
 ];

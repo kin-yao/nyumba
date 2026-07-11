@@ -52,6 +52,11 @@ class Property extends Model
         return $this->belongsTo(Account::class);
     }
 
+    public function assignedUsers()
+    {
+        return $this->belongsToMany(User::class, 'property_user');
+    }
+
     public function utilityRates()
     {
         return $this->hasMany(UtilityRate::class);

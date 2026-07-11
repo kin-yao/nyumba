@@ -156,11 +156,11 @@
                     ->unread()->count()
             );
 
-            $allProperties = $account ? cache()->remember(
-                'props_list_' . $authUser->account_id, 300,
-                fn() => \App\Models\Property::where('account_id', $authUser->account_id)
+            $allProperties = $account
+                ? \App\Models\Property::where('account_id', $authUser->account_id)
+                    ->whereIn('id', $authUser->accessiblePropertyIds())
                     ->orderBy('name')->get()
-            ) : collect();
+                : collect();
 
             $filterPropertyId = session('filter_property_id');
             $filterProperty   = $filterPropertyId ? $allProperties->firstWhere('id', $filterPropertyId) : null;

@@ -13,10 +13,11 @@ class SettingsController extends Controller
 {
     public function index()
     {
-        $account = auth()->user()->account;
-        $users   = User::where('account_id', $account->id)->get();
+        $account   = auth()->user()->account;
+        $users     = User::where('account_id', $account->id)->with('assignedProperties')->get();
+        $properties = \App\Models\Property::where('account_id', $account->id)->orderBy('name')->get();
 
-        return view('settings.index', compact('account', 'users'));
+        return view('settings.index', compact('account', 'users', 'properties'));
     }
 
     public function updateAccount(Request $request)
@@ -93,17 +94,31 @@ class SettingsController extends Controller
             'password'         => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 
-        if (!Hash::check($validated['current_password'], auth()->user()->password)) {
+        $user = auth()->user();
+
+        if (!$user->firebase_uid) {
+            return back()->withErrors(['current_password' => 'Password changes are not available for this account. Please contact support.']);
+        }
+
+        $firebase = app(\App\Services\FirebaseService::class);
+
+        if (!$firebase->verifyPassword($user->email, $validated['current_password'])) {
             return back()->withErrors(['current_password' => 'Current password is incorrect.']);
         }
 
-        auth()->user()->update([
+        if (!$firebase->changeUserPassword($user->firebase_uid, $validated['password'])) {
+            return back()->withErrors(['current_password' => 'Could not update your password. Please try again.']);
+        }
+
+        // Keep the local hash in sync too, though Firebase is what actually
+        // gates login.
+        $user->update([
             'password' => Hash::make($validated['password']),
         ]);
 
         AuditService::log(
             'settings.password_changed',
-            'Password changed by ' . auth()->user()->name,
+            'Password changed by ' . $user->name,
             null
         );
 
@@ -114,10 +129,12 @@ class SettingsController extends Controller
     public function inviteUser(Request $request)
     {
         $validated = $request->validate([
-            'name'  => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'unique:users,email'],
-            'phone' => ['required', 'string', 'max:20'],
-            'role'  => ['required', 'in:owner,manager,caretaker'],
+            'name'          => ['required', 'string', 'max:255'],
+            'email'         => ['required', 'email', 'unique:users,email'],
+            'phone'         => ['required', 'string', 'max:20'],
+            'role'          => ['required', 'in:owner,manager,caretaker'],
+            'property_ids'   => ['nullable', 'array'],
+            'property_ids.*' => ['integer', 'exists:properties,id'],
         ]);
 
         $tempPassword = 'password123';
@@ -145,15 +162,56 @@ class SettingsController extends Controller
             'email_verified_at'  => now(),
         ]);
 
+        $assignedProperties = [];
+        if (in_array($validated['role'], ['manager', 'caretaker']) && !empty($validated['property_ids'])) {
+            $properties = \App\Models\Property::where('account_id', auth()->user()->account_id)
+                ->whereIn('id', $validated['property_ids'])
+                ->pluck('id');
+            $user->assignedProperties()->sync($properties);
+            $assignedProperties = $properties->all();
+        }
+
         AuditService::log(
             'user.invited',
-            'User ' . $validated['name'] . ' (' . $validated['email'] . ') added with role: ' . $validated['role'],
+            'User ' . $validated['name'] . ' (' . $validated['email'] . ') added with role: ' . $validated['role']
+                . (!empty($assignedProperties) ? ', assigned to ' . count($assignedProperties) . ' ' . \Illuminate\Support\Str::plural('property', count($assignedProperties)) : ''),
             $user,
-            ['email' => $validated['email'], 'role' => $validated['role']]
+            ['email' => $validated['email'], 'role' => $validated['role'], 'property_ids' => $assignedProperties]
         );
 
         return redirect()->route('settings.index')
             ->with('success', $validated['name'] . ' has been added. They can sign in with email ' . $validated['email'] . ' and temporary password: ' . $tempPassword)
+            ->with('_panel', 'users');
+    }
+
+    public function updateUserProperties(Request $request, User $user)
+    {
+        abort_unless($user->account_id === auth()->user()->account_id, 403);
+
+        if ($user->isOwner()) {
+            return back()->with('error', 'Owners always have access to every property.')->with('_panel', 'users');
+        }
+
+        $validated = $request->validate([
+            'property_ids'   => ['nullable', 'array'],
+            'property_ids.*' => ['integer', 'exists:properties,id'],
+        ]);
+
+        $properties = \App\Models\Property::where('account_id', auth()->user()->account_id)
+            ->whereIn('id', $validated['property_ids'] ?? [])
+            ->pluck('id');
+
+        $user->assignedProperties()->sync($properties);
+
+        AuditService::log(
+            'user.properties_updated',
+            'Property access updated for ' . $user->name . ' — now assigned to ' . $properties->count() . ' ' . \Illuminate\Support\Str::plural('property', $properties->count()),
+            $user,
+            ['property_ids' => $properties->all()]
+        );
+
+        return redirect()->route('settings.index')
+            ->with('success', 'Property access updated for ' . $user->name . '.')
             ->with('_panel', 'users');
     }
 

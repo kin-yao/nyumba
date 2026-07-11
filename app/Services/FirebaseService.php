@@ -87,4 +87,51 @@ class FirebaseService
             return false;
         }
     }
+
+    /**
+     * Verify an email/password pair against Firebase itself. The Admin SDK
+     * cannot check a password directly, so this calls the Identity Toolkit
+     * REST API (the same one the client SDK uses) with the project's public
+     * Web API key. Used to confirm "current password" before a change.
+     */
+    public function verifyPassword(string $email, string $password): bool
+    {
+        $apiKey = config('services.firebase.web_api_key');
+
+        if (!$apiKey) {
+            \Log::error('Firebase web_api_key is not configured — cannot verify current password.');
+            return false;
+        }
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::post(
+                'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=' . $apiKey,
+                [
+                    'email'             => $email,
+                    'password'          => $password,
+                    'returnSecureToken' => false,
+                ]
+            );
+
+            return $response->successful();
+        } catch (\Exception $e) {
+            \Log::error('Firebase verifyPassword failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Change a Firebase user's real login password via the Admin SDK.
+     * This is the password actually checked by signInWithEmailAndPassword.
+     */
+    public function changeUserPassword(string $uid, string $newPassword): bool
+    {
+        try {
+            $this->auth->updateUser($uid, ['password' => $newPassword]);
+            return true;
+        } catch (\Exception $e) {
+            \Log::error('Firebase changeUserPassword failed for uid ' . $uid . ': ' . $e->getMessage());
+            return false;
+        }
+    }
 }

@@ -143,10 +143,10 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
         if ($propertyId === 'all' || !$propertyId) {
             session()->forget('filter_property_id');
         } else {
-            $property = \App\Models\Property::where('id', $propertyId)
-                ->where('account_id', auth()->user()->account_id)
-                ->first();
-            if ($property) session(['filter_property_id' => $propertyId]);
+            $accessible = auth()->user()->accessiblePropertyIds();
+            if (in_array((int) $propertyId, $accessible, true)) {
+                session(['filter_property_id' => $propertyId]);
+            }
         }
         return redirect()->back();
     })->name('filter.property');
@@ -243,6 +243,7 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
     Route::post('/settings/mpesa', [SettingsController::class, 'updateMpesa'])->name('settings.mpesa');
     Route::post('/settings/password', [SettingsController::class, 'updatePassword'])->name('settings.password');
     Route::post('/settings/users', [SettingsController::class, 'inviteUser'])->name('settings.users.invite');
+    Route::post('/settings/users/{user}/properties', [SettingsController::class, 'updateUserProperties'])->name('settings.users.properties');
     Route::delete('/settings/users/{user}', [SettingsController::class, 'removeUser'])->name('settings.users.remove');
     Route::post('/settings/reset-account', [SettingsController::class, 'resetAccount'])->name('settings.reset-account');
 

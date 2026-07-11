@@ -19,6 +19,10 @@ abstract class Controller
         $propertyId = session('filter_property_id');
         if (!$propertyId) return null;
 
+        if (!in_array((int) $propertyId, auth()->user()->accessiblePropertyIds(), true)) {
+            return null;
+        }
+
         return Property::where('id', $propertyId)
             ->where('account_id', auth()->user()->account_id)
             ->first();
@@ -30,13 +34,12 @@ abstract class Controller
             return $this->cachedPropertyIds;
         }
 
+        $accessible = auth()->user()->accessiblePropertyIds();
         $propertyId = session('filter_property_id');
 
-        $this->cachedPropertyIds = $propertyId
-            ? [$propertyId]
-            : Property::where('account_id', auth()->user()->account_id)
-                ->pluck('id')
-                ->toArray();
+        $this->cachedPropertyIds = ($propertyId && in_array((int) $propertyId, $accessible, true))
+            ? [(int) $propertyId]
+            : $accessible;
 
         return $this->cachedPropertyIds;
     }
