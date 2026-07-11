@@ -235,6 +235,7 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
     Route::get('/communications', [CommunicationController::class, 'index'])->name('communications.index');
     Route::post('/communications/send', [CommunicationController::class, 'send'])->name('communications.send');
     Route::post('/communications/templates', [CommunicationController::class, 'storeTemplate'])->name('communications.templates.store');
+    Route::put('/communications/templates/{messageTemplate}', [CommunicationController::class, 'updateTemplate'])->name('communications.templates.update');
     Route::delete('/communications/templates/{messageTemplate}', [CommunicationController::class, 'destroyTemplate'])->name('communications.templates.destroy');
 
     // Settings

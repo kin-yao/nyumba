@@ -20,6 +20,23 @@ class CommunicationController extends Controller
 
         $templates = MessageTemplate::latest()->get();
 
+        if ($templates->isEmpty()) {
+            $accountId = auth()->user()->account_id;
+            $now       = now();
+
+            $rows = array_map(function ($template) use ($accountId, $now) {
+                return $template + [
+                    'account_id' => $accountId,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }, MessageTemplate::defaults());
+
+            MessageTemplate::insert($rows);
+
+            $templates = MessageTemplate::latest()->get();
+        }
+
         $tenants = Tenant::with('activeLease.unit.property')
             ->whereHas('activeLease', fn($q) => $q->whereIn('unit_id', $unitIds))
             ->get();
@@ -168,9 +185,10 @@ class CommunicationController extends Controller
     public function storeTemplate(Request $request)
     {
         $validated = $request->validate([
-            'name'    => ['required', 'string', 'max:100'],
-            'channel' => ['required', 'in:sms,whatsapp,both'],
-            'body'    => ['required', 'string'],
+            'name'     => ['required', 'string', 'max:100'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'channel'  => ['required', 'in:sms,whatsapp,both'],
+            'body'     => ['required', 'string'],
         ]);
 
         $validated['account_id'] = auth()->user()->account_id;
@@ -186,6 +204,29 @@ class CommunicationController extends Controller
 
         return redirect()->route('communications.index')
             ->with('success', 'Template saved.');
+    }
+
+    public function updateTemplate(Request $request, MessageTemplate $messageTemplate)
+    {
+        $validated = $request->validate([
+            'name'     => ['required', 'string', 'max:100'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'channel'  => ['required', 'in:sms,whatsapp,both'],
+            'body'     => ['required', 'string'],
+        ]);
+
+        $messageTemplate->update($validated);
+
+        AuditService::log(
+            'sms.template_updated',
+            'SMS template "' . $validated['name'] . '" updated',
+            $messageTemplate,
+            ['name' => $validated['name'], 'channel' => $validated['channel']]
+        );
+
+        return redirect()->route('communications.index')
+            ->with('success', 'Template updated.')
+            ->with('_panel', 'templates');
     }
 
     public function destroyTemplate(MessageTemplate $messageTemplate)

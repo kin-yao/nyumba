@@ -118,8 +118,12 @@
                         <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Use template</label>
                         <select onchange="loadTemplate(this)" style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
                             <option value="">Select a template (optional)</option>
-                            @foreach($templates as $template)
-                                <option value="{{ $template->body }}">{{ $template->name }}</option>
+                            @foreach($templates->groupBy(fn($t) => $t->category ?: 'Other') as $category => $group)
+                                <optgroup label="{{ $category }}">
+                                    @foreach($group as $template)
+                                        <option value="{{ $template->body }}">{{ $template->name }}</option>
+                                    @endforeach
+                                </optgroup>
                             @endforeach
                         </select>
                     </div>
@@ -220,33 +224,45 @@
                 No templates yet.
             </div>
         @else
-            <div style="display:grid;gap:10px;max-width:700px">
-                @foreach($templates as $template)
-                    <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:18px 20px">
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:10px;flex-wrap:wrap">
-                            <div>
-                                <div style="font-size:13px;font-weight:500">{{ $template->name }}</div>
-                                <div style="font-size:11px;color:#8a8880;margin-top:2px">{{ ucfirst($template->channel) }} &middot; {{ $template->created_at->format('d M Y') }}</div>
+            @foreach($templates->groupBy(fn($t) => $t->category ?: 'Other')->sortKeys() as $category => $group)
+                <div style="font-size:10px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#8a8880;margin:20px 0 10px">
+                    {{ $category }}
+                </div>
+                <div style="display:grid;gap:10px;max-width:700px;margin-bottom:6px">
+                    @foreach($group as $template)
+                        <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:18px 20px">
+                            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:10px;flex-wrap:wrap">
+                                <div>
+                                    <div style="font-size:13px;font-weight:500">{{ $template->name }}</div>
+                                    <div style="font-size:11px;color:#8a8880;margin-top:2px">{{ ucfirst($template->channel) }} &middot; {{ $template->created_at->format('d M Y') }}</div>
+                                </div>
+                                <div style="display:flex;gap:6px;flex-shrink:0">
+                                    <button type="button"
+                                            onclick="openEditTemplateModal({{ $template->id }}, '{{ addslashes($template->name) }}', '{{ addslashes($template->category ?? 'Other') }}', '{{ $template->channel }}', '{{ addslashes($template->body) }}')"
+                                            style="padding:4px 10px;background:transparent;color:#1a6b52;border:1px solid rgba(26,107,82,0.2);border-radius:6px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
+                                        Edit
+                                    </button>
+                                    <form method="POST" action="{{ route('communications.templates.destroy', $template) }}"
+                                          onsubmit="return confirm('Delete this template?')">
+                                        @csrf @method('DELETE')
+                                        <button type="submit" style="padding:4px 10px;background:transparent;color:#b91c1c;border:1px solid rgba(185,28,28,0.2);border-radius:6px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
+                                            Delete
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
-                            <form method="POST" action="{{ route('communications.templates.destroy', $template) }}"
-                                  onsubmit="return confirm('Delete this template?')">
-                                @csrf @method('DELETE')
-                                <button type="submit" style="padding:4px 10px;background:transparent;color:#b91c1c;border:1px solid rgba(185,28,28,0.2);border-radius:6px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
-                                    Delete
-                                </button>
-                            </form>
+                            <div style="font-size:12px;color:#8a8880;font-style:italic;background:#f5f4f0;padding:10px 12px;border-radius:7px;margin-bottom:10px">
+                                "{{ $template->body }}"
+                            </div>
+                            <button type="button"
+                                    onclick="document.getElementById('message-body').value='{{ addslashes($template->body) }}';showTab('compose',document.querySelector('.tab'));updateCharCount(document.getElementById('message-body'))"
+                                    style="padding:4px 10px;background:#e6f2ed;color:#1a6b52;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">
+                                Use this template
+                            </button>
                         </div>
-                        <div style="font-size:12px;color:#8a8880;font-style:italic;background:#f5f4f0;padding:10px 12px;border-radius:7px;margin-bottom:10px">
-                            "{{ $template->body }}"
-                        </div>
-                        <button type="button"
-                                onclick="document.getElementById('message-body').value='{{ addslashes($template->body) }}';showTab('compose',document.querySelector('.tab'));updateCharCount(document.getElementById('message-body'))"
-                                style="padding:4px 10px;background:#e6f2ed;color:#1a6b52;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif">
-                            Use this template
-                        </button>
-                    </div>
-                @endforeach
-            </div>
+                    @endforeach
+                </div>
+            @endforeach
         @endif
     </div>
 
@@ -312,6 +328,16 @@
                            style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
                 </div>
                 <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Category</label>
+                    <select name="category" style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                        <option value="Rent & Payments">Rent & Payments</option>
+                        <option value="Lease & Tenancy">Lease & Tenancy</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Announcements">Announcements</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
                     <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Channel</label>
                     <select name="channel" required style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
                         <option value="sms">SMS</option>
@@ -330,6 +356,61 @@
                     Save template
                 </button>
                 <button type="button" onclick="document.getElementById('template-modal').style.display='none'"
+                        style="padding:7px 15px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Edit Template Modal --}}
+<div id="edit-template-modal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:50;align-items:center;justify-content:center;padding:16px">
+    <div class="modal-inner">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,0.07)">
+            <div style="font-size:15px;font-weight:500">Edit template</div>
+            <button onclick="document.getElementById('edit-template-modal').style.display='none'"
+                    style="background:none;border:none;font-size:22px;cursor:pointer;color:#8a8880;line-height:1">&times;</button>
+        </div>
+        <form method="POST" id="edit-template-form">
+            @csrf
+            @method('PUT')
+            <div style="display:grid;gap:13px;margin-bottom:18px">
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Template name</label>
+                    <input name="name" id="edit-template-name" type="text" required
+                           style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                </div>
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Category</label>
+                    <select name="category" id="edit-template-category" style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                        <option value="Rent & Payments">Rent & Payments</option>
+                        <option value="Lease & Tenancy">Lease & Tenancy</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Announcements">Announcements</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Channel</label>
+                    <select name="channel" id="edit-template-channel" required style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
+                        <option value="sms">SMS</option>
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="both">Both</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Message body</label>
+                    <textarea name="body" id="edit-template-body" required rows="4" placeholder="Use {first_name}, {balance}, {unit_number} as placeholders"
+                              style="width:100%;padding:9px 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;resize:vertical"></textarea>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="submit" style="padding:7px 15px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                    Save changes
+                </button>
+                <button type="button" onclick="document.getElementById('edit-template-modal').style.display='none'"
                         style="padding:7px 15px;background:transparent;color:#8a8880;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">
                     Cancel
                 </button>
@@ -373,5 +454,20 @@ function updateCharCount(ta) {
     var el = document.getElementById('char-count');
     if (el) el.textContent = ta.value.length + ' / 160';
 }
+
+function openEditTemplateModal(id, name, category, channel, body) {
+    document.getElementById('edit-template-form').action = '/communications/templates/' + id;
+    document.getElementById('edit-template-name').value = name;
+    document.getElementById('edit-template-category').value = category;
+    document.getElementById('edit-template-channel').value = channel;
+    document.getElementById('edit-template-body').value = body;
+    document.getElementById('edit-template-modal').style.display = 'flex';
+}
+
+@if(session('_panel') === 'templates')
+    document.addEventListener('DOMContentLoaded', function () {
+        showTab('templates', document.querySelectorAll('.tab')[1]);
+    });
+@endif
 </script>
 </x-layouts.app>
