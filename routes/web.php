@@ -50,6 +50,9 @@ Route::get('/', function () {
 });
 
 // ─── Public ────────────────────────────────────────────────────────────────────
+Route::get('/terms', fn() => view('legal.terms'))->name('terms');
+Route::get('/privacy', fn() => view('legal.privacy'))->name('privacy');
+
 Route::get('/invoices/{invoice}/download', [InvoiceController::class, 'publicPdf'])
     ->name('invoices.pdf.public')
     ->middleware('signed');
