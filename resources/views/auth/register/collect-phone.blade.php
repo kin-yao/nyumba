@@ -35,8 +35,6 @@
     <div class="steps">
         <div class="step done"></div>
         <div class="step active"></div>
-        <div class="step inactive"></div>
-        <div class="step inactive"></div>
     </div>
 
     <h1>Add your phone number</h1>

@@ -55,8 +55,11 @@ input:focus{border-color:#1a6b52}
             <label>Password</label>
             <a href="{{ route('password.request') }}" class="forgot">Forgot password?</a>
         </div>
-        <input type="password" id="e-pass" placeholder="••••••••"
-               onkeydown="if(event.key==='Enter')signInEmail()">
+        <div style="position:relative">
+            <input type="password" id="e-pass" placeholder="••••••••" style="padding-right:44px"
+                   onkeydown="if(event.key==='Enter')signInEmail()">
+            <button type="button" onclick="togglePw('e-pass',this)" style="position:absolute;right:2px;top:2px;bottom:2px;width:38px;background:none;border:none;cursor:pointer;color:#8a8880;display:flex;align-items:center;justify-content:center" aria-label="Show password"><i class="fa-regular fa-eye"></i></button>
+        </div>
     </div>
 
     <button class="btn" id="btn-email" onclick="signInEmail()">Sign in</button>
@@ -135,6 +138,14 @@ function fe(code){
     return 'Something went wrong. Please try again, or contact support if it continues.';
 }
 function csrf(){ return document.querySelector('meta[name="csrf-token"]').content; }
+window.togglePw = function(id, btn) {
+    const input = document.getElementById(id);
+    const icon  = btn.querySelector('i');
+    const show  = input.type === 'password';
+    input.type  = show ? 'text' : 'password';
+    icon.className = show ? 'fa-solid fa-eye-slash' : 'fa-regular fa-eye';
+    btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+};
 
 function showErr(m){
     const e=document.getElementById('err-box');

@@ -91,8 +91,6 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <div class="steps">
         <div class="step done"></div>
         <div class="step active"></div>
-        <div class="step inactive"></div>
-        <div class="step inactive"></div>
     </div>
 
     <h1>Check your inbox</h1>

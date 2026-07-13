@@ -14,6 +14,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     <title>Create account — Nyumba</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
         body{font-family:'DM Sans',sans-serif;background:#f5f4f0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
@@ -94,18 +95,22 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <div class="steps">
         <div class="step active"></div>
         <div class="step inactive"></div>
-        <div class="step inactive"></div>
-        <div class="step inactive"></div>
     </div>
     <h1>Create your account</h1>
-    <p class="sub">Step 1 of 4</p>
 
     <div id="err-box" class="err"></div>
 
-    <div class="field">
-        <label>Full name</label>
-        <input type="text" id="name" placeholder="John Kamau" autofocus>
-        <div class="field-err" id="e-name"></div>
+    <div class="field" style="display:flex;gap:10px">
+        <div style="flex:1">
+            <label>First name</label>
+            <input type="text" id="first_name" placeholder="John" autofocus>
+            <div class="field-err" id="e-first_name"></div>
+        </div>
+        <div style="flex:1">
+            <label>Last name</label>
+            <input type="text" id="last_name" placeholder="Kamau">
+            <div class="field-err" id="e-last_name"></div>
+        </div>
     </div>
     <div class="field">
         <label>Email address</label>
@@ -119,14 +124,31 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </div>
     <div class="field">
         <label>Password</label>
-        <input type="password" id="password" placeholder="Min 8 characters">
+        <div style="position:relative">
+            <input type="password" id="password" placeholder="Min 8 characters" style="padding-right:44px">
+            <button type="button" onclick="togglePw('password',this)" style="position:absolute;right:2px;top:2px;bottom:2px;width:38px;background:none;border:none;cursor:pointer;color:#8a8880;display:flex;align-items:center;justify-content:center" aria-label="Show password"><i class="fa-regular fa-eye"></i></button>
+        </div>
         <div class="field-err" id="e-password"></div>
     </div>
     <div class="field">
         <label>Confirm password</label>
-        <input type="password" id="confirm" placeholder="Repeat password">
+        <div style="position:relative">
+            <input type="password" id="confirm" placeholder="Repeat password" style="padding-right:44px">
+            <button type="button" onclick="togglePw('confirm',this)" style="position:absolute;right:2px;top:2px;bottom:2px;width:38px;background:none;border:none;cursor:pointer;color:#8a8880;display:flex;align-items:center;justify-content:center" aria-label="Show password"><i class="fa-regular fa-eye"></i></button>
+        </div>
         <div class="field-err" id="e-confirm"></div>
     </div>
+
+    <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;margin:14px 0;font-size:12px;color:#6b6a63;line-height:1.5">
+        <input type="checkbox" id="accept_terms" style="width:15px;height:15px;margin-top:1px;accent-color:#1a6b52;flex-shrink:0">
+        <span>
+            I agree to Nyumba's
+            <a href="{{ route('terms') }}" target="_blank" style="color:#1a6b52;font-weight:500">Terms of Service</a>
+            and
+            <a href="{{ route('privacy') }}" target="_blank" style="color:#1a6b52;font-weight:500">Privacy Policy</a>.
+        </span>
+    </label>
+    <div class="field-err" id="e-accept_terms" style="margin-bottom:8px"></div>
 
     <button class="btn" id="btn-create" onclick="createAccount()">Create account</button>
 
@@ -195,8 +217,16 @@ function fe(code){
     return 'Something went wrong. Please try again, or contact support if it continues.';
 }
 function csrf(){return document.querySelector('meta[name="csrf-token"]').content;}
+window.togglePw = function(id, btn) {
+    const input = document.getElementById(id);
+    const icon  = btn.querySelector('i');
+    const show  = input.type === 'password';
+    input.type  = show ? 'text' : 'password';
+    icon.className = show ? 'fa-solid fa-eye-slash' : 'fa-regular fa-eye';
+    btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+};
 function showErr(m){const e=document.getElementById('err-box');e.textContent=m;e.style.display='block';}
-function clearErr(){document.getElementById('err-box').style.display='none';['name','email','phone','password','confirm'].forEach(f=>{document.getElementById('e-'+f).textContent=''});}
+function clearErr(){document.getElementById('err-box').style.display='none';['first_name','last_name','email','phone','password','confirm','accept_terms'].forEach(f=>{document.getElementById('e-'+f).textContent=''});}
 
 async function callVerify(token,provider,intent,extra={}){
     let r;
@@ -219,17 +249,21 @@ const googleIconHtml = `<svg width="16" height="16" viewBox="0 0 18 18" fill="no
 
 window.createAccount = async function() {
     clearErr();
-    const name=document.getElementById('name').value.trim();
+    const firstName=document.getElementById('first_name').value.trim();
+    const lastName=document.getElementById('last_name').value.trim();
     const email=document.getElementById('email').value.trim();
     const phone=document.getElementById('phone').value.trim();
     const pass=document.getElementById('password').value;
     const confirm=document.getElementById('confirm').value;
+    const acceptTerms=document.getElementById('accept_terms').checked;
     let ok=true;
-    if(!name){document.getElementById('e-name').textContent='Required';ok=false;}
+    if(!firstName){document.getElementById('e-first_name').textContent='Required';ok=false;}
+    if(!lastName){document.getElementById('e-last_name').textContent='Required';ok=false;}
     if(!email){document.getElementById('e-email').textContent='Required';ok=false;}
     if(!phone){document.getElementById('e-phone').textContent='Required';ok=false;}
     if(!pass){document.getElementById('e-password').textContent='Required';ok=false;}
     if(pass!==confirm){document.getElementById('e-confirm').textContent='Passwords do not match';ok=false;}
+    if(!acceptTerms){document.getElementById('e-accept_terms').textContent='Please accept the Terms of Service and Privacy Policy';ok=false;}
     if(!ok)return;
 
     const btn=document.getElementById('btn-create');
@@ -239,7 +273,7 @@ window.createAccount = async function() {
         const cred=await createUserWithEmailAndPassword(auth,email,pass);
         await sendEmailVerification(cred.user,{url:CONTINUE_URL});
         const token=await cred.user.getIdToken();
-        const d=await callVerify(token,'email','register',{name,phone});
+        const d=await callVerify(token,'email','register',{first_name:firstName,last_name:lastName,phone,accept_terms:acceptTerms});
         if(d.redirect){window.location.href=d.redirect;return;}
         hideLoader();
         showErr(d.error||'Registration failed. Please try again.');
@@ -254,13 +288,16 @@ window.createAccount = async function() {
 
 window.googleSignUp = async function() {
     clearErr();
+    const acceptTerms=document.getElementById('accept_terms').checked;
+    if(!acceptTerms){document.getElementById('e-accept_terms').textContent='Please accept the Terms of Service and Privacy Policy';return;}
+
     const btn=document.getElementById('btn-google');
     btn.disabled=true; btn.textContent='Connecting...';
     showLoader('Connecting with Google...');
     try {
         const r=await signInWithPopup(auth,gp);
         const t=await r.user.getIdToken();
-        const d=await callVerify(t,'google','register');
+        const d=await callVerify(t,'google','register',{accept_terms:acceptTerms});
         if(d.redirect){window.location.href=d.redirect;return;}
         hideLoader();
         showErr(d.error||'Something went wrong.');

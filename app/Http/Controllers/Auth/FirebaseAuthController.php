@@ -19,11 +19,17 @@ class FirebaseAuthController extends Controller
     public function verify(Request $request)
     {
         $request->validate([
-            'id_token' => ['required', 'string'],
-            'provider' => ['required', 'in:email,google,phone'],
-            'intent'   => ['required', 'in:login,register'],
-            'name'     => ['nullable', 'string', 'max:255'],
-            'phone'    => ['nullable', 'string', 'max:20'],
+            'id_token'     => ['required', 'string'],
+            'provider'     => ['required', 'in:email,google,phone'],
+            'intent'       => ['required', 'in:login,register'],
+            'name'         => ['nullable', 'string', 'max:255'],
+            'first_name'   => ['nullable', 'string', 'max:255'],
+            'last_name'    => ['nullable', 'string', 'max:255'],
+            'phone'        => ['nullable', 'string', 'max:20'],
+            'accept_terms' => ['required_if:intent,register', 'accepted_if:intent,register'],
+        ], [
+            'accept_terms.required_if' => 'Please accept the Terms of Service and Privacy Policy to continue.',
+            'accept_terms.accepted_if' => 'Please accept the Terms of Service and Privacy Policy to continue.',
         ]);
 
         $claims = $this->decodeJwtPayload($request->id_token);
@@ -36,12 +42,20 @@ class FirebaseAuthController extends Controller
         $email         = $claims['email'] ?? null;
         $phone         = $claims['phone_number'] ?? $request->phone;
         $name          = $claims['name'] ?? $request->name;
+        $firstName     = $request->first_name ?? $claims['given_name'] ?? null;
+        $lastName      = $request->last_name ?? $claims['family_name'] ?? null;
         $provider      = $request->provider;
         $intent        = $request->intent;
         $emailVerified = $claims['email_verified'] ?? false;
 
         if (!$uid) {
             return response()->json(['error' => 'Invalid token. Please try again.'], 401);
+        }
+
+        if (!$firstName && !$lastName && $name) {
+            $parts     = explode(' ', trim($name), 2);
+            $firstName = $parts[0] ?? null;
+            $lastName  = $parts[1] ?? null;
         }
 
         // ── LOGIN ──────────────────────────────────────────────────────────────
@@ -126,12 +140,17 @@ class FirebaseAuthController extends Controller
             'firebase.email'          => $email,
             'firebase.phone'          => $regPhone,
             'firebase.name'           => $name,
+            'firebase.first_name'     => $firstName,
+            'firebase.last_name'      => $lastName,
             'firebase.provider'       => $provider,
             'firebase.email_verified' => $emailVerified || in_array($provider, ['google', 'phone']),
             'reg.name'                => $name ?? '',
+            'reg.first_name'          => $firstName ?? '',
+            'reg.last_name'           => $lastName ?? '',
             'reg.email'               => $email ?? '',
             'reg.phone'               => $regPhone ?? '',
             'reg.phone_verified'      => $provider === 'phone',
+            'reg.accept_terms_at'     => now(),
         ]);
 
         if ($provider === 'google' && !$regPhone) {
@@ -148,9 +167,17 @@ class FirebaseAuthController extends Controller
             ]);
         }
 
+        // We already have identity, phone, and terms acceptance — nothing
+        // else to ask. Finish setting up the account right now.
+        $user = $this->finishRegistration($uid, $email, $regPhone, $firstName, $lastName, $provider, $emailVerified);
+
+        if (!$user) {
+            return response()->json(['error' => 'Account creation failed. Please try again.'], 500);
+        }
+
         return response()->json([
-            'status'   => 'new_user',
-            'redirect' => route('register.step3'),
+            'status'   => 'registered',
+            'redirect' => route('dashboard'),
         ]);
     }
 
@@ -210,18 +237,27 @@ class FirebaseAuthController extends Controller
             }
         }
 
-        // Case 3: Mid-registration — continue to step 3
-        session([
-            'firebase.uid'            => $uid,
-            'firebase.email'          => $email,
-            'firebase.email_verified' => true,
-            'firebase.name'           => $claims['name'] ?? session('firebase.name'),
-            'firebase.provider'       => 'email',
-            'reg.phone_verified'      => true,
-            'reg.name'                => $claims['name'] ?? session('reg.name', ''),
-            'reg.email'               => $email ?? '',
-        ]);
-        return response()->json(['redirect' => route('register.step3')]);
+        // Case 3: Mid-registration — we already have everything we need
+        // (name, phone, terms acceptance were captured at step 1).
+        $firstName = session('reg.first_name') ?: $claims['given_name'] ?? null;
+        $lastName  = session('reg.last_name') ?: $claims['family_name'] ?? null;
+        $phone     = session('reg.phone');
+
+        $user = $this->finishRegistration(
+            $uid,
+            $email,
+            $phone,
+            $firstName,
+            $lastName,
+            'email',
+            true
+        );
+
+        if (!$user) {
+            return response()->json(['error' => 'Account creation failed. Please try again.'], 500);
+        }
+
+        return response()->json(['redirect' => route('dashboard')]);
     }
 
     // ─── Phone collection for Google signup ───────────────────────────────────
@@ -252,7 +288,26 @@ class FirebaseAuthController extends Controller
             'reg.phone'      => $request->phone,
         ]);
 
-        return redirect()->route('register.step3');
+        if (!session('firebase.uid')) {
+            return redirect()->route('register.step1')
+                ->withErrors(['error' => 'Session expired. Please start again.']);
+        }
+
+        $user = $this->finishRegistration(
+            session('firebase.uid'),
+            session('firebase.email'),
+            $request->phone,
+            session('reg.first_name'),
+            session('reg.last_name'),
+            'google',
+            true
+        );
+
+        if (!$user) {
+            return back()->withErrors(['error' => 'Account creation failed. Please try again.']);
+        }
+
+        return redirect()->route('dashboard');
     }
 
     // ─── Phone collection for logged-in users ─────────────────────────────────
@@ -271,44 +326,34 @@ class FirebaseAuthController extends Controller
         return redirect()->route('dashboard')->with('success', 'Phone number saved.');
     }
 
-    // ─── Create account (called from step 4) ──────────────────────────────────
-    public function createAccount(Request $request)
-    {
-        $uid           = session('firebase.uid');
-        $email         = session('firebase.email');
-        $phone         = session('firebase.phone') ?? session('reg.phone');
-        $name          = session('firebase.name') ?? session('reg.name');
-        $provider      = session('firebase.provider');
-        $emailVerified = session('firebase.email_verified', false);
-
-        if (!$uid) {
-            return redirect()->route('register.step1')
-                ->withErrors(['error' => 'Session expired. Please start again.']);
-        }
-
-        $validated = $request->validate([
-            'unit_range' => ['required', 'string', 'in:1-5,6-20,21-50,51-100,100+'],
-        ]);
-
-        $planMap = [
-            '1-5'    => 'explore',
-            '6-20'   => 'starter',
-            '21-50'  => 'growth',
-            '51-100' => 'pro',
-            '100+'   => 'enterprise',
-        ];
+    /**
+     * Creates the Account + owner User once we have everything we need:
+     * a verified identity (uid/email), a phone number, and terms acceptance.
+     * Called directly from verify()/storePhone()/markEmailVerified() — there
+     * is no separate "finish setting up" step anymore.
+     */
+    private function finishRegistration(
+        string $uid,
+        ?string $email,
+        ?string $phone,
+        ?string $firstName,
+        ?string $lastName,
+        string $provider,
+        bool $emailVerified
+    ) {
+        $fullName = trim(($firstName ?? '') . ' ' . ($lastName ?? '')) ?: 'User';
 
         try {
+            $user = null;
+
             DB::transaction(function () use (
-                $uid, $email, $phone, $name, $provider,
-                $emailVerified, $validated, $planMap
+                $uid, $email, $phone, $fullName, $provider, $emailVerified, &$user
             ) {
                 // Always read from PLANS — never hardcode unit limits or SMS credits.
-                // If plan config changes, registration automatically reflects it.
                 $explorePlan = Account::PLANS['explore'];
 
                 $account = Account::create([
-                    'name'                 => ($name ?? 'User') . "'s Properties",
+                    'name'                 => $fullName . "'s Properties",
                     'phone'                => $phone ?? '',
                     'email'                => $email ?? '',
                     'plan'                 => 'explore',
@@ -320,9 +365,10 @@ class FirebaseAuthController extends Controller
                     // plan_expires_at = null until a paid plan is purchased via M-Pesa
                     'trial_ends_at'        => now()->addDays(30),
                     'plan_expires_at'      => null,
-                    'use_case'             => session('reg.use_case', 'own_rental'),
-                    'unit_count_range'     => $validated['unit_range'],
-                    'recommended_plan'     => $planMap[$validated['unit_range']],
+                    'use_case'             => 'own_rental',
+                    'terms_accepted_at'    => session('reg.accept_terms_at', now()),
+                    'unit_count_range'     => null,
+                    'recommended_plan'     => 'starter',
                     'currency'             => 'KES',
                 ]);
 
@@ -330,7 +376,7 @@ class FirebaseAuthController extends Controller
                     'account_id'          => $account->id,
                     'firebase_uid'        => $uid,
                     'auth_provider'       => $provider,
-                    'name'                => $name ?? 'User',
+                    'name'                => $fullName,
                     'email'               => $email ?? '',
                     'phone'               => $phone ?? '',
                     'email_verified_at'   => ($emailVerified || in_array($provider, ['google', 'phone'])) ? now() : null,
@@ -353,19 +399,19 @@ class FirebaseAuthController extends Controller
             });
         } catch (\Exception $e) {
             \Log::error('Account creation failed: ' . $e->getMessage());
-            return back()->withErrors(['error' => 'Account creation failed. Please try again.']);
+            return null;
         }
 
         session()->forget([
             'firebase.uid', 'firebase.email', 'firebase.phone',
-            'firebase.name', 'firebase.provider', 'firebase.email_verified',
-            'reg.name', 'reg.email', 'reg.phone',
-            'reg.phone_verified', 'reg.use_case',
+            'firebase.name', 'firebase.first_name', 'firebase.last_name', 'firebase.provider', 'firebase.email_verified',
+            'reg.name', 'reg.first_name', 'reg.last_name', 'reg.email', 'reg.phone',
+            'reg.phone_verified', 'reg.accept_terms_at',
         ]);
 
         session(['firebase_checked_at' => now()->timestamp]);
 
-        return redirect()->route('dashboard');
+        return $user;
     }
 
     // ─── Forgot password page ──────────────────────────────────────────────────
