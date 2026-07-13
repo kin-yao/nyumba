@@ -105,6 +105,22 @@
 </head>
 <body style="font-family:'DM Sans',sans-serif;margin:0;padding:0">
 
+{{-- Persistent refresh button — always visible, top-right --}}
+<button onclick="location.reload()" title="Refresh page" id="nyumba-refresh-btn"
+        style="position:fixed;top:14px;right:14px;z-index:9998;width:36px;height:36px;border-radius:50%;
+        background:#111110;color:#fff;border:none;cursor:pointer;display:flex;align-items:center;
+        justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25)">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 11-2.64-6.36"/>
+        <path d="M21 3v6h-6"/>
+    </svg>
+</button>
+<style>
+    @media (max-width: 768px) {
+        #nyumba-refresh-btn { top: 62px; width: 32px; height: 32px; font-size: 12px; }
+    }
+</style>
+
 {{-- Page loading indicator --}}
 <div id="nyumba-loader" style="
     display: none;
