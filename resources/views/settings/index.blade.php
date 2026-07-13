@@ -214,7 +214,7 @@
                             <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Company logo</label>
                             @if($account->logo_path)
                                 <div style="margin-bottom:8px;display:flex;align-items:center;gap:10px">
-                                    <img src="{{ asset('storage/'.$account->logo_path) }}" alt="Logo"
+                                    <img src="{{ route('settings.logo') }}" alt="Logo"
                                          style="height:48px;object-fit:contain;border-radius:6px;border:1px solid rgba(0,0,0,0.07);padding:6px;background:#fff">
                                     <span style="font-size:12px;color:#8a8880">Current logo</span>
                                 </div>

@@ -20,6 +20,22 @@ class SettingsController extends Controller
         return view('settings.index', compact('account', 'users', 'properties'));
     }
 
+    public function showLogo()
+    {
+        $account = auth()->user()->account;
+
+        if (!$account->logo_path || !\Storage::disk('r2')->exists($account->logo_path)) {
+            abort(404);
+        }
+
+        $contents = \Storage::disk('r2')->get($account->logo_path);
+        $mime     = \Storage::disk('r2')->mimeType($account->logo_path) ?? 'image/png';
+
+        return response($contents, 200)
+            ->header('Content-Type', $mime)
+            ->header('Cache-Control', 'private, max-age=3600');
+    }
+
     public function updateAccount(Request $request)
     {
         $validated = $request->validate([
@@ -34,10 +50,10 @@ class SettingsController extends Controller
         $account = auth()->user()->account;
 
         if ($request->hasFile('logo')) {
-            if ($account->logo_path && \Storage::disk('public')->exists($account->logo_path)) {
-                \Storage::disk('public')->delete($account->logo_path);
+            if ($account->logo_path && \Storage::disk('r2')->exists($account->logo_path)) {
+                \Storage::disk('r2')->delete($account->logo_path);
             }
-            $path = $request->file('logo')->store('logos', 'public');
+            $path = $request->file('logo')->store('logos', 'r2');
             $validated['logo_path'] = $path;
         }
 

@@ -312,8 +312,8 @@
     {{-- Header --}}
     <div class="header">
         <div class="header-left">
-            @if($account->logo_path)
-                <img src="{{ storage_path('app/public/' . $account->logo_path) }}"
+            @if($logoPath ?? null)
+                <img src="{{ $logoPath }}"
                      alt="{{ $account->name }}"
                      style="height:50px;object-fit:contain;margin-bottom:6px;display:block">
             @else

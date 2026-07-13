@@ -516,11 +516,18 @@ class InvoiceController extends Controller
         $amountPaid = $invoice->allocations->sum('amount');
         $amountDue  = $invoice->total_amount - $amountPaid;
         $account    = auth()->user()->account;
+        $logoPath   = $this->resolveLogoPath($account);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoices.pdf', compact('invoice', 'amountPaid', 'amountDue', 'account'));
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoices.pdf', compact('invoice', 'amountPaid', 'amountDue', 'account', 'logoPath'));
         $pdf->setPaper('a4', 'portrait');
 
-        return $pdf->download('Invoice-' . $invoice->reference . '.pdf');
+        $response = $pdf->download('Invoice-' . $invoice->reference . '.pdf');
+
+        if ($logoPath) {
+            @unlink($logoPath);
+        }
+
+        return $response;
     }
 
     public function publicPdf(Invoice $invoice)
@@ -531,10 +538,41 @@ class InvoiceController extends Controller
         $amountDue  = $invoice->total_amount - $amountPaid;
         $account    = $invoice->lease->unit->property->account
             ?? \App\Models\Account::find(\App\Models\User::where('account_id', '!=', null)->value('account_id'));
+        $logoPath   = $this->resolveLogoPath($account);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoices.pdf', compact('invoice', 'amountPaid', 'amountDue', 'account'));
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('invoices.pdf', compact('invoice', 'amountPaid', 'amountDue', 'account', 'logoPath'));
         $pdf->setPaper('a4', 'portrait');
 
-        return $pdf->download('Invoice-' . $invoice->reference . '.pdf');
+        $response = $pdf->download('Invoice-' . $invoice->reference . '.pdf');
+
+        if ($logoPath) {
+            @unlink($logoPath);
+        }
+
+        return $response;
+    }
+
+    /**
+     * Pull the account's logo from R2 into a temp local file so DomPDF can
+     * embed it — DomPDF needs a local path or remote-fetch enabled; pulling
+     * via the filesystem API is more reliable than remote HTTP fetching
+     * during PDF generation. Caller is responsible for deleting the temp file.
+     */
+    private function resolveLogoPath(?\App\Models\Account $account): ?string
+    {
+        if (!$account || !$account->logo_path) {
+            return null;
+        }
+
+        if (!\Storage::disk('r2')->exists($account->logo_path)) {
+            return null;
+        }
+
+        $extension = pathinfo($account->logo_path, PATHINFO_EXTENSION) ?: 'png';
+        $tempPath  = storage_path('app/temp_logo_' . $account->id . '_' . uniqid() . '.' . $extension);
+
+        file_put_contents($tempPath, \Storage::disk('r2')->get($account->logo_path));
+
+        return $tempPath;
     }
 }

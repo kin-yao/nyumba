@@ -27,6 +27,11 @@ Schedule::command('leases:apply-escalations')->dailyAt('07:00')->withoutOverlapp
 // Automatically move out tenants whose accepted move-out date has arrived
 Schedule::command('move-outs:process')->dailyAt('07:30')->withoutOverlapping();
 
+// Back up the database (only — uploaded files already live independently on
+// R2) to the same R2 bucket, genuinely independent of Railway's own infra.
+Schedule::command('backup:clean')->dailyAt('01:30')->withoutOverlapping();
+Schedule::command('backup:run --only-db')->dailyAt('02:00')->withoutOverlapping();
+
 // Reconcile M-Pesa C2B transactions via Pull API for registered properties.
 // Runs every 3 hours — worst case a missed C2B callback is caught within 3hrs.
 // Reduce to ->hourly() if landlords report payment delays.

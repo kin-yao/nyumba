@@ -241,6 +241,7 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
     // Settings
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
     Route::post('/settings/account', [SettingsController::class, 'updateAccount'])->name('settings.account');
+    Route::get('/settings/logo', [SettingsController::class, 'showLogo'])->name('settings.logo');
     Route::post('/settings/mpesa', [SettingsController::class, 'updateMpesa'])->name('settings.mpesa');
     Route::post('/settings/password', [SettingsController::class, 'updatePassword'])->name('settings.password');
     Route::post('/settings/users', [SettingsController::class, 'inviteUser'])->name('settings.users.invite');
