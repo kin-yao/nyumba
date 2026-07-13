@@ -117,7 +117,7 @@
 </button>
 <style>
     @media (max-width: 768px) {
-        #nyumba-refresh-btn { top: 62px; width: 32px; height: 32px; font-size: 12px; }
+        #nyumba-refresh-btn { display: none !important; }
     }
 </style>
 
@@ -489,18 +489,27 @@
             <div style="background:#fff;border-radius:8px;padding:6px 10px">
                 <img src="/images/logo.png" alt="Nyumba" style="height:28px;width:auto;object-fit:contain;display:block">
             </div>
-            <a href="{{ route('notifications.index') }}"
-               style="position:relative;padding:4px;display:flex;{{ $isExpired ? 'pointer-events:none;opacity:0.35' : '' }}">
-                <svg width="20" height="20" viewBox="0 0 14 14" fill="none">
-                    <path d="M7 1a4 4 0 014 4v3l1 1.5H2L3 8V5a4 4 0 014-4z" stroke="white" stroke-width="1.2" stroke-linejoin="round"/>
-                    <path d="M5.5 11.5a1.5 1.5 0 003 0" stroke="white" stroke-width="1.2"/>
-                </svg>
-                @if($unreadCount > 0)
-                    <span style="position:absolute;top:0;right:0;background:#b91c1c;color:#fff;font-size:9px;font-weight:700;width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center">
-                        {{ $unreadCount > 9 ? '9+' : $unreadCount }}
-                    </span>
-                @endif
-            </a>
+            <div style="display:flex;align-items:center;gap:14px">
+                <button onclick="location.reload()" title="Refresh page"
+                        style="background:none;border:none;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;color:#fff">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12a9 9 0 11-2.64-6.36"/>
+                        <path d="M21 3v6h-6"/>
+                    </svg>
+                </button>
+                <a href="{{ route('notifications.index') }}"
+                   style="position:relative;padding:4px;display:flex;{{ $isExpired ? 'pointer-events:none;opacity:0.35' : '' }}">
+                    <svg width="20" height="20" viewBox="0 0 14 14" fill="none">
+                        <path d="M7 1a4 4 0 014 4v3l1 1.5H2L3 8V5a4 4 0 014-4z" stroke="white" stroke-width="1.2" stroke-linejoin="round"/>
+                        <path d="M5.5 11.5a1.5 1.5 0 003 0" stroke="white" stroke-width="1.2"/>
+                    </svg>
+                    @if($unreadCount > 0)
+                        <span style="position:absolute;top:0;right:0;background:#b91c1c;color:#fff;font-size:9px;font-weight:700;width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center">
+                            {{ $unreadCount > 9 ? '9+' : $unreadCount }}
+                        </span>
+                    @endif
+                </a>
+            </div>
         </div>
 
         {{-- Banners --}}
