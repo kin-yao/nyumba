@@ -135,7 +135,7 @@ class MpesaC2BController extends Controller
      *
      * @return string 'matched' | 'unmatched' | 'duplicate'
      */
-    public function processTransaction(Property $property, array $txn): string
+    public function processTransaction(Property $property, array $txn, string $method = 'mpesa', string $providerLabel = 'M-Pesa'): string
     {
         $transId   = $txn['TransID'] ?? null;
         $amount    = (float) ($txn['TransAmount'] ?? 0);
@@ -144,14 +144,14 @@ class MpesaC2BController extends Controller
         $transTime = $txn['TransTime'] ?? null;
 
         if (!$transId || $amount <= 0) {
-            Log::warning('M-Pesa C2B: incomplete transaction payload', [
+            Log::warning($providerLabel . ' C2B: incomplete transaction payload', [
                 'property_id' => $property->id,
                 'txn'         => $txn,
             ]);
             return 'unmatched';
         }
 
-        // Idempotency — don't double-record the same M-Pesa receipt
+        // Idempotency — don't double-record the same receipt
         if (Payment::withoutGlobalScopes()->where('reference', $transId)->exists()) {
             return 'duplicate';
         }
@@ -172,9 +172,9 @@ class MpesaC2BController extends Controller
                 'amount'       => $amount,
                 'payment_type' => 'rent',
                 'payment_date' => $paymentDate,
-                'method'       => 'mpesa',
+                'method'       => $method,
                 'reference'    => $transId,
-                'notes'        => 'Unmatched M-Pesa C2B payment. BillRef: "' . $billRef
+                'notes'        => 'Unmatched ' . $providerLabel . ' C2B payment. BillRef: "' . $billRef
                     . '", Phone: ' . $msisdn
                     . ', Property: ' . $property->name
                     . '. Needs manual assignment.',
@@ -183,8 +183,8 @@ class MpesaC2BController extends Controller
 
             try {
                 AuditService::log(
-                    'payment.mpesa_unmatched',
-                    'Unmatched M-Pesa payment of ' . currency($amount) . ' (ref: ' . $transId . ') for "'
+                    'payment.' . $method . '_unmatched',
+                    'Unmatched ' . $providerLabel . ' payment of ' . currency($amount) . ' (ref: ' . $transId . ') for "'
                         . $property->name . '" — needs manual assignment',
                     $property,
                     [
@@ -210,7 +210,7 @@ class MpesaC2BController extends Controller
 
         $payment = DB::transaction(function () use (
             $property, $amount, $paymentDate, $transId, $billRef, $msisdn,
-            $tenant, $lease, &$fullyPaidInvoices, &$newBalance, &$creditCarried
+            $tenant, $lease, $method, $providerLabel, &$fullyPaidInvoices, &$newBalance, &$creditCarried
         ) {
             $payment = Payment::create([
                 'account_id'   => $property->account_id,
@@ -219,9 +219,9 @@ class MpesaC2BController extends Controller
                 'amount'       => $amount,
                 'payment_type' => 'rent',
                 'payment_date' => $paymentDate,
-                'method'       => 'mpesa',
+                'method'       => $method,
                 'reference'    => $transId,
-                'notes'        => 'Auto-reconciled M-Pesa C2B payment. Phone: ' . $msisdn . ', Account: ' . $billRef,
+                'notes'        => 'Auto-reconciled ' . $providerLabel . ' C2B payment. Phone: ' . $msisdn . ', Account: ' . $billRef,
                 'is_allocated' => false,
             ]);
 
@@ -292,9 +292,9 @@ class MpesaC2BController extends Controller
                         'amount'       => $remaining,
                         'payment_type' => 'rent',
                         'payment_date' => $paymentDate,
-                        'method'       => 'mpesa',
+                        'method'       => $method,
                         'reference'    => $transId . '-CR',
-                        'notes'        => 'Rent credit carried forward from M-Pesa payment ' . $transId . '. To be applied to next invoice.',
+                        'notes'        => 'Rent credit carried forward from ' . $providerLabel . ' payment ' . $transId . '. To be applied to next invoice.',
                         'is_allocated' => false,
                     ]);
                 }
@@ -314,8 +314,8 @@ class MpesaC2BController extends Controller
 
         try {
             AuditService::log(
-                'payment.mpesa_reconciled',
-                'M-Pesa payment of ' . currency($amount) . ' auto-reconciled for '
+                'payment.' . $method . '_reconciled',
+                $providerLabel . ' payment of ' . currency($amount) . ' auto-reconciled for '
                     . ($tenant?->full_name ?? 'unit ' . $unit->name)
                     . ' (ref: ' . $transId . ')',
                 $payment,
@@ -332,7 +332,7 @@ class MpesaC2BController extends Controller
         }
 
         if ($tenant && $tenant->phone) {
-            $this->sendConfirmationSms($property, $tenant, $payment, $fullyPaidInvoices, $newBalance, $creditCarried);
+            $this->sendConfirmationSms($property, $tenant, $payment, $fullyPaidInvoices, $newBalance, $creditCarried, $providerLabel);
         }
 
         return 'matched';
@@ -420,8 +420,10 @@ class MpesaC2BController extends Controller
         Payment $payment,
         $fullyPaidInvoices,
         float $newBalance,
-        float $creditCarried = 0
+        float $creditCarried = 0,
+        string $providerLabel = 'MPESA'
     ): void {
+        $providerLabel = strtoupper($providerLabel);
         $account = $property->account;
         $sms     = new SmsService($account);
         if (!$sms->hasCredits()) return;
@@ -449,7 +451,7 @@ class MpesaC2BController extends Controller
                 'Tenant: ' . $tenant->full_name . "\n" .
                 'Unit: ' . ($unit?->name ?? '') . "\n" .
                 'Period: ' . $period . "\n" .
-                'Amount: KES ' . $amount . ' (MPESA)' . "\n" .
+                'Amount: KES ' . $amount . ' (' . $providerLabel . ')' . "\n" .
                 'Ref: ' . $payment->reference . "\n" .
                 'Date: ' . $datePaid . "\n" .
                 $balanceLine . "\n" .

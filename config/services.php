@@ -49,6 +49,12 @@ return [
         'env'            => env('MPESA_ENV', 'sandbox'), // or 'production'
     ],
 
+    'kcb' => [
+        // KCB's public key used to verify the SHA256withRSA `Signature` header
+        // on every IPN notification (PEM format, account-wide, not per-property).
+        'ipn_public_key' => env('KCB_IPN_PUBLIC_KEY'),
+    ],
+
     'firebase' => [
         // Firebase Web API keys are public by design (same one used
         // client-side on the login page) — used server-side only to verify

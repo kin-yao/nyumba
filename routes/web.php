@@ -69,6 +69,21 @@ Route::post('/payments/c2b/{property}/confirmation', [App\Http\Controllers\Mpesa
 Route::post('/payments/c2b/{property}/validation', [App\Http\Controllers\MpesaC2BController::class, 'validation'])->name('payments.c2b.validation');
 Route::post('/payments/pull/{property}/callback', [App\Http\Controllers\MpesaC2BController::class, 'pullCallback'])->name('payments.pull.callback');
 
+// ─── KCB Buni IPN — public, account-wide URL KCB pushes to ────────────────
+// IPN endpoint: https://www.nyumbapc.co.ke/payments/kcb/account-notification
+Route::post('/payments/kcb/account-notification', [App\Http\Controllers\KcbIpnController::class, 'accountNotification'])->name('kcb.account-notification');
+
+// Admin-visible self-check: hit this URL once after deploy to confirm the
+// KCB public key is actually configured, without waiting for a real payment.
+Route::get('/payments/kcb/health', function () {
+    $configured = !empty(config('services.kcb.ipn_public_key'));
+
+    return response()->json([
+        'kcb_ipn_public_key_configured' => $configured,
+        'status' => $configured ? 'ok' : 'MISSING — KCB payments will be rejected in production',
+    ], $configured ? 200 : 503);
+})->middleware('auth')->name('kcb.health');
+
 // ─── Firebase auth endpoints ───────────────────────────────────────────────────
 Route::post('/auth/verify', [App\Http\Controllers\Auth\FirebaseAuthController::class, 'verify'])
     ->name('auth.verify');

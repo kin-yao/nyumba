@@ -30,6 +30,8 @@ class Property extends Model
         'mpesa_nominated_number',
         'mpesa_c2b_registered_at',
         'mpesa_pull_registered_at',
+        'kcb_account_number',
+        'kcb_ipn_registered_at',
         'auto_invoice_enabled',
         'invoice_send_day',
     ];
@@ -38,6 +40,7 @@ class Property extends Model
         'mpesa_consumer_secret'    => 'encrypted',
         'mpesa_c2b_registered_at'  => 'datetime',
         'mpesa_pull_registered_at' => 'datetime',
+        'kcb_ipn_registered_at'    => 'datetime',
         'auto_invoice_enabled'     => 'boolean',
         'invoice_send_day'         => 'integer',
     ];
