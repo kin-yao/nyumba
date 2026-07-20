@@ -53,6 +53,11 @@ return [
         // KCB's public key used to verify the SHA256withRSA `Signature` header
         // on every IPN notification (PEM format, account-wide, not per-property).
         'ipn_public_key' => env('KCB_IPN_PUBLIC_KEY'),
+
+        // TEMPORARY toggle — false disables signature verification entirely.
+        // Defaults to true (secure) if unset, so forgetting to set this var
+        // fails safe rather than fails open.
+        'verify_signature' => env('KCB_IPN_VERIFY_SIGNATURE', true),
     ],
 
     'firebase' => [

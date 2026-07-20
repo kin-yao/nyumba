@@ -58,6 +58,15 @@ class KcbIpnController extends Controller
 
     private function verifySignature(Request $request): bool
     {
+        // TEMPORARY — signature verification disabled at Eddy's (KCB) request
+        // so they can test the endpoint before we have the real public key.
+        // Re-enable by setting KCB_IPN_VERIFY_SIGNATURE=true in Railway (or
+        // just removing this block) once KCB confirms the key/sandbox is ready.
+        if (!config('services.kcb.verify_signature', true)) {
+            Log::warning('KCB IPN: signature verification is DISABLED — accepting unsigned requests');
+            return true;
+        }
+
         $publicKeyPem = config('services.kcb.ipn_public_key');
 
         if (empty($publicKeyPem)) {
