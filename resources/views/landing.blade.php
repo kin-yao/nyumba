@@ -53,7 +53,7 @@ a{color:inherit;text-decoration:none}
 /* Nav */
 .nav{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:60}
 .nav-inner{max-width:1280px;margin:0 auto;padding:0 24px;height:72px;display:flex;align-items:center;justify-content:space-between}
-.nav-logo img{height:34px;width:auto;object-fit:contain}
+.nav-logo img{height:48px;width:auto;object-fit:contain}
 .nav-links{display:flex;gap:34px}
 .nav-links a{font-size:14px;font-weight:500;color:var(--ink-2);position:relative;padding:4px 0}
 .nav-links a::after{content:"";position:absolute;left:0;right:100%;bottom:-2px;height:2px;background:var(--green);transition:right .28s}
@@ -189,8 +189,8 @@ a{color:inherit;text-decoration:none}
 /* Footer */
 .foot{background:var(--ink);color:var(--paper);padding:64px 0 28px}
 .foot-grid{display:grid;grid-template-columns:1.8fr 1fr 1fr 1.2fr;gap:40px;padding-bottom:40px;border-bottom:1px solid rgba(244,242,236,.12)}
-.foot-logo{background:#fff;border-radius:6px;padding:6px 10px;display:inline-block;margin-bottom:16px}
-.foot-logo img{height:26px;width:auto}
+.foot-logo{display:inline-block;margin-bottom:16px}
+.foot-logo img{height:36px;width:auto}
 .foot-desc{font-family:'Clash Display',serif;font-weight:400;font-size:17px;line-height:1.4;color:rgba(244,242,236,.5);max-width:260px}
 .foot-h{font-family:'Cabinet Grotesk',sans-serif;font-weight:700;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:18px}
 .foot-a{display:block;font-size:14px;color:rgba(244,242,236,.6);margin-bottom:11px;transition:color .2s,padding .2s}

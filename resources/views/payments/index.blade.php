@@ -148,9 +148,15 @@
             All payments
         </button>
         <button class="pay-tab" onclick="showTab('unmatched', this)">
-            Unmatched M-Pesa
+            Unmatched
             @if($unmatched->count() > 0)
                 <span class="badge-count">{{ $unmatched->count() }}</span>
+            @endif
+        </button>
+        <button class="pay-tab" onclick="showTab('proofs', this)">
+            Tenant submitted
+            @if($pendingProofs->count() > 0)
+                <span class="badge-count">{{ $pendingProofs->count() }}</span>
             @endif
         </button>
     </div>
@@ -339,18 +345,99 @@
             </div>
         @endif
     </div>
+
+    {{-- Tenant submitted proof of payment --}}
+    <div id="tab-proofs" style="display:none">
+        @if($pendingProofs->isEmpty())
+            <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:60px;text-align:center;color:#8a8880;font-size:13px">
+                <div style="font-size:36px;margin-bottom:12px">📩</div>
+                <div style="font-weight:500;margin-bottom:4px">No pending proof-of-payment claims</div>
+                <div>Tenant-submitted payment messages will show up here for verification.</div>
+            </div>
+        @else
+            <div style="background:#e6f2ed;border:1px solid #a7d7c5;border-radius:10px;padding:12px 15px;margin-bottom:16px;font-size:13px;color:#166534">
+                {{ $pendingProofs->count() }} tenant-submitted payment message(s) awaiting your verification.
+            </div>
+
+            <div style="display:grid;gap:12px">
+                @foreach($pendingProofs as $proof)
+                    <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:16px">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+                            <div>
+                                <div style="font-size:14px;font-weight:600">{{ $proof->tenant?->full_name }}</div>
+                                <div style="font-size:12px;color:#8a8880;margin-top:2px">
+                                    {{ $proof->lease?->unit?->name }}, {{ $proof->lease?->unit?->property?->name }}
+                                    &middot; {{ $proof->created_at->format('d M Y, g:ia') }}
+                                </div>
+                            </div>
+                            <span class="pay-tag" style="background:#e6f2ed;color:#166534">Tenant submitted</span>
+                        </div>
+
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+                            <span class="pay-tag">{{ ucfirst($proof->payment_for) }}</span>
+                            @if($proof->method)
+                                <span class="pay-tag">Paid via {{ strtoupper($proof->method) }}</span>
+                            @endif
+                            @if($proof->periodLabel())
+                                <span class="pay-tag">For {{ $proof->periodLabel() }}</span>
+                            @endif
+                        </div>
+
+                        <div style="font-size:12.5px;color:#111110;background:#f5f4f0;border-radius:6px;padding:10px 12px;margin-bottom:14px;line-height:1.5;white-space:pre-wrap">{{ $proof->message }}</div>
+
+                        <form method="POST" action="{{ route('proof-of-payments.verify', $proof) }}"
+                              style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px">
+                            @csrf
+                            <div style="flex:1;min-width:130px">
+                                <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Amount</label>
+                                <input type="number" step="0.01" name="amount" required placeholder="0.00"
+                                       style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box">
+                            </div>
+                            <div style="flex:1;min-width:150px">
+                                <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Date paid</label>
+                                <input type="date" name="payment_date" required value="{{ now()->format('Y-m-d') }}" max="{{ now()->format('Y-m-d') }}"
+                                       style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box">
+                            </div>
+                            <button type="submit"
+                                    style="height:36px;padding:0 16px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
+                                Verify &amp; allocate
+                            </button>
+                        </form>
+
+                        <form method="POST" action="{{ route('proof-of-payments.dismiss', $proof) }}"
+                              onsubmit="return confirm('Dismiss this claim? No payment will be recorded.')"
+                              style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+                            @csrf
+                            <div style="flex:1;min-width:200px">
+                                <input type="text" name="review_note" placeholder="Reason (optional) — e.g. no matching bank transaction found"
+                                       style="width:100%;height:34px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:12.5px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box">
+                            </div>
+                            <button type="submit"
+                                    style="height:34px;padding:0 14px;background:transparent;color:#b91c1c;border:1px solid rgba(185,28,28,0.25);border-radius:7px;font-size:12.5px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
+                                Dismiss
+                            </button>
+                        </form>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </div>
 </div>
 
 <script>
 function showTab(name, el) {
     document.getElementById('tab-all').style.display       = name === 'all'       ? 'block' : 'none';
     document.getElementById('tab-unmatched').style.display = name === 'unmatched' ? 'block' : 'none';
+    document.getElementById('tab-proofs').style.display    = name === 'proofs'    ? 'block' : 'none';
     document.querySelectorAll('.pay-tab').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
 }
 
 if (window.location.hash === '#unmatched') {
     showTab('unmatched', document.querySelectorAll('.pay-tab')[1]);
+}
+if (window.location.hash === '#proofs') {
+    showTab('proofs', document.querySelectorAll('.pay-tab')[2]);
 }
 </script>
 </x-layouts.app>

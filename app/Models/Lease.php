@@ -55,6 +55,16 @@ class Lease extends Model
         return $this->hasMany(Payment::class);
     }
 
+    public function proofOfPayments()
+    {
+        return $this->hasMany(ProofOfPayment::class);
+    }
+
+    public function documents()
+    {
+        return $this->hasMany(Document::class);
+    }
+
     public function isActive(): bool
     {
         return $this->status === 'active';

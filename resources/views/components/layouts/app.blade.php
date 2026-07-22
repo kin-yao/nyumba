@@ -151,9 +151,9 @@
     <aside class="nyumba-sidebar" id="sidebar">
 
         <div style="padding:16px 16px 14px;border-bottom:1px solid rgba(255,255,255,0.06)">
-            <div style="background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:6px">
+            <div style="margin-bottom:6px">
                 <img src="/images/logo.png" alt="Nyumba"
-                     style="width:100%;height:auto;object-fit:contain;display:block">
+                     style="height:40px;width:auto;object-fit:contain;display:block">
             </div>
             <div style="font-size:11px;color:rgba(255,255,255,0.28)">
                 {{ auth()->user()->account->name ?? 'My Account' }}
@@ -486,8 +486,8 @@
                     <path d="M3 6h16M3 11h16M3 16h16" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
                 </svg>
             </button>
-            <div style="background:#fff;border-radius:8px;padding:6px 10px">
-                <img src="/images/logo.png" alt="Nyumba" style="height:28px;width:auto;object-fit:contain;display:block">
+            <div>
+                <img src="/images/logo.png" alt="Nyumba" style="height:30px;width:auto;object-fit:contain;display:block">
             </div>
             <div style="display:flex;align-items:center;gap:14px">
                 <button onclick="location.reload()" title="Refresh page"

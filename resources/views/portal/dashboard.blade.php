@@ -4,6 +4,16 @@
         We couldn't find an active tenancy on your account. Please contact your landlord.
     </div>
 @else
+    {{-- Greeting --}}
+    <div style="margin-bottom:14px">
+        @php
+            $hour = now()->hour;
+            $greeting = $hour < 12 ? 'Good morning' : ($hour < 17 ? 'Good afternoon' : 'Good evening');
+        @endphp
+        <div style="font-size:12px;color:#8a8880">{{ $greeting }}</div>
+        <div style="font-family:'DM Serif Display',serif;font-size:23px;color:#111110;margin-top:2px;line-height:1.2">{{ $tenant->full_name }}</div>
+    </div>
+
     {{-- Property / unit card --}}
     <div style="background:#111110;border-radius:12px;padding:20px;margin-bottom:14px;color:#fff">
         <div style="font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Your home</div>
@@ -60,33 +70,19 @@
         </div>
     </div>
 
-    {{-- Ledger, grouped by month --}}
-    <div style="font-size:11px;color:#8a8880;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Transaction ledger</div>
-    @if($ledgerByMonth->isEmpty())
-        <div style="background:#fff;border-radius:12px;border:1px solid rgba(0,0,0,0.07);padding:24px;text-align:center;color:#8a8880;font-size:13px">
-            No transactions yet.
+    {{-- Tenancy documents --}}
+    @if($documents->isNotEmpty())
+        <div style="font-size:11px;color:#8a8880;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Tenancy documents</div>
+        <div style="background:#fff;border-radius:12px;border:1px solid rgba(0,0,0,0.07);padding:8px;margin-bottom:14px">
+            @foreach($documents as $doc)
+                <a href="{{ route('portal.documents.download', $doc) }}" target="_blank"
+                   style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;text-decoration:none;color:#111110;{{ !$loop->last ? 'border-bottom:1px solid rgba(0,0,0,0.05)' : '' }}">
+                    <span style="font-size:13px;font-weight:500">{{ $doc->label }}</span>
+                    <span style="font-size:11px;color:#1a6b52">Download</span>
+                </a>
+            @endforeach
         </div>
-    @else
-        @foreach($ledgerByMonth as $monthLabel => $rows)
-            <div style="background:#fff;border-radius:12px;border:1px solid rgba(0,0,0,0.07);margin-bottom:12px;overflow:hidden">
-                <div style="padding:10px 16px;background:#faf9f7;border-bottom:1px solid rgba(0,0,0,0.06);font-size:12px;font-weight:600">
-                    {{ $monthLabel }}
-                </div>
-                @foreach($rows as $row)
-                    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(0,0,0,0.04)">
-                        <div style="min-width:0">
-                            <div style="font-size:12.5px">{{ $row['description'] }}</div>
-                            <div style="font-size:10.5px;color:#8a8880;margin-top:1px">{{ $row['date']->format('d M') }}{{ $row['reference'] ? ' · ' . $row['reference'] : '' }}</div>
-                        </div>
-                        @if($row['charged'] !== null)
-                            <div style="font-size:13px;font-weight:600;color:#b91c1c;flex-shrink:0">-{{ currency($row['charged']) }}</div>
-                        @else
-                            <div style="font-size:13px;font-weight:600;color:#15803d;flex-shrink:0">+{{ currency($row['paid']) }}</div>
-                        @endif
-                    </div>
-                @endforeach
-            </div>
-        @endforeach
     @endif
-@endif
+
+    @endif
 </x-layouts.portal>

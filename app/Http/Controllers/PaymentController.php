@@ -28,13 +28,21 @@ class PaymentController extends Controller
         $unallocated = $payments->where('is_allocated', false)
             ->where('payment_type', '!=', 'deposit');
 
-        // Unmatched M-Pesa C2B payments — no tenant/lease, recorded by auto-reconciliation
+        // Unmatched auto-reconciled payments — no tenant/lease, recorded by
+        // M-Pesa/KCB IPN reconciliation when nothing matched.
         $unmatched = Payment::with(['lease.unit.property'])
             ->where('account_id', auth()->user()->account_id)
             ->whereNull('tenant_id')
             ->whereNull('lease_id')
-            ->where('method', 'mpesa')
+            ->whereIn('method', ['mpesa', 'bank'])
             ->where('is_allocated', false)
+            ->latest()
+            ->get();
+
+        // Tenant-submitted proof-of-payment claims awaiting landlord verification
+        $pendingProofs = \App\Models\ProofOfPayment::with(['tenant', 'lease.unit.property'])
+            ->whereIn('lease_id', $leaseIds)
+            ->where('status', 'pending')
             ->latest()
             ->get();
 
@@ -43,7 +51,7 @@ class PaymentController extends Controller
             ->whereHas('activeLease', fn($q) => $q->whereIn('unit_id', $unitIds))
             ->get();
 
-        return view('payments.index', compact('payments', 'unallocated', 'unmatched', 'tenants'));
+        return view('payments.index', compact('payments', 'unallocated', 'unmatched', 'pendingProofs', 'tenants'));
     }
 
     public function create()
@@ -261,6 +269,144 @@ class PaymentController extends Controller
 
         return redirect()->route('payments.index')
             ->with('success', 'Payment of ' . currency($payment->amount) . ' assigned to ' . $tenant->full_name . ' and allocated.');
+    }
+
+    // ── Verify a tenant-submitted proof-of-payment claim ──────────────────
+    // Creates a REAL Payment (with an amount the landlord actually enters
+    // after reading the claim) and links the claim to it. The payments
+    // table is never touched until this point.
+    public function verifyProof(Request $request, \App\Models\ProofOfPayment $proofOfPayment)
+    {
+        if ($proofOfPayment->account_id !== auth()->user()->account_id || $proofOfPayment->status !== 'pending') {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'amount'       => ['required', 'numeric', 'min:1'],
+            'payment_date' => ['required', 'date'],
+        ]);
+
+        $tenant      = $proofOfPayment->tenant;
+        $activeLease = $proofOfPayment->lease;
+        $isDeposit   = $proofOfPayment->payment_for === 'deposit';
+
+        $fullyPaidInvoices = collect();
+        $newBalance        = 0;
+
+        $payment = DB::transaction(function () use ($proofOfPayment, $validated, $activeLease, $isDeposit, $tenant, &$fullyPaidInvoices, &$newBalance) {
+            $payment = Payment::create([
+                'account_id'   => $proofOfPayment->account_id,
+                'tenant_id'    => $tenant?->id,
+                'lease_id'     => $activeLease?->id,
+                'amount'       => $validated['amount'],
+                'payment_date' => $validated['payment_date'],
+                'payment_type' => $proofOfPayment->payment_for,
+                'method'       => $proofOfPayment->method ?? 'cash',
+                'notes'        => 'Verified from tenant-submitted proof of payment.',
+                'is_allocated' => $isDeposit,
+            ]);
+
+            if (!$isDeposit && $activeLease) {
+                $outstanding = $activeLease->invoices()
+                    ->whereIn('status', ['sent', 'partial', 'overdue'])
+                    ->orderBy('invoice_date')
+                    ->get();
+
+                $remaining = floatval($validated['amount']);
+
+                foreach ($outstanding as $invoice) {
+                    if ($remaining <= 0) break;
+
+                    $invoiceBalance = floatval($invoice->total_amount) - floatval($invoice->amount_paid);
+                    if ($invoiceBalance <= 0) continue;
+
+                    $allocate = min($remaining, $invoiceBalance);
+
+                    PaymentAllocation::create([
+                        'payment_id' => $payment->id,
+                        'invoice_id' => $invoice->id,
+                        'amount'     => $allocate,
+                    ]);
+
+                    $newAmountPaid = floatval($invoice->amount_paid) + $allocate;
+                    $newStatus     = $newAmountPaid >= floatval($invoice->total_amount) ? 'paid' : 'partial';
+
+                    $invoice->update([
+                        'amount_paid' => $newAmountPaid,
+                        'status'      => $newStatus,
+                    ]);
+
+                    if ($newStatus === 'paid') {
+                        $fullyPaidInvoices->push($invoice->fresh());
+                    }
+
+                    $remaining -= $allocate;
+                }
+
+                $payment->update(['is_allocated' => true]);
+
+                $activeLease->load(['invoices', 'payments']);
+                $newBalance = floatval($activeLease->invoices->sum('total_amount'))
+                            - floatval($activeLease->payments->where('payment_type', '!=', 'deposit')->sum('amount'));
+            }
+
+            return $payment;
+        });
+
+        $proofOfPayment->update([
+            'status'      => 'verified',
+            'payment_id'  => $payment->id,
+            'reviewed_by' => auth()->id(),
+            'reviewed_at' => now(),
+        ]);
+
+        AuditService::log(
+            'payment.proof_verified',
+            'Tenant-submitted payment proof verified for ' . ($tenant?->full_name ?? 'unknown tenant') . ': ' . currency($validated['amount']),
+            $payment,
+            ['amount' => $validated['amount'], 'proof_of_payment_id' => $proofOfPayment->id]
+        );
+
+        if ($tenant) {
+            if ($isDeposit) {
+                $this->sendDepositConfirmationSms($tenant, $payment, auth()->user()->account);
+            } else {
+                $this->sendPaymentConfirmationSms($tenant, $payment, $fullyPaidInvoices, $newBalance, auth()->user()->account);
+            }
+        }
+
+        return redirect()->route('payments.index')
+            ->with('success', 'Payment verified and allocated.');
+    }
+
+    // ── Dismiss a tenant-submitted proof-of-payment claim ──────────────────
+    // No Payment record is ever created for a dismissed claim.
+    public function dismissProof(Request $request, \App\Models\ProofOfPayment $proofOfPayment)
+    {
+        if ($proofOfPayment->account_id !== auth()->user()->account_id || $proofOfPayment->status !== 'pending') {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'review_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $proofOfPayment->update([
+            'status'      => 'dismissed',
+            'reviewed_by' => auth()->id(),
+            'reviewed_at' => now(),
+            'review_note' => $validated['review_note'] ?? null,
+        ]);
+
+        AuditService::log(
+            'payment.proof_dismissed',
+            'Tenant-submitted payment proof dismissed for ' . ($proofOfPayment->tenant?->full_name ?? 'unknown tenant'),
+            $proofOfPayment,
+            ['review_note' => $validated['review_note'] ?? null]
+        );
+
+        return redirect()->route('payments.index')
+            ->with('success', 'Marked as dismissed.');
     }
 
     private function sendDepositConfirmationSms(Tenant $tenant, Payment $payment, $account): void

@@ -183,8 +183,53 @@
             </div>
         </div>
 
-        {{-- Right: ledger --}}
+        {{-- Right: documents + ledger --}}
         <div>
+            @if($activeLease)
+                <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:16px;margin-bottom:16px">
+                    <div style="font-size:10px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:#8a8880;margin-bottom:12px">
+                        Tenancy documents
+                    </div>
+
+                    @if($documents->isNotEmpty())
+                        <div style="display:grid;gap:8px;margin-bottom:14px">
+                            @foreach($documents as $doc)
+                                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;background:#f5f4f0;border-radius:7px">
+                                    <div style="min-width:0">
+                                        <a href="{{ route('documents.download', $doc) }}" target="_blank"
+                                           style="font-size:13px;font-weight:500;color:#111110;text-decoration:none">{{ $doc->label }}</a>
+                                        <div style="font-size:11px;color:#8a8880;margin-top:1px">{{ $doc->original_filename }} &middot; {{ $doc->created_at->format('d M Y') }}</div>
+                                    </div>
+                                    <form method="POST" action="{{ route('documents.destroy', $doc) }}"
+                                          onsubmit="return confirm('Remove this document?')" style="flex-shrink:0">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" title="Remove"
+                                                style="background:none;border:none;color:#b91c1c;cursor:pointer;font-size:16px;line-height:1;padding:2px">&times;</button>
+                                    </form>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    <form method="POST" action="{{ route('documents.store', $tenant) }}" enctype="multipart/form-data" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+                        @csrf
+                        <div style="flex:1;min-width:140px">
+                            <input type="text" name="label" required placeholder="e.g. Tenancy Agreement"
+                                   style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box">
+                        </div>
+                        <div style="flex:1;min-width:160px">
+                            <input type="file" name="file" required accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                   style="width:100%;font-size:12px;font-family:'DM Sans',sans-serif">
+                        </div>
+                        <button type="submit"
+                                style="height:36px;padding:0 14px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">
+                            Upload
+                        </button>
+                    </form>
+                </div>
+            @endif
+
             <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);overflow:hidden">
                 <div style="padding:13px 16px 9px;font-size:10px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:#8a8880">
                     Transaction ledger

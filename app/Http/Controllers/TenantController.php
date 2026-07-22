@@ -109,8 +109,12 @@ class TenantController extends Controller
                 ->get();
         }
 
+        $documents = $activeLease
+            ? $activeLease->documents()->with('uploader')->latest()->get()
+            : collect();
+
         return view('tenants.show', compact(
-            'tenant', 'activeLease', 'ledger', 'balance', 'vacantUnits'
+            'tenant', 'activeLease', 'ledger', 'balance', 'vacantUnits', 'documents'
         ));
     }
 

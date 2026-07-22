@@ -22,7 +22,7 @@
             align-items: center;
             justify-content: space-between;
         }
-        .portal-logo { height: 22px; width: auto; display: block; }
+        .portal-logo { height: 34px; width: auto; display: block; }
         .portal-logout {
             background: none;
             border: none;
@@ -101,8 +101,11 @@
             <a href="{{ route('portal.payment') }}" class="portal-nav-item {{ request()->routeIs('portal.payment') ? 'active' : '' }}">
                 <img src="/images/portal/icon-payment.png" class="portal-nav-icon" alt="Payment"> Payment
             </a>
-            <a href="{{ route('portal.communications') }}" class="portal-nav-item {{ request()->routeIs('portal.communications') ? 'active' : '' }}">
-                <img src="/images/portal/icon-requests.png" class="portal-nav-icon" alt="Requests"> Requests
+            <a href="{{ route('portal.maintenance') }}" class="portal-nav-item {{ request()->routeIs('portal.maintenance') ? 'active' : '' }}">
+                <img src="/images/portal/icon-maintenance.png" class="portal-nav-icon" alt="Maintenance"> Maintenance
+            </a>
+            <a href="{{ route('portal.move-out') }}" class="portal-nav-item {{ request()->routeIs('portal.move-out') ? 'active' : '' }}">
+                <img src="/images/portal/icon-moveout.png" class="portal-nav-icon" alt="Move out"> Move out
             </a>
         </div>
     @endif

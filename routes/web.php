@@ -10,6 +10,7 @@ use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SubscriptionController;
+use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\UnitController;
 use App\Http\Controllers\UtilityController;
@@ -36,10 +37,13 @@ Route::prefix('portal')->name('portal.')->group(function () {
     Route::middleware('tenant.auth')->group(function () {
         Route::get('/dashboard', [App\Http\Controllers\Portal\DashboardController::class, 'index'])->name('dashboard');
         Route::get('/payment', [App\Http\Controllers\Portal\PaymentController::class, 'index'])->name('payment');
-        Route::get('/communications', [App\Http\Controllers\Portal\CommunicationController::class, 'index'])->name('communications');
-        Route::post('/communications/maintenance', [App\Http\Controllers\Portal\CommunicationController::class, 'storeMaintenance'])->name('communications.maintenance');
-        Route::post('/communications/move-out', [App\Http\Controllers\Portal\CommunicationController::class, 'storeMoveOut'])->name('communications.move-out');
-        Route::post('/communications/move-out/{moveOutRequest}/cancel', [App\Http\Controllers\Portal\CommunicationController::class, 'cancelMoveOut'])->name('communications.move-out.cancel');
+        Route::post('/payment/proof', [App\Http\Controllers\Portal\PaymentController::class, 'storeProof'])->name('payment.proof');
+        Route::get('/documents/{document}/download', [App\Http\Controllers\DocumentController::class, 'download'])->name('documents.download');
+        Route::get('/maintenance', [App\Http\Controllers\Portal\MaintenanceController::class, 'index'])->name('maintenance');
+        Route::post('/maintenance', [App\Http\Controllers\Portal\MaintenanceController::class, 'store'])->name('maintenance.store');
+        Route::get('/move-out', [App\Http\Controllers\Portal\MoveOutController::class, 'index'])->name('move-out');
+        Route::post('/move-out', [App\Http\Controllers\Portal\MoveOutController::class, 'store'])->name('move-out.store');
+        Route::post('/move-out/{moveOutRequest}/cancel', [App\Http\Controllers\Portal\MoveOutController::class, 'cancel'])->name('move-out.cancel');
     });
 });
 
@@ -190,6 +194,15 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
     Route::delete('/tenants/{tenant}', [TenantController::class, 'destroy'])->name('tenants.destroy');
     Route::post('/tenants/{id}/restore', [TenantController::class, 'restore'])->name('tenants.restore');
     Route::post('/tenants/{tenant}/transfer', [TenantController::class, 'transfer'])->name('tenants.transfer');
+
+    // Tenancy agreement documents
+    Route::post('/tenants/{tenant}/documents', [DocumentController::class, 'store'])->name('documents.store');
+    Route::delete('/documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
+    Route::get('/documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
+
+    // Proof-of-payment verification (tenant-submitted claims)
+    Route::post('/proof-of-payments/{proofOfPayment}/verify', [PaymentController::class, 'verifyProof'])->name('proof-of-payments.verify');
+    Route::post('/proof-of-payments/{proofOfPayment}/dismiss', [PaymentController::class, 'dismissProof'])->name('proof-of-payments.dismiss');
 
     // Invoices
     Route::get('/invoices/bulk', [InvoiceController::class, 'bulkCreate'])->name('invoices.bulk');

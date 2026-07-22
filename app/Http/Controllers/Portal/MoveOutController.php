@@ -3,13 +3,12 @@
 namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
-use App\Models\MaintenanceRequest;
 use App\Models\MoveOutRequest;
 use App\Models\Notification;
 use App\Models\Tenant;
 use Illuminate\Http\Request;
 
-class CommunicationController extends Controller
+class MoveOutController extends Controller
 {
     protected function tenant(): Tenant
     {
@@ -23,61 +22,16 @@ class CommunicationController extends Controller
         $lease  = $tenant->activeLease;
         $unit   = $lease?->unit;
 
-        $maintenanceRequests = $unit
-            ? MaintenanceRequest::where('unit_id', $unit->id)
-                ->where('tenant_id', $tenant->id)
-                ->latest()
-                ->get()
-            : collect();
-
         $moveOutRequests = MoveOutRequest::where('tenant_id', $tenant->id)
             ->latest()
             ->get();
 
         $hasPendingMoveOut = $moveOutRequests->whereIn('status', ['pending', 'acknowledged', 'accepted'])->isNotEmpty();
 
-        return view('portal.communications', compact(
-            'tenant', 'lease', 'unit', 'maintenanceRequests', 'moveOutRequests', 'hasPendingMoveOut'
-        ));
+        return view('portal.move-out', compact('tenant', 'lease', 'unit', 'moveOutRequests', 'hasPendingMoveOut'));
     }
 
-    public function storeMaintenance(Request $request)
-    {
-        $validated = $request->validate([
-            'description' => ['required', 'string', 'max:2000'],
-            'priority'    => ['required', 'in:urgent,normal,low'],
-        ]);
-
-        $tenant = $this->tenant();
-        $lease  = $tenant->activeLease;
-
-        if (!$lease) {
-            return back()->with('error', 'No active tenancy found.');
-        }
-
-        $unit = $lease->unit;
-
-        $maintenance = MaintenanceRequest::create([
-            'account_id'  => $unit->property->account_id,
-            'unit_id'     => $unit->id,
-            'tenant_id'   => $tenant->id,
-            'description' => $validated['description'],
-            'priority'    => $validated['priority'],
-            'status'      => 'open',
-        ]);
-
-        Notification::create([
-            'account_id' => $unit->property->account_id,
-            'type'       => 'maintenance_request_tenant',
-            'title'      => 'New maintenance request from ' . $tenant->full_name,
-            'body'       => 'Unit ' . $unit->name . ' (' . $unit->property->name . '): ' . $validated['description'],
-            'data'       => ['unit' => $unit->name, 'priority' => $validated['priority']],
-        ]);
-
-        return back()->with('success', 'Your maintenance request has been submitted.');
-    }
-
-    public function storeMoveOut(Request $request)
+    public function store(Request $request)
     {
         $validated = $request->validate([
             'requested_move_out_date' => ['required', 'date', 'after_or_equal:today'],
@@ -122,7 +76,7 @@ class CommunicationController extends Controller
         return back()->with('success', 'Your move-out request has been submitted. Your landlord will be notified.');
     }
 
-    public function cancelMoveOut(MoveOutRequest $moveOutRequest)
+    public function cancel(MoveOutRequest $moveOutRequest)
     {
         $tenant = $this->tenant();
 
