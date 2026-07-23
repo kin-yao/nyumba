@@ -229,11 +229,9 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <a href="#pricing">Pricing</a>
       <a href="#contact">Contact</a>
       <a href="{{ route('portal.login') }}">Tenant login</a>
-      <a href="/login">Sign in</a>
     </div>
     <div class="nav-cta">
       <a href="/login" class="btn btn-gold">Sign in</a>
-      <a href="/register/step1" class="btn btn-green">Start free <span class="arr">&rarr;</span></a>
     </div>
     <button class="nav-burger" id="navBurger" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
   </div>
