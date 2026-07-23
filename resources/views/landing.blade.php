@@ -10,7 +10,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <!-- End Google Tag Manager -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nyumba — Collect rent, not excuses</title>
+<title>Nyumba Collect rent, not excuses</title>
 <meta name="description" content="Automated invoicing, M-Pesa reconciliation, utility billing and SMS reminders for Kenyan rental portfolios.">
 
 <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
@@ -75,13 +75,13 @@ a{color:inherit;text-decoration:none}
 .shard.a{left:-6%;width:46%;background:var(--green);opacity:.92;clip-path:polygon(0 0,72% 0,40% 100%,0 100%)}
 .shard.b{left:8%;width:44%;background:var(--green-deep);opacity:.85;clip-path:polygon(18% 0,60% 0,30% 100%,0 100%)}
 .shard.c{left:30%;width:30%;background:var(--gold);opacity:.16;clip-path:polygon(40% 0,72% 0,40% 100%,12% 100%)}
-.hero-inner{position:relative;z-index:2;max-width:1280px;margin:0 auto;padding:92px 24px 150px}
+.hero-inner{position:relative;z-index:2;max-width:900px;margin:0 auto;padding:92px 24px 150px;text-align:center}
 .hero-badge{display:inline-flex;align-items:center;gap:9px;background:rgba(244,242,236,.1);border:1px solid rgba(244,242,236,.2);color:var(--paper);padding:8px 16px;border-radius:3px;font-family:'Cabinet Grotesk',sans-serif;font-weight:500;font-size:11px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:26px}
 .hero-badge b{width:6px;height:6px;border-radius:50%;background:var(--gold)}
-.hero h1{color:var(--paper);font-size:clamp(46px,7vw,92px);margin-bottom:24px;max-width:14ch}
+.hero h1{color:var(--paper);font-size:clamp(46px,7vw,92px);margin:0 auto 24px;max-width:14ch}
 .hero h1 em{font-style:italic;font-weight:400;color:#9ed8c2}
-.hero-sub{font-size:16px;line-height:1.7;color:rgba(244,242,236,.7);max-width:460px;margin-bottom:34px}
-.hero-actions{display:flex;gap:12px;flex-wrap:wrap}
+.hero-sub{font-size:16px;line-height:1.7;color:rgba(244,242,236,.7);max-width:460px;margin:0 auto 34px}
+.hero-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
 
 /* Feature cards */
 .fcards-band{margin-top:-88px;position:relative;z-index:5}
@@ -228,6 +228,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <a href="#about">Why Nyumba</a>
       <a href="#pricing">Pricing</a>
       <a href="#contact">Contact</a>
+      <a href="{{ route('portal.login') }}">Tenant login</a>
       <a href="/login">Sign in</a>
     </div>
     <div class="nav-cta">
@@ -245,10 +246,11 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   </div>
   <div class="shard a"></div><div class="shard b"></div><div class="shard c"></div>
   <div class="hero-inner rv">
-    <h1 class="display">Collect rent,<br>not <em>excuses</em>.</h1>
-    <p class="hero-sub">Invoicing, M-Pesa reconciliation, utility billing and SMS reminders — running automatically for every unit in the portfolio.</p>
+    <h1 class="display">Everything you need to manage your rentals,<br>in <em>one place</em>.</h1>
+    <p class="hero-sub">Our system helps you send rent invoices, track M-Pesa payments, bill utilities, and remind tenants automatically so you spend less time following up and more time growing your property.</p>
     <div class="hero-actions">
       <a href="/register/step1" class="btn btn-gold">Start free trial <span class="arr" style="background:rgba(20,17,15,.15)">&rarr;</span></a>
+      <a href="{{ route('portal.login') }}" class="btn" style="background:#09399E;color:#FCD768">Tenant login <span class="arr" style="background:rgba(252,215,104,.25);color:#FCD768">&rarr;</span></a>
       <button class="btn btn-light" onclick="openDemo()"><span class="arr" style="background:var(--green)">&#9654;</span> Watch demo</button>
     </div>
   </div>
@@ -260,9 +262,9 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     @foreach([
       ['Automated invoicing','PDF invoices built and sent on schedule.','M3 7h14M5 3h10l2 4v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z'],
       ['M-Pesa reconciliation','Payments matched to invoices instantly.','M12 1v22M5 6h10a3 3 0 010 6H7a3 3 0 000 6h10'],
-      ['SMS reminders','Arrears chased before they grow.','M4 4h16v12H8l-4 4V4z'],
-      ['Utility billing','Meter readings to billed amounts.','M4 20V10M10 20V4M16 20v-7M22 20H2'],
-      ['Audit trail','Every action timestamped and traceable.','M9 11l3 3 8-8M21 12a9 9 0 11-6.2-8.5'],
+      ['SMS reminders','Automatically remind tenants before and after rent is due.','M4 4h16v12H8l-4 4V4z'],
+      ['Utility billing','Record meter readings and generate accurate utility bills in seconds.','M4 20V10M10 20V4M16 20v-7M22 20H2'],
+      ['Tenant self service','Tenants pay, submit proof of payment, and raise requests themselves.','M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5z'],
     ] as [$t,$d,$path])
       <div class="fcard rv">
         <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ $path }}"/></svg></div>
@@ -276,11 +278,11 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <section class="trust">
   <div class="wrap">
     <div class="trust-inner rv">
-      <div class="trust-lead">Trusted across Kenyan rental <span>portfolios</span> of every size.</div>
+      <div class="trust-lead">Helping landlords and property managers across Kenya manage rent <span>with </span>less stress.</div>
       <div class="trust-stats">
-        <div class="tstat"><div class="n">500+</div><div class="l">Landlords</div></div>
-        <div class="tstat"><div class="n">12k+</div><div class="l">Units live</div></div>
-        <div class="tstat"><div class="n">47</div><div class="l">Counties</div></div>
+        <div class="tstat"><div class="n">120</div><div class="l">Property Managers</div></div>
+        <div class="tstat"><div class="n">7k+</div><div class="l">Units live</div></div>
+        <div class="tstat"><div class="n">17</div><div class="l">Counties</div></div>
         <div class="tstat"><div class="n">30 day</div><div class="l">Free trial</div></div>
       </div>
     </div>
@@ -298,12 +300,12 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       </div>
       <div class="rv">
         <div class="eyebrow">Why Nyumba</div>
-        <h2 class="display">Built for the realities of <em>Kenyan property</em>.</h2>
-        <p class="about-body">Rent rarely arrives on time, and never in one format. Nyumba reconciles M-Pesa, Till and bank payments against every invoice, then chases arrears by SMS — without manual follow-up.</p>
+        <h2 class="display">Designed for how property management <em>works in Kenya</em>.</h2>
+        <p class="about-body">Whether tenants pay through M-Pesa, a bank transfer, or a till number, Nyumba helps you keep track of every payment. It automatically updates balances, sends reminders, and gives you a clear picture of what's happening across all your properties.</p>
         <div class="about-points">
           <div class="apoint">
             <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M5 6h10a3 3 0 010 6H7a3 3 0 000 6h10"/></svg></div>
-            <div><h5>Payment matching</h5><p>M-Pesa and bank inflows reconciled to invoices.</p></div>
+            <div><h5>Payment matching</h5><p>Every payment is linked to the correct tenant, reducing mistakes and saving hours of manual work.</p></div>
           </div>
           <div class="apoint">
             <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6"/></svg></div>
@@ -331,9 +333,9 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </div>
     <div class="svc-grid">
       @foreach([
-        ['Residential & commercial','Bedsitters to godowns, billed on their own terms.','M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6'],
-        ['Tenant & lease tracking','Deposits, lease terms and balances in one ledger.','M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8'],
-        ['Financial reporting','Collection rate, occupancy and net income on demand.','M3 3v18h18M7 14l4-4 4 4 4-6'],
+        ['Residential & commercial','From bedsitters and apartments to shops and warehouses, manage every property from one dashboard.','M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6'],
+        ['Tenant & lease tracking','Keep tenant details, leases, deposits and rent balances organized in one place.','M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.9M16 3.1a4 4 0 010 7.8'],
+        ['Financial reporting','See rent collected, outstanding balances, occupancy and income whenever you need them.','M3 3v18h18M7 14l4-4 4 4 4-6'],
         ['Maintenance requests','Issues logged, assigned and closed with a record.','M14.7 6.3a4 4 0 01-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 015.4-5.4l-3 3-2-2 3-3z'],
       ] as [$t,$d,$path])
         <div class="scard rv">
@@ -372,7 +374,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
               <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>{{ $f }}</li>
             @endforeach
           </ul>
-          <a href="{{ $name==='Enterprise' ? 'mailto:hello@nyumba.co.ke' : '/register/step1' }}" class="pcta">{{ $name==='Enterprise' ? 'Talk to support' : 'Start free trial' }}</a>
+          <a href="{{ $name==='Enterprise' ? 'mailto:info@nyumba.co.ke' : '/register/step1' }}" class="pcta">{{ $name==='Enterprise' ? 'Talk to support' : 'Start free trial' }}</a>
         </div>
       @endforeach
     </div>
@@ -401,7 +403,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
           </div>
           <div class="cm">
             <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></div>
-            <div><div class="t">Email</div><div class="v">hello@nyumba.co.ke</div></div>
+            <div><div class="t">Email</div><div class="v">info@nyumba.co.ke</div></div>
           </div>
           <div class="cm">
             <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
@@ -437,7 +439,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div>
         <div class="foot-h">Talk to support</div>
         <a href="https://wa.me/254705056343" class="foot-a">WhatsApp · 0705 056 343</a>
-        <a href="mailto:hello@nyumba.co.ke" class="foot-a">hello@nyumba.co.ke</a>
+        <a href="mailto:info@nyumba.co.ke" class="foot-a">info@nyumba.co.ke</a>
         <span class="foot-a">Nairobi, Kenya</span>
       </div>
     </div>
