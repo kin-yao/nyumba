@@ -289,10 +289,10 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <div class="trust-inner rv">
       <div class="trust-lead">Helping landlords and property managers across Kenya manage rent <span>with </span>less stress.</div>
       <div class="trust-stats">
-        <div class="tstat"><div class="n">120</div><div class="l">Property Managers</div></div>
-        <div class="tstat"><div class="n">7k+</div><div class="l">Units live</div></div>
+        <div class="tstat"><div class="n">36</div><div class="l">Property Managers</div></div>
+        <div class="tstat"><div class="n">3200+</div><div class="l">Units live</div></div>
         <div class="tstat"><div class="n">17</div><div class="l">Counties</div></div>
-        <div class="tstat"><div class="n">30 day</div><div class="l">Free trial</div></div>
+        <div class="tstat"><div class="n">7 day</div><div class="l">Free trial</div></div>
       </div>
     </div>
   </div>
@@ -312,15 +312,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         <h2 class="display">Designed for how property management <em>works in Kenya</em>.</h2>
         <p class="about-body">Whether tenants pay through M-Pesa, a bank transfer, or a till number, Nyumba helps you keep track of every payment. It automatically updates balances, sends reminders, and gives you a clear picture of what's happening across all your properties.</p>
         <div class="about-points">
-          <div class="apoint">
-            <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22M5 6h10a3 3 0 010 6H7a3 3 0 000 6h10"/></svg></div>
-            <div><h5>Payment matching</h5><p>Every payment is linked to the correct tenant, reducing mistakes and saving hours of manual work.</p></div>
-          </div>
-          <div class="apoint">
-            <div class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6"/></svg></div>
-            <div><h5>Caretaker ready</h5><p>Meter readings entered from any phone.</p></div>
-          </div>
-        </div>
+          
         <div class="about-cta">
           <a href="/register/step1" class="btn btn-green">Start free trial <span class="arr">&rarr;</span></a>
           <div class="about-phone">
