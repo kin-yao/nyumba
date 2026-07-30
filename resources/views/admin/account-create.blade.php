@@ -99,11 +99,10 @@
                             @foreach(['explore','starter','growth','pro','enterprise'] as $p)
                                 <option value="{{ $p }}" {{ old('plan','explore') === $p ? 'selected' : '' }}>
                                     {{ ucfirst($p) }}
-                                    @if($p==='explore') (Free) @endif
-                                    @if($p==='starter') (KES 2,000/mo, 20 units) @endif
-                                    @if($p==='growth')  (KES 4,500/mo, 50 units) @endif
-                                    @if($p==='pro')     (KES 7,000/mo, 100 units) @endif
-                                    @if($p==='enterprise') (Unlimited) @endif
+                                    @if($p==='explore') (Free, 7 days, 3 units) @endif
+                                    @if($p==='starter') (KES 3,750/mo flat, up to 75 units) @endif
+                                    @if($p==='growth')  (KES 50/unit/mo, 76–150 units) @endif
+                                    @if($p==='enterprise') (KES 40/unit/mo, 151+ units) @endif
                                 </option>
                             @endforeach
                         </select>

@@ -150,7 +150,7 @@ a{color:inherit;text-decoration:none}
 .pricing-head .eyebrow{display:inline-block;margin-bottom:14px}
 .pricing-head h2{font-size:clamp(30px,4vw,52px);color:var(--paper);max-width:18ch;margin:0 auto}
 .pricing-head h2 em{font-style:italic;font-weight:400;color:#9ed8c2}
-.pricing-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:980px;margin:0 auto}
 .pc{background:rgba(244,242,236,.05);border:1px solid rgba(244,242,236,.1);border-radius:12px;padding:30px 26px;display:flex;flex-direction:column;transition:transform .26s,border-color .26s}
 .pc:hover{transform:translateY(-8px);border-color:rgba(244,242,236,.3)}
 .pc.hot{background:var(--green);border-color:var(--green)}
@@ -170,6 +170,17 @@ a{color:inherit;text-decoration:none}
 .pc.hot .pcta{background:var(--gold);color:var(--ink)}.pc.hot .pcta:hover{background:#fff}
 .pricing-note{text-align:center;margin-top:30px;font-family:'Clash Display',serif;font-style:italic;font-size:16px;color:rgba(244,242,236,.45)}
 .pricing-note b{color:var(--gold);font-style:normal;font-weight:600}
+.calc-box{max-width:640px;margin:44px auto 0;background:rgba(244,242,236,.06);border:1px solid rgba(244,242,236,.16);border-radius:12px;padding:30px 34px}
+.calc-title{font-family:'Cabinet Grotesk',sans-serif;font-weight:700;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:rgba(244,242,236,.55);margin-bottom:20px}
+.calc-title b{color:var(--gold)}
+.calc-input-row{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.calc-input-row label{font-size:14px;color:var(--paper)}
+.calc-input-row input{width:110px;height:42px;border-radius:6px;border:1px solid rgba(244,242,236,.25);background:rgba(244,242,236,.08);color:var(--paper);font-size:16px;text-align:center;font-family:'Satoshi',sans-serif;outline:none}
+.calc-result{border-top:1px solid rgba(244,242,236,.14);padding-top:20px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px}
+.calc-plan{font-family:'Cabinet Grotesk',sans-serif;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:700}
+.calc-price{font-family:'Clash Display',serif;font-weight:600;font-size:36px;color:var(--paper);margin-top:6px;letter-spacing:-.02em}
+.calc-per{font-size:13px;color:rgba(244,242,236,.5);margin-left:6px;font-family:'Satoshi',sans-serif}
+.calc-meta{display:flex;flex-direction:column;gap:5px;text-align:right;font-size:12.5px;color:rgba(244,242,236,.6);font-family:'Cabinet Grotesk',sans-serif}
 
 /* Contact CTA */
 .contact{padding:90px 0}
@@ -205,7 +216,7 @@ a{color:inherit;text-decoration:none}
 .demo-box{background:var(--ink);border-radius:10px;width:100%;max-width:840px;overflow:hidden;position:relative}
 .demo-x{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;background:rgba(244,242,236,.12);border:none;color:var(--paper);font-size:18px;cursor:pointer;z-index:2}
 
-@media(max-width:1040px){.fcards{grid-template-columns:repeat(3,1fr)}.svc-grid{grid-template-columns:repeat(2,1fr)}.pricing-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:1040px){.fcards{grid-template-columns:repeat(3,1fr)}.svc-grid{grid-template-columns:repeat(2,1fr)}.pricing-grid{grid-template-columns:1fr 1fr;max-width:640px}}
 @media(max-width:980px){.foot-grid{grid-template-columns:1fr 1fr;gap:30px}.util-left .it.hide-sm{display:none}.contact-inner{grid-template-columns:1fr;gap:36px}}
 @media(max-width:860px){.about-grid{grid-template-columns:1fr;gap:44px}.about-visual{max-width:460px}}
 @media(max-width:760px){.nav-burger{display:flex}.nav-cta .btn-gold{display:none}.nav-links{display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;gap:0;background:var(--card);border-bottom:1px solid var(--line);box-shadow:0 16px 30px -18px rgba(20,17,15,.3);padding:6px 24px 14px}.nav-links.open{display:flex}.nav-links a{padding:14px 2px;border-bottom:1px solid var(--line);font-size:15px}.nav-links a:last-child{border-bottom:none}.nav-links a::after{display:none}.util-right{display:none}.foot-grid{grid-template-columns:1fr 1fr}.foot-bottom{flex-direction:column;gap:6px;text-align:center}}
@@ -355,16 +366,15 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <div class="pricing-grid">
       @php
         $plans = [
-          ['Starter','KES 2,300','per month','For the new landlord moving off notebooks and onto schedule.',['Up to 20 units','80 SMS credits monthly','PDF invoices','Utility tracking'],false],
-          ['Growth','KES 4,600','per month','For the growing portfolio that should run without daily oversight.',['Up to 50 units','200 SMS credits monthly','Bulk invoicing','Advanced reports'],true],
-          ['Pro','KES 7,500','per month','For multiple buildings, caretaker teams and co-owners.',['Up to 100 units','400 SMS credits monthly','Multi-user access','Full audit trail'],false],
-          ['Enterprise','Custom','tailored to portfolio','For managers running 100+ units across many owners.',['Unlimited units','Custom SMS bundle','Dedicated support','API access'],false],
+          ['Starter','KES 3,750','flat, per month','For landlords with up to 75 units — one flat price, no per-unit maths.',['Up to 75 units','300 SMS credits monthly','PDF invoices','Utility tracking'],false],
+          ['Growth','KES 50','per unit / month','For the growing portfolio between 76 and 150 units.',['76–150 units','4 SMS credits per unit','Bulk invoicing','Advanced reports'],true],
+          ['Enterprise','KES 40','per unit / month','For managers running 151+ units across many owners.',['151+ units','4 SMS credits per unit','Dedicated support','API access'],false],
         ];
       @endphp
       @foreach($plans as [$name,$amt,$per,$desc,$feats,$hot])
         <div class="pc {{ $hot ? 'hot' : '' }} rv">
           <div class="pname">{{ $name }} @if($hot)<span class="badge">Popular</span>@endif</div>
-          <div class="amt" @if($name==='Enterprise') style="font-size:32px;padding-top:8px" @endif>{{ $amt }}</div>
+          <div class="amt" @if(in_array($name,['Growth','Enterprise'])) style="font-size:32px;padding-top:8px" @endif>{{ $amt }}</div>
           <div class="per">{{ $per }}</div>
           <p class="desc">{{ $desc }}</p>
           <ul>
@@ -377,8 +387,57 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       @endforeach
     </div>
     <p class="pricing-note">Pay 6 months, get 1 free. <b>Pay 12 months, get 2 free.</b> Extra SMS at KES 1 per credit.</p>
+
+    <div class="calc-box rv">
+      <div class="calc-title">Not sure which plan fits? <b>Calculate your price</b></div>
+      <div class="calc-input-row">
+        <label for="calcUnits">Units in your portfolio</label>
+        <input type="number" id="calcUnits" min="1" value="25" oninput="calcPricing()">
+      </div>
+      <div class="calc-result">
+        <div>
+          <div class="calc-plan" id="calcPlanName">Starter</div>
+          <div class="calc-price"><span id="calcPrice">KES 2,500</span><span class="calc-per">/month</span></div>
+        </div>
+        <div class="calc-meta">
+          <span id="calcPerUnit">KES 50 / unit</span>
+          <span id="calcSms">200 SMS credits included</span>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
+
+<script>
+function calcPricing() {
+  const units = Math.max(1, parseInt(document.getElementById('calcUnits').value) || 1);
+
+  let planName, price, sms;
+
+  if (units <= 75) {
+    planName = 'Starter';
+    price = 3750;
+    sms = 300;
+  } else if (units <= 150) {
+    planName = 'Growth';
+    price = units * 50;
+    sms = units * 4;
+  } else {
+    planName = 'Enterprise';
+    price = units * 40;
+    sms = units * 4;
+  }
+
+  const perUnit = Math.round(price / units);
+  const fmt = n => 'KES ' + n.toLocaleString('en-KE');
+
+  document.getElementById('calcPlanName').textContent = planName;
+  document.getElementById('calcPrice').textContent = fmt(price);
+  document.getElementById('calcPerUnit').textContent = fmt(perUnit) + ' / unit';
+  document.getElementById('calcSms').textContent = sms.toLocaleString('en-KE') + ' SMS credits included';
+}
+document.addEventListener('DOMContentLoaded', calcPricing);
+</script>
 
 <!-- CONTACT CTA -->
 <section class="contact" id="contact">

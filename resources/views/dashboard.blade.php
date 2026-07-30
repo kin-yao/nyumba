@@ -548,15 +548,16 @@
                 <button type="button" id="dexp-cycle-yearly" onclick="dexpSetCycle('yearly')">Yearly</button>
             </div>
 
+            @php
+                $dexpUnits   = max(1, auth()->user()->account->currentUnitCount());
+                $dexpPricing = \App\Models\Account::priceForUnitCount($dexpUnits);
+            @endphp
             <div class="db-expiry-plans">
-                @foreach(['starter','growth','pro'] as $planKey)
-                    @php $plan = \App\Models\Account::PLANS[$planKey]; @endphp
-                    <div class="db-expiry-plan" id="dexp-plan-{{ $planKey }}" onclick="dexpSelectPlan('{{ $planKey }}')">
-                        <div class="db-expiry-plan-name">{{ $plan['name'] }}</div>
-                        <div class="db-expiry-plan-price price-monthly">{{ currency($plan['price_monthly']) }}/mo</div>
-                        <div class="db-expiry-plan-price price-yearly" style="display:none">{{ currency($plan['price_yearly']) }}/yr</div>
-                    </div>
-                @endforeach
+                <div class="db-expiry-plan on">
+                    <div class="db-expiry-plan-name">{{ $dexpPricing['name'] }} &middot; {{ $dexpUnits }} unit{{ $dexpUnits === 1 ? '' : 's' }}</div>
+                    <div class="db-expiry-plan-price price-monthly">{{ currency($dexpPricing['monthly']) }}/mo</div>
+                    <div class="db-expiry-plan-price price-yearly" style="display:none">{{ currency($dexpPricing['yearly']) }}/yr</div>
+                </div>
             </div>
 
             <div style="text-align:left;margin-bottom:14px">
@@ -1016,7 +1017,6 @@
 @if($isExpired)
 <script>
 var dexpCycle = 'monthly';
-var dexpPlan  = null;
 var dexpPollTimer = null;
 
 function dexpSetCycle(cycle) {
@@ -1027,21 +1027,8 @@ function dexpSetCycle(cycle) {
     document.querySelectorAll('.db-expiry-plan .price-yearly').forEach(el => el.style.display = cycle === 'yearly' ? 'block' : 'none');
 }
 
-function dexpSelectPlan(planKey) {
-    dexpPlan = planKey;
-    document.querySelectorAll('.db-expiry-plan').forEach(el => el.classList.remove('on'));
-    document.getElementById('dexp-plan-' + planKey).classList.add('on');
-    document.getElementById('dexp-error').style.display = 'none';
-}
-
 function dexpInitiateStkPush() {
     var errEl = document.getElementById('dexp-error');
-
-    if (!dexpPlan) {
-        errEl.textContent = 'Please choose a plan first.';
-        errEl.style.display = 'block';
-        return;
-    }
 
     var phone = document.getElementById('dexp-phone').value.trim();
     if (!/^(0[71][0-9]{8}|254[71][0-9]{8}|\+254[71][0-9]{8})$/.test(phone)) {
@@ -1058,7 +1045,7 @@ function dexpInitiateStkPush() {
     fetch('{{ route('subscription.upgrade') }}', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
-        body: JSON.stringify({ plan: dexpPlan, billing_cycle: dexpCycle, phone: phone }),
+        body: JSON.stringify({ billing_cycle: dexpCycle, phone: phone }),
     })
     .then(r => r.json().then(data => ({ ok: r.ok, data })))
     .then(({ ok, data }) => {

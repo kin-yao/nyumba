@@ -372,43 +372,42 @@
                 </div>
 
                 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px">
-                    <div style="font-size:13px;font-weight:500">Available plans</div>
+                    <div style="font-size:13px;font-weight:500">Your price</div>
                     <div class="cycle-toggle">
                         <button type="button" class="active" id="cycle-monthly" onclick="setCycle('monthly')">Monthly</button>
-                        <button type="button" id="cycle-yearly" onclick="setCycle('yearly')">Yearly</button>
+                        <button type="button" id="cycle-yearly" onclick="setCycle('yearly')">Yearly <span style="opacity:.7">(1 month free)</span></button>
                     </div>
                 </div>
 
-                <div class="plans-grid">
-                    @foreach(['starter','growth','pro'] as $planKey)
-                        @php
-                            $plan      = \App\Models\Account::PLANS[$planKey];
-                            $isCurrent = $account->plan === $planKey;
-                        @endphp
-                        <div style="background:#fff;border-radius:10px;border:2px solid {{ $isCurrent?'#1a6b52':'rgba(0,0,0,0.07)' }};padding:16px;position:relative">
-                            @if($isCurrent)
-                                <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#1a6b52;color:#fff;font-size:10px;font-weight:600;padding:2px 10px;border-radius:10px;white-space:nowrap">CURRENT</div>
-                            @endif
-                            <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:#8a8880;margin-bottom:6px">{{ $plan['name'] }}</div>
-                            <div class="price-monthly">
-                                <div style="font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:2px">{{ currency($plan['price_monthly']) }}</div>
-                                <div style="font-size:11px;color:#8a8880;margin-bottom:6px">per month</div>
-                            </div>
-                            <div class="price-yearly" style="display:none">
-                                <div style="font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:2px">{{ currency($plan['price_yearly']) }}</div>
-                                <div style="font-size:11px;color:#8a8880;margin-bottom:6px">per year</div>
-                            </div>
-                            <div style="border-top:1px solid rgba(0,0,0,0.06);padding-top:10px;font-size:12px;display:grid;gap:3px;color:#8a8880;margin-bottom:12px">
-                                <div>Up to {{ $plan['unit_limit'] }} units</div>
-                                <div>{{ $plan['sms_credits_monthly'] }} SMS/month</div>
-                            </div>
-                            <button type="button"
-                                    onclick="openUpgradeModal('{{ $planKey }}', '{{ $plan['name'] }}')"
-                                    style="width:100%;padding:7px;background:{{ $isCurrent?'transparent':'#1a6b52' }};color:{{ $isCurrent?'#1a6b52':'#fff' }};border:1px solid #1a6b52;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
-                                {{ $isCurrent ? 'Renew / Extend' : 'Upgrade' }}
-                            </button>
-                        </div>
-                    @endforeach
+                @php
+                    $realUnits    = $account->currentUnitCount();
+                    $pricingNow   = \App\Models\Account::priceForUnitCount($realUnits);
+                @endphp
+                <div style="background:#fff;border-radius:10px;border:2px solid #1a6b52;padding:20px;max-width:340px;margin-bottom:16px">
+                    <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:#8a8880;margin-bottom:6px">{{ $pricingNow['name'] }} &middot; {{ $realUnits }} unit{{ $realUnits === 1 ? '' : 's' }}</div>
+                    <div class="price-monthly">
+                        <div style="font-family:'DM Serif Display',serif;font-size:26px;margin-bottom:2px">{{ currency($pricingNow['monthly']) }}</div>
+                        <div style="font-size:11px;color:#8a8880;margin-bottom:6px">per month</div>
+                    </div>
+                    <div class="price-yearly" style="display:none">
+                        <div style="font-family:'DM Serif Display',serif;font-size:26px;margin-bottom:2px">{{ currency($pricingNow['yearly']) }}</div>
+                        <div style="font-size:11px;color:#8a8880;margin-bottom:6px">per year</div>
+                    </div>
+                    <div style="border-top:1px solid rgba(0,0,0,0.06);padding-top:10px;font-size:12px;color:#8a8880;margin-bottom:14px">
+                        {{ $pricingNow['sms'] }} SMS credits/month included
+                    </div>
+                    <button type="button"
+                            onclick="openUpgradeModal('{{ $pricingNow['name'] }}')"
+                            style="width:100%;padding:9px;background:#1a6b52;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif">
+                        {{ $account->isActive() && $account->plan !== 'explore' ? 'Renew / Extend' : 'Pay now' }}
+                    </button>
+                    <div style="font-size:11px;color:#8a8880;margin-top:10px;line-height:1.5">
+                        @if($realUnits === 0)
+                            You haven't added any units yet — this is the minimum price to activate your account. Add units any time and your next payment will reflect the new count.
+                        @else
+                            Price is based on your current {{ $realUnits }} unit{{ $realUnits === 1 ? '' : 's' }}. Add more units later and your next payment simply reflects the new count — no plan to switch.
+                        @endif
+                    </div>
                 </div>
 
                 <div style="background:#fff;border-radius:10px;border:1px solid rgba(0,0,0,0.07);padding:16px 18px;max-width:700px;font-size:13px">
@@ -724,10 +723,9 @@ window.addEventListener('resize', fixNavBorders);
 fixNavBorders();
 
 var currentCycle = 'monthly';
-var planPrices = {
-    starter: { monthly: {{ \App\Models\Account::PLANS['starter']['price_monthly'] }}, yearly: {{ \App\Models\Account::PLANS['starter']['price_yearly'] }} },
-    growth:  { monthly: {{ \App\Models\Account::PLANS['growth']['price_monthly'] }},  yearly: {{ \App\Models\Account::PLANS['growth']['price_yearly'] }} },
-    pro:     { monthly: {{ \App\Models\Account::PLANS['pro']['price_monthly'] }},     yearly: {{ \App\Models\Account::PLANS['pro']['price_yearly'] }} },
+var pricingNow = {
+    monthly: {{ $pricingNow['monthly'] }},
+    yearly:  {{ $pricingNow['yearly'] }},
 };
 
 function setCycle(cycle) {
@@ -738,14 +736,12 @@ function setCycle(cycle) {
     document.querySelectorAll('.price-yearly').forEach(el => el.style.display = cycle === 'yearly' ? 'block' : 'none');
 }
 
-var selectedPlan = null;
-var pollTimer    = null;
+var pollTimer = null;
 
-function openUpgradeModal(planKey, planName) {
-    selectedPlan = planKey;
-    document.getElementById('upgrade-title').textContent = 'Upgrade to ' + planName;
+function openUpgradeModal(planName) {
+    document.getElementById('upgrade-title').textContent = 'Pay for ' + planName;
     document.getElementById('upgrade-amount').textContent =
-        '{{ currency_symbol() }} ' + planPrices[planKey][currentCycle].toLocaleString() + ' / ' + (currentCycle === 'monthly' ? 'month' : 'year');
+        '{{ currency_symbol() }} ' + pricingNow[currentCycle].toLocaleString() + ' / ' + (currentCycle === 'monthly' ? 'month' : 'year');
     resetUpgradeModal();
     document.getElementById('upgrade-modal').style.display = 'flex';
 }
@@ -781,7 +777,7 @@ function initiateStkPush() {
     fetch('{{ route('subscription.upgrade') }}', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
-        body: JSON.stringify({ plan: selectedPlan, billing_cycle: currentCycle, phone: phone }),
+        body: JSON.stringify({ billing_cycle: currentCycle, phone: phone }),
     })
     .then(r => r.json().then(data => ({ ok: r.ok, data })))
     .then(({ ok, data }) => {

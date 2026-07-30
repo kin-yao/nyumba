@@ -51,33 +51,35 @@ class Account extends Model
             'price_monthly'       => 0,
             'price_yearly'        => 0,
         ],
+    ];
+
+    // Trial: 7 days, capped at 3 units — the only plan with a real unit cap.
+    const EXPLORE_TRIAL_DAYS = 7;
+
+    // Paid pricing is a function of actual unit count, not a menu of fixed
+    // tiers — see priceForUnitCount(). Bands:
+    //   Starter (1–75):    flat fee, flat SMS allowance
+    //   Growth (76–150):   per-unit rate
+    //   Enterprise (151+): lower per-unit rate
+    // Paying accounts have no unit_limit cap (set to 999999 on upgrade) —
+    // cost simply scales with however many units they add.
+    const PRICING_BANDS = [
         'starter' => [
-            'name'                => 'Starter',
-            'unit_limit'          => 20,
-            'sms_credits_monthly' => 80,
-            'price_monthly'       => 2300,
-            'price_yearly'        => 19300,
+            'name'       => 'Starter',
+            'max_units'  => 75,
+            'flat_price' => 3750,
+            'flat_sms'   => 300,
         ],
         'growth' => [
-            'name'                => 'Growth',
-            'unit_limit'          => 50,
-            'sms_credits_monthly' => 200,
-            'price_monthly'       => 4600,
-            'price_yearly'        => 38600,
-        ],
-        'pro' => [
-            'name'                => 'Pro',
-            'unit_limit'          => 100,
-            'sms_credits_monthly' => 400,
-            'price_monthly'       => 7500,
-            'price_yearly'        => 63000,
+            'name'         => 'Growth',
+            'max_units'    => 150,
+            'per_unit'     => 50,
+            'sms_per_unit' => 4,
         ],
         'enterprise' => [
-            'name'                => 'Enterprise',
-            'unit_limit'          => 999999,
-            'sms_credits_monthly' => 500,
-            'price_monthly'       => 0,
-            'price_yearly'        => 0,
+            'name'         => 'Enterprise',
+            'per_unit'     => 40,
+            'sms_per_unit' => 4,
         ],
     ];
 
@@ -96,6 +98,41 @@ class Account extends Model
         return $this->plan === 'explore'
             && $this->trial_ends_at
             && $this->trial_ends_at->isPast();
+    }
+
+    /**
+     * The actual pricing engine. Returns the plan label, monthly price,
+     * yearly price (pay 12 months, get 1 free → 11× monthly), and SMS
+     * allowance for a given unit count. This is the single source of truth
+     * for what a landlord pays — nothing else should compute price directly.
+     */
+    public static function priceForUnitCount(int $units): array
+    {
+        $units = max(1, $units);
+        $bands = self::PRICING_BANDS;
+
+        if ($units <= $bands['starter']['max_units']) {
+            $planKey = 'starter';
+            $monthly = $bands['starter']['flat_price'];
+            $sms     = $bands['starter']['flat_sms'];
+        } elseif ($units <= $bands['growth']['max_units']) {
+            $planKey = 'growth';
+            $monthly = $units * $bands['growth']['per_unit'];
+            $sms     = $units * $bands['growth']['sms_per_unit'];
+        } else {
+            $planKey = 'enterprise';
+            $monthly = $units * $bands['enterprise']['per_unit'];
+            $sms     = $units * $bands['enterprise']['sms_per_unit'];
+        }
+
+        return [
+            'plan_key' => $planKey,
+            'name'     => $bands[$planKey]['name'],
+            'units'    => $units,
+            'monthly'  => $monthly,
+            'yearly'   => $monthly * 11, // pay 12 months, get 1 free
+            'sms'      => $sms,
+        ];
     }
 
     public function isActive(): bool
@@ -121,8 +158,7 @@ class Account extends Model
     public function trialDaysRemaining(): int
     {
         if (!$this->isOnTrial()) return 0;
-        // No trial_ends_at means unlimited trial — show 30 as default
-        if (!$this->trial_ends_at) return 30;
+        if (!$this->trial_ends_at) return self::EXPLORE_TRIAL_DAYS;
         return max(0, (int) now()->diffInDays($this->trial_ends_at));
     }
 

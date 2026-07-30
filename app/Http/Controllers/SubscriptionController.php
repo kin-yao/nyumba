@@ -12,22 +12,23 @@ use Illuminate\Support\Facades\Log;
 class SubscriptionController extends Controller
 {
     /**
-     * Initiate an STK push for a plan upgrade.
+     * Initiate an STK push to renew/upgrade — price is computed from the
+     * account's actual current unit count, not a chosen plan tier.
      */
     public function initiate(Request $request, MpesaService $mpesa)
     {
         $validated = $request->validate([
-            'plan'          => ['required', 'in:starter,growth,pro'],
             'billing_cycle' => ['required', 'in:monthly,yearly'],
             'phone'         => ['required', 'string'],
         ]);
 
         $account = auth()->user()->account;
-        $planDef = Account::PLANS[$validated['plan']];
+        $units   = max(1, $account->currentUnitCount());
+        $pricing = Account::priceForUnitCount($units);
 
         $amount = $validated['billing_cycle'] === 'yearly'
-            ? $planDef['price_yearly']
-            : $planDef['price_monthly'];
+            ? $pricing['yearly']
+            : $pricing['monthly'];
 
         if ($amount <= 0) {
             return response()->json([
@@ -51,7 +52,7 @@ class SubscriptionController extends Controller
             phone: $phone,
             amount: (float) $amount,
             accountRef: 'NYUMBA-' . $account->id,
-            description: ucfirst($validated['plan']) . ' plan',
+            description: $pricing['name'] . ' plan (' . $units . ' units)',
             callbackUrl: $callbackUrl
         );
 
@@ -62,7 +63,7 @@ class SubscriptionController extends Controller
         $transaction = MpesaTransaction::create([
             'account_id'          => $account->id,
             'type'                => 'subscription',
-            'plan'                => $validated['plan'],
+            'plan'                => $pricing['plan_key'],
             'billing_cycle'       => $validated['billing_cycle'],
             'amount'              => $amount,
             'phone'               => $phone,
@@ -163,21 +164,24 @@ class SubscriptionController extends Controller
      * Apply the plan upgrade after successful M-Pesa payment.
      *
      * Duration logic:
-     * - Monthly: calculate months covered = floor(amount / price_monthly)
-     *   e.g. Starter at KES 2,300/mo, pay KES 4,600 → 2 months → 60 days
+     * - Monthly: calculate months covered = floor(amount / monthly price at
+     *   time of payment) — recomputed from the account's unit count NOW.
      * - Yearly: fixed 365 days
      * - Always from NOW — never stacked on existing expiry
+     *
+     * Paying accounts get unit_limit = 999999 (no cap) — cost scales with
+     * actual unit count instead of a hard ceiling per tier.
      */
     private function applyPlanUpgrade(MpesaTransaction $transaction): void
     {
         $account = Account::find($transaction->account_id);
         if (!$account) return;
 
-        $planDef = Account::PLANS[$transaction->plan] ?? null;
-        if (!$planDef) return;
+        $units   = max(1, $account->currentUnitCount());
+        $pricing = Account::priceForUnitCount($units);
 
         $amountPaid   = floatval($transaction->amount);
-        $priceMonthly = floatval($planDef['price_monthly']);
+        $priceMonthly = floatval($pricing['monthly']);
 
         if ($transaction->billing_cycle === 'yearly') {
             $days          = 365;
@@ -189,18 +193,15 @@ class SubscriptionController extends Controller
             $days = $monthsCovered * 30;
         }
 
-        $creditsToAdd = $planDef['sms_credits_monthly'] * $monthsCovered;
+        $creditsToAdd = $pricing['sms'] * $monthsCovered;
 
         $account->update([
-            'plan'                => $transaction->plan,
+            'plan'                => $pricing['plan_key'],
             'plan_expires_at'     => now()->addDays($days),
             'subscribed_at'       => $account->subscribed_at ?? now(),
             'trial_ends_at'       => null,
-            // Update unit_limit and sms_credits_monthly to match the new plan
-            // These were missing before — caused paid accounts to still show
-            // the Explore plan's 3-unit limit after upgrading
-            'unit_limit'          => $planDef['unit_limit'],
-            'sms_credits_monthly' => $planDef['sms_credits_monthly'],
+            'unit_limit'          => 999999,
+            'sms_credits_monthly' => $pricing['sms'],
         ]);
 
         $account->increment('sms_credits', $creditsToAdd);
@@ -208,9 +209,9 @@ class SubscriptionController extends Controller
         \App\Models\Notification::create([
             'account_id' => $account->id,
             'type'       => 'subscription_activated',
-            'title'      => 'Plan upgraded to ' . $planDef['name'],
+            'title'      => 'Plan upgraded to ' . $pricing['name'],
             'body'       => 'Your payment of KES ' . number_format($amountPaid) . ' was received via M-Pesa ('
-                . $transaction->mpesa_receipt . '). Your ' . $planDef['name'] . ' plan is active for '
+                . $transaction->mpesa_receipt . '). Your ' . $pricing['name'] . ' plan is active for '
                 . $days . ' days (' . $monthsCovered . ' '
                 . ($monthsCovered === 1 ? 'month' : 'months') . '). '
                 . $creditsToAdd . ' SMS credits added.',
@@ -218,16 +219,16 @@ class SubscriptionController extends Controller
 
         AuditService::log(
             'subscription.upgraded',
-            'Account upgraded to ' . $planDef['name'] . ' via M-Pesa (' . $transaction->mpesa_receipt . ')'
+            'Account upgraded to ' . $pricing['name'] . ' via M-Pesa (' . $transaction->mpesa_receipt . ')'
                 . ' — ' . $monthsCovered . ' month(s) / ' . $days . ' days',
             $account,
             [
-                'plan'           => $transaction->plan,
+                'plan'           => $pricing['plan_key'],
+                'units'          => $units,
                 'billing_cycle'  => $transaction->billing_cycle,
                 'amount_paid'    => $amountPaid,
                 'months_covered' => $monthsCovered,
                 'days'           => $days,
-                'unit_limit'     => $planDef['unit_limit'],
                 'receipt'        => $transaction->mpesa_receipt,
                 'credits_added'  => $creditsToAdd,
             ]
