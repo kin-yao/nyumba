@@ -361,9 +361,9 @@ class FirebaseAuthController extends Controller
                     'unit_limit'           => $explorePlan['unit_limit'],
                     'sms_credits'          => $explorePlan['sms_credits_monthly'],
                     'sms_credits_monthly'  => $explorePlan['sms_credits_monthly'],
-                    // trial_ends_at = the 30-day free trial window
+                    // trial_ends_at = the free trial window (7 days, 3 units)
                     // plan_expires_at = null until a paid plan is purchased via M-Pesa
-                    'trial_ends_at'        => now()->addDays(30),
+                    'trial_ends_at'        => now()->addDays(Account::EXPLORE_TRIAL_DAYS),
                     'plan_expires_at'      => null,
                     'use_case'             => 'own_rental',
                     'terms_accepted_at'    => session('reg.accept_terms_at', now()),
