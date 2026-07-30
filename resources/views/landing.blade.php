@@ -439,7 +439,7 @@ document.addEventListener('DOMContentLoaded', calcPricing);
       <div class="contact-inner">
         <div>
           <h2 class="display">Start the <em>free trial</em> today.</h2>
-          <p>Thirty days, full features, no card. Properties, units and tenants import from a single CSV, with setup support included.</p>
+          <p>Seven days, full features, no card. Properties, units and tenants import from a single CSV, with setup support included.</p>
           <div class="contact-actions">
             <a href="/register/step1" class="btn btn-gold">Create an account <span class="arr" style="background:rgba(20,17,15,.15)">&rarr;</span></a>
             <a href="https://wa.me/254705056343" class="btn btn-light">WhatsApp support</a>
@@ -470,7 +470,7 @@ document.addEventListener('DOMContentLoaded', calcPricing);
     <div class="foot-grid">
       <div>
         <a href="/" class="foot-logo"><img src="/images/logo.png" alt="Nyumba"></a>
-        <p class="foot-desc">The operating system for Kenyan landlords.</p>
+        <p class="foot-desc">The operating system for landlords and property managers and real estate agents.</p>
       </div>
       <div>
         <div class="foot-h">Product</div>
@@ -494,7 +494,7 @@ document.addEventListener('DOMContentLoaded', calcPricing);
     </div>
     <div class="foot-bottom">
       <span>&copy; {{ date('Y') }} Nyumba. All rights reserved.</span>
-      <span>Built in Nairobi.</span>
+      
     </div>
   </div>
 </footer>
