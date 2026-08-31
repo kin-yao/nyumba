@@ -8,6 +8,7 @@ use App\Models\Unit;
 use App\Models\UtilityReading;
 use App\Models\UtilityRate;
 use App\Services\AuditService;
+use App\Support\Money;
 use Illuminate\Http\Request;
 
 class UtilityController extends Controller
@@ -66,9 +67,13 @@ class UtilityController extends Controller
             ->where('active', true)
             ->first();
 
-        $ratePerUnit   = $configuredRate ? floatval($configuredRate->amount) : 0;
-        $unitsConsumed = $validated['current_reading'] - $validated['previous_reading'];
-        $chargeAmount  = $unitsConsumed * $ratePerUnit;
+        $ratePerUnitSafe   = $configuredRate ? Money::normalize($configuredRate->amount) : '0.00';
+        $unitsConsumedSafe = Money::sub($validated['current_reading'], $validated['previous_reading']);
+        $chargeAmountSafe  = Money::mul($unitsConsumedSafe, $ratePerUnitSafe);
+
+        $ratePerUnit   = (float) $ratePerUnitSafe;
+        $unitsConsumed = (float) $unitsConsumedSafe;
+        $chargeAmount  = (float) $chargeAmountSafe;
 
         $reading = UtilityReading::updateOrCreate(
             [
@@ -167,7 +172,7 @@ class UtilityController extends Controller
                         $tenant->full_name,
                         $rate->type,
                         $rate->name,
-                        $last ? floatval($last->current_reading) : 0,
+                        $last ? (float) Money::normalize($last->current_reading) : 0,
                         '', // to be filled in
                     ];
                 }
@@ -255,19 +260,23 @@ class UtilityController extends Controller
                 continue;
             }
 
-            $previousReading = is_numeric($data['previous_reading'] ?? null)
-                ? floatval($data['previous_reading'])
-                : 0;
+            $previousReadingSafe = is_numeric($data['previous_reading'] ?? null)
+                ? Money::normalize($data['previous_reading'])
+                : '0.00';
 
-            $currentReading = floatval($currentReading);
+            $currentReadingSafe = Money::normalize($currentReading);
+            $previousReading    = (float) $previousReadingSafe;
+            $currentReading     = (float) $currentReadingSafe;
 
             if ($currentReading < $previousReading) {
                 $skipped[] = "Row {$rowNum} ({$unit->name}, {$type}): current reading is less than previous reading";
                 continue;
             }
 
-            $unitsConsumed = $currentReading - $previousReading;
-            $chargeAmount  = $unitsConsumed * floatval($rate->amount);
+            $unitsConsumedSafe = Money::sub($currentReadingSafe, $previousReadingSafe);
+            $chargeAmountSafe  = Money::mul($unitsConsumedSafe, $rate->amount);
+            $unitsConsumed     = (float) $unitsConsumedSafe;
+            $chargeAmount      = (float) $chargeAmountSafe;
 
             UtilityReading::updateOrCreate(
                 [
@@ -410,7 +419,7 @@ class UtilityController extends Controller
 
             $charges[] = [
                 'description' => ($rate ? $rate->name : ucfirst($reading->utility_type)) . ' charges',
-                'amount'      => floatval($reading->charge_amount),
+                'amount'      => (float) Money::normalize($reading->charge_amount),
                 'type'        => $reading->utility_type,
             ];
         }
@@ -418,7 +427,7 @@ class UtilityController extends Controller
         foreach ($unit->property->utilityRates->where('billing_type', 'flat_fee')->where('active', true) as $rate) {
             $charges[] = [
                 'description' => $rate->name,
-                'amount'      => floatval($rate->amount),
+                'amount'      => (float) Money::normalize($rate->amount),
                 'type'        => $rate->type,
             ];
         }

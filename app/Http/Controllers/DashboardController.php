@@ -10,6 +10,7 @@ use App\Models\Payment;
 use App\Models\Property;
 use App\Models\Tenant;
 use App\Models\Unit;
+use App\Support\Money;
 
 class DashboardController extends Controller
 {
@@ -55,23 +56,25 @@ class DashboardController extends Controller
             ')
             ->first();
 
-        $expectedThisMonth    = floatval($invoiceStats->expected  ?? 0);
-        $collectedThisMonth   = floatval($invoiceStats->collected ?? 0);
-        $outstandingThisMonth = $expectedThisMonth - $collectedThisMonth;
-        $collectionRate       = $expectedThisMonth > 0
+        $expectedThisMonthSafe  = Money::normalize($invoiceStats->expected  ?? 0);
+        $collectedThisMonthSafe = Money::normalize($invoiceStats->collected ?? 0);
+        $expectedThisMonth      = (float) $expectedThisMonthSafe;
+        $collectedThisMonth     = (float) $collectedThisMonthSafe;
+        $outstandingThisMonth   = (float) Money::sub($expectedThisMonthSafe, $collectedThisMonthSafe);
+        $collectionRate         = Money::isPositive($expectedThisMonthSafe)
             ? round(($collectedThisMonth / $expectedThisMonth) * 100) : 0;
 
         // ── Total outstanding ─────────────────────────────────────────────
-        $totalInvoiced = floatval(Invoice::whereIn('lease_id', $leaseIds)->sum('total_amount'));
-        $totalPaid     = floatval(
+        $totalInvoicedSafe = Money::normalize(Invoice::whereIn('lease_id', $leaseIds)->sum('total_amount'));
+        $totalPaidSafe     = Money::normalize(
             Payment::whereIn('lease_id', $leaseIds)
                 ->where('payment_type', '!=', 'deposit')
                 ->sum('amount')
         );
-        $totalOutstanding = $totalInvoiced - $totalPaid;
+        $totalOutstanding = (float) Money::sub($totalInvoicedSafe, $totalPaidSafe);
 
         // ── This month income & expenses — deposits excluded ──────────────
-        $paymentsThisMonth = floatval(
+        $paymentsThisMonthSafe = Money::normalize(
             Payment::whereIn('lease_id', $leaseIds)
                 ->where('payment_type', '!=', 'deposit')
                 ->whereMonth('payment_date', $month)
@@ -79,14 +82,16 @@ class DashboardController extends Controller
                 ->sum('amount')
         );
 
-        $expensesThisMonth = floatval(
+        $expensesThisMonthSafe = Money::normalize(
             Expense::whereIn('property_id', $propertyIds)
                 ->whereMonth('expense_date', $month)
                 ->whereYear('expense_date', $year)
                 ->sum('amount')
         );
 
-        $netProfitThisMonth = $paymentsThisMonth - $expensesThisMonth;
+        $paymentsThisMonth  = (float) $paymentsThisMonthSafe;
+        $expensesThisMonth  = (float) $expensesThisMonthSafe;
+        $netProfitThisMonth = (float) Money::sub($paymentsThisMonthSafe, $expensesThisMonthSafe);
 
         // ── Maintenance ───────────────────────────────────────────────────
         $maintenanceStats = MaintenanceRequest::whereIn('unit_id', $unitIds)
@@ -120,7 +125,7 @@ class DashboardController extends Controller
             ->withSum('invoices', 'total_amount')
             ->get()
             ->map(function ($lease) {
-                $paid = floatval(
+                $paid = Money::normalize(
                     Payment::where('lease_id', $lease->id)
                         ->where('payment_type', '!=', 'deposit')
                         ->sum('amount')
@@ -129,7 +134,7 @@ class DashboardController extends Controller
                     'tenant'   => $lease->tenant,
                     'unit'     => $lease->unit,
                     'property' => $lease->unit->property,
-                    'balance'  => floatval($lease->invoices_sum_total_amount ?? 0) - $paid,
+                    'balance'  => (float) Money::sub($lease->invoices_sum_total_amount ?? 0, $paid),
                 ];
             })
             ->filter(fn($l) => $l['balance'] > 0)
@@ -164,16 +169,16 @@ class DashboardController extends Controller
 
         $chartData = [];
         for ($i = 5; $i >= 0; $i--) {
-            $date     = now()->subMonths($i);
-            $key      = $date->format('Y-m');
-            $income   = floatval($incomeByMonth->get($key)?->total  ?? 0);
-            $expenses = floatval($expensesByMonth->get($key)?->total ?? 0);
+            $date         = now()->subMonths($i);
+            $key          = $date->format('Y-m');
+            $incomeSafe   = Money::normalize($incomeByMonth->get($key)?->total  ?? 0);
+            $expensesSafe = Money::normalize($expensesByMonth->get($key)?->total ?? 0);
 
             $chartData[] = [
                 'label'    => $date->format('M Y'),
-                'income'   => $income,
-                'expenses' => $expenses,
-                'profit'   => $income - $expenses,
+                'income'   => (float) $incomeSafe,
+                'expenses' => (float) $expensesSafe,
+                'profit'   => (float) Money::sub($incomeSafe, $expensesSafe),
             ];
         }
 

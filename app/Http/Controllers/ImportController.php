@@ -7,6 +7,7 @@ use App\Models\Property;
 use App\Models\Tenant;
 use App\Models\Unit;
 use App\Services\AuditService;
+use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -22,13 +23,13 @@ class ImportController extends Controller
 
         $rows = [
             [
-                'unit_name','unit_type','rent_amount','deposit_amount',
+                'unit_name','unit_type','rent_amount','deposit_amount','payment_reference',
                 'first_name','last_name','phone','alt_phone','id_number','email',
                 'move_in_date','lease_end_date','deposit_paid','deposit_method','notes'
             ],
-            ['A1','1 bedroom','15000','30000','John','Doe','0712345678','0722345678','12345678','john@example.com','01/01/2024','31/12/2025','30000','mpesa',''],
-            ['A2','2 bedroom','20000','40000','Jane','Smith','0787654321','','','jane@example.com','01/03/2024','','40000','cash','Fixed term'],
-            ['B1','Bedsitter','8000','16000','','','','','','','','','','','Vacant'],
+            ['A1','1 bedroom','15000','30000','KLM-A1','John','Doe','0712345678','0722345678','12345678','john@example.com','01/01/2024','31/12/2025','30000','mpesa',''],
+            ['A2','2 bedroom','20000','40000','','Jane','Smith','0787654321','','','jane@example.com','01/03/2024','','40000','cash','Fixed term'],
+            ['B1','Bedsitter','8000','16000','','','','','','','','','','','','Vacant'],
         ];
 
         $callback = function () use ($rows) {
@@ -226,10 +227,11 @@ class ImportController extends Controller
 
             $rows[] = [
                 'row_number'     => $rowNumber,
-                'unit_name'      => $row['unit_name']      ?? '',
-                'unit_type'      => $row['unit_type']      ?? '',
-                'rent_amount'    => $row['rent_amount']    ?? '',
-                'deposit_amount' => $row['deposit_amount'] ?? '',
+                'unit_name'         => $row['unit_name']         ?? '',
+                'unit_type'         => $row['unit_type']         ?? '',
+                'rent_amount'       => $row['rent_amount']       ?? '',
+                'deposit_amount'    => $row['deposit_amount']    ?? '',
+                'payment_reference' => $row['payment_reference'] ?? '',
                 'first_name'     => $row['first_name']     ?? '',
                 'last_name'      => $row['last_name']      ?? '',
                 // Normalize phone at parse time so preview matches what gets saved
@@ -329,12 +331,13 @@ class ImportController extends Controller
 
                 try {
                     $unit = Unit::create([
-                        'property_id'    => $property->id,
-                        'name'           => $row['unit_name'],
-                        'type'           => $row['unit_type'],
-                        'rent_amount'    => floatval($row['rent_amount']),
-                        'deposit_amount' => floatval($row['deposit_amount']),
-                        'status'         => $row['has_tenant'] ? 'occupied' : 'vacant',
+                        'property_id'       => $property->id,
+                        'name'              => $row['unit_name'],
+                        'payment_reference' => ($row['payment_reference'] ?? '') ?: null,
+                        'type'              => $row['unit_type'],
+                        'rent_amount'       => (float) Money::normalize($row['rent_amount']),
+                        'deposit_amount'    => (float) Money::normalize($row['deposit_amount']),
+                        'status'            => $row['has_tenant'] ? 'occupied' : 'vacant',
                     ]);
 
                     $unitsCreated++;
@@ -361,7 +364,7 @@ class ImportController extends Controller
                             ? $this->parseDate($row['lease_end_date'])?->toDateString()
                             : null;
 
-                        $depositPaid   = floatval($row['deposit_paid'] ?? 0);
+                        $depositPaid   = (float) Money::normalize($row['deposit_paid'] ?? 0);
                         $depositMethod = strtolower($row['deposit_method'] ?? 'cash');
 
                         if (!in_array($depositMethod, ['mpesa','cash','bank','cheque'])) {
@@ -373,8 +376,8 @@ class ImportController extends Controller
                             'tenant_id'        => $tenant->id,
                             'move_in_date'     => $moveInDate,
                             'lease_end_date'   => $leaseEndDate,
-                            'monthly_rent'     => floatval($row['rent_amount']),
-                            'deposit_required' => floatval($row['deposit_amount']),
+                            'monthly_rent'     => (float) Money::normalize($row['rent_amount']),
+                            'deposit_required' => (float) Money::normalize($row['deposit_amount']),
                             'deposit_paid'     => $depositPaid,
                             'status'           => 'active',
                             'notes'            => $row['notes'] ?: null,

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
+use App\Support\Money;
 use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
@@ -23,11 +24,11 @@ class DashboardController extends Controller
 
         $lease?->load(['payments']);
 
-        $totalCharged = floatval($lease?->invoices()->sum('total_amount') ?? 0);
-        $totalPaid    = floatval(
-            $lease?->payments->where('payment_type', '!=', 'deposit')->sum('amount') ?? 0
-        );
-        $balance = $totalCharged - $totalPaid;
+        $totalChargedSafe = Money::normalize($lease?->invoices()->sum('total_amount') ?? 0);
+        $totalPaidSafe    = $lease
+            ? $lease->payments->where('payment_type', '!=', 'deposit')->reduce(fn($carry, $payment) => Money::add($carry, $payment->amount), '0.00')
+            : '0.00';
+        $balance = (float) Money::sub($totalChargedSafe, $totalPaidSafe);
 
         $documents = $lease
             ? $lease->documents()->latest()->get()

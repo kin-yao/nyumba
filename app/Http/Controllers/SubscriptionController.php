@@ -6,6 +6,7 @@ use App\Models\Account;
 use App\Models\MpesaTransaction;
 use App\Services\AuditService;
 use App\Services\MpesaService;
+use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -26,11 +27,11 @@ class SubscriptionController extends Controller
         $units   = max(1, $account->currentUnitCount());
         $pricing = Account::priceForUnitCount($units);
 
-        $amount = $validated['billing_cycle'] === 'yearly'
-            ? $pricing['yearly']
-            : $pricing['monthly'];
+        $amount = Money::normalize(
+            $validated['billing_cycle'] === 'yearly' ? $pricing['yearly'] : $pricing['monthly']
+        );
 
-        if ($amount <= 0) {
+        if (!Money::isPositive($amount)) {
             return response()->json([
                 'success' => false,
                 'error'   => 'This plan cannot be purchased online. Please contact support.',
@@ -50,6 +51,9 @@ class SubscriptionController extends Controller
 
         $result = $mpesa->stkPush(
             phone: $phone,
+            // (float) here is a boundary cast into Safaricom's own typed
+            // API, not an internal arithmetic step — $amount itself stays
+            // decimal-safe right up until this external call.
             amount: (float) $amount,
             accountRef: 'NYUMBA-' . $account->id,
             description: $pricing['name'] . ' plan (' . $units . ' units)',
@@ -180,15 +184,15 @@ class SubscriptionController extends Controller
         $units   = max(1, $account->currentUnitCount());
         $pricing = Account::priceForUnitCount($units);
 
-        $amountPaid   = floatval($transaction->amount);
-        $priceMonthly = floatval($pricing['monthly']);
+        $amountPaid   = Money::normalize($transaction->amount);
+        $priceMonthly = Money::normalize($pricing['monthly']);
 
         if ($transaction->billing_cycle === 'yearly') {
             $days          = 365;
             $monthsCovered = 12;
         } else {
-            $monthsCovered = $priceMonthly > 0
-                ? max(1, (int) floor($amountPaid / $priceMonthly))
+            $monthsCovered = Money::isPositive($priceMonthly)
+                ? max(1, (int) Money::div($amountPaid, $priceMonthly))
                 : 1;
             $days = $monthsCovered * 30;
         }
@@ -217,7 +221,8 @@ class SubscriptionController extends Controller
                 . $creditsToAdd . ' SMS credits added.',
         ]);
 
-        AuditService::log(
+        AuditService::system(
+            $account->id,
             'subscription.upgraded',
             'Account upgraded to ' . $pricing['name'] . ' via M-Pesa (' . $transaction->mpesa_receipt . ')'
                 . ' — ' . $monthsCovered . ' month(s) / ' . $days . ' days',

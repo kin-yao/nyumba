@@ -12,6 +12,7 @@ class Unit extends Model
     protected $fillable = [
         'property_id',
         'name',
+        'payment_reference',
         'type',
         'rent_amount',
         'deposit_amount',

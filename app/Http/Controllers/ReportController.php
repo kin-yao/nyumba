@@ -10,6 +10,7 @@ use App\Models\Property;
 use App\Models\Tenant;
 use App\Models\Unit;
 use App\Models\UtilityReading;
+use App\Support\Money;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
@@ -36,9 +37,9 @@ class ReportController extends Controller
                     ->whereIn('billing_type', ['per_unit', 'per_meter_reading']),
             ])->get();
 
-        $rows         = [];
-        $totalsByType = [];
-        $grandTotal   = 0;
+        $rows             = [];
+        $totalsByTypeSafe = [];
+        $grandTotalSafe   = '0.00';
 
         foreach ($properties as $property) {
             if ($property->utilityRates->isEmpty()) continue;
@@ -55,7 +56,7 @@ class ReportController extends Controller
 
                 foreach ($property->utilityRates as $rate) {
                     $reading = $readings->get($unit->id . '_' . $rate->type)?->first();
-                    $charge  = $reading ? floatval($reading->charge_amount) : 0;
+                    $charge  = $reading ? Money::normalize($reading->charge_amount) : '0.00';
 
                     $rows[] = [
                         'property'     => $property->name,
@@ -66,16 +67,18 @@ class ReportController extends Controller
                         'previous'     => $reading ? floatval($reading->previous_reading) : null,
                         'current'      => $reading ? floatval($reading->current_reading) : null,
                         'consumed'     => $reading ? floatval($reading->units_consumed) : null,
-                        'charge'       => $charge,
+                        'charge'       => (float) $charge,
                         'has_reading'  => (bool) $reading,
                     ];
 
-                    $totalsByType[$rate->name] = ($totalsByType[$rate->name] ?? 0) + $charge;
-                    $grandTotal += $charge;
+                    $totalsByTypeSafe[$rate->name] = Money::add($totalsByTypeSafe[$rate->name] ?? '0.00', $charge);
+                    $grandTotalSafe = Money::add($grandTotalSafe, $charge);
                 }
             }
         }
 
+        $totalsByType = array_map(fn($v) => (float) $v, $totalsByTypeSafe);
+        $grandTotal   = (float) $grandTotalSafe;
         $missingCount = collect($rows)->where('has_reading', false)->count();
 
         return view('reports.utilities', compact(
@@ -157,11 +160,22 @@ class ReportController extends Controller
             ->whereIn('unit_id', $unitIds)
             ->get();
 
-        $totalRequired    = floatval($leases->sum(fn($l) => floatval($l->deposit_required ?? 0)));
-        $totalHeld        = floatval($leases->sum(fn($l) => floatval($l->deposit_paid ?? 0)));
-        $totalOutstanding = floatval($leases->sum(
-            fn($l) => max(0, floatval($l->deposit_required ?? 0) - floatval($l->deposit_paid ?? 0))
-        ));
+        $totalRequiredSafe    = '0.00';
+        $totalHeldSafe        = '0.00';
+        $totalOutstandingSafe = '0.00';
+
+        foreach ($leases as $lease) {
+            $required = Money::normalize($lease->deposit_required ?? 0);
+            $held     = Money::normalize($lease->deposit_paid ?? 0);
+
+            $totalRequiredSafe    = Money::add($totalRequiredSafe, $required);
+            $totalHeldSafe        = Money::add($totalHeldSafe, $held);
+            $totalOutstandingSafe = Money::add($totalOutstandingSafe, Money::max('0.00', Money::sub($required, $held)));
+        }
+
+        $totalRequired    = (float) $totalRequiredSafe;
+        $totalHeld        = (float) $totalHeldSafe;
+        $totalOutstanding = (float) $totalOutstandingSafe;
 
         return compact('totalRequired', 'totalHeld', 'totalOutstanding');
     }
@@ -173,14 +187,14 @@ class ReportController extends Controller
             ->whereIn('unit_id', $unitIds)
             ->get()
             ->map(function ($lease) {
-                $totalCharged = floatval($lease->invoices->sum('total_amount'));
-                $totalPaid    = floatval(
-                    $lease->payments->where('payment_type', '!=', 'deposit')->sum('amount')
-                );
+                $totalCharged = $lease->invoices->reduce(fn($carry, $invoice) => Money::add($carry, $invoice->total_amount), '0.00');
+                $totalPaid    = $lease->payments
+                    ->where('payment_type', '!=', 'deposit')
+                    ->reduce(fn($carry, $payment) => Money::add($carry, $payment->amount), '0.00');
 
                 return [
                     'tenant'  => $lease->tenant,
-                    'balance' => $totalCharged - $totalPaid,
+                    'balance' => (float) Money::sub($totalCharged, $totalPaid),
                 ];
             })
             ->filter(fn($l) => $l['balance'] > 0)
@@ -201,30 +215,34 @@ class ReportController extends Controller
                 $q->where('period_month', $month)->where('period_year', $year),
         ]);
 
-        $rows           = [];
-        $totalExpected  = 0;
-        $totalCollected = 0;
+        $rows               = [];
+        $totalExpectedSafe  = '0.00';
+        $totalCollectedSafe = '0.00';
 
         foreach ($property->units as $unit) {
             if (!$unit->activeLease) continue;
 
             $invoice   = $unit->activeLease->invoices->first();
-            $expected  = $invoice ? floatval($invoice->total_amount) : floatval($unit->activeLease->monthly_rent);
-            $collected = $invoice ? floatval($invoice->amount_paid) : 0;
+            $expected  = $invoice ? Money::normalize($invoice->total_amount) : Money::normalize($unit->activeLease->monthly_rent);
+            $collected = $invoice ? Money::normalize($invoice->amount_paid) : '0.00';
 
-            $totalExpected  += $expected;
-            $totalCollected += $collected;
+            $totalExpectedSafe  = Money::add($totalExpectedSafe, $expected);
+            $totalCollectedSafe = Money::add($totalCollectedSafe, $collected);
 
             $rows[] = [
                 'unit'      => $unit,
                 'tenant'    => $unit->activeLease->tenant,
-                'expected'  => $expected,
-                'collected' => $collected,
+                'expected'  => (float) $expected,
+                'collected' => (float) $collected,
             ];
         }
 
-        $totalOutstanding = $totalExpected - $totalCollected;
-        $collectionRate   = $totalExpected > 0 ? round(($totalCollected / $totalExpected) * 100, 1) : 0;
+        $totalExpected    = (float) $totalExpectedSafe;
+        $totalCollected   = (float) $totalCollectedSafe;
+        $totalOutstanding = (float) Money::sub($totalExpectedSafe, $totalCollectedSafe);
+        $collectionRate   = Money::isPositive($totalExpectedSafe)
+            ? round(($totalCollected / $totalExpected) * 100, 1)
+            : 0;
 
         return compact('rows', 'totalExpected', 'totalCollected', 'totalOutstanding', 'collectionRate');
     }
@@ -238,12 +256,14 @@ class ReportController extends Controller
             ->whereYear('payment_date', $year)
             ->get();
 
-        $totalCollected = floatval($payments->sum('amount'));
+        $totalCollected = (float) $payments->reduce(
+            fn($carry, $payment) => Money::add($carry, $payment->amount), '0.00'
+        );
 
         $byMethod = $payments->groupBy('method')
             ->map(fn($g) => [
                 'count'  => $g->count(),
-                'amount' => floatval($g->sum('amount')),
+                'amount' => (float) $g->reduce(fn($carry, $payment) => Money::add($carry, $payment->amount), '0.00'),
             ]);
 
         return compact('payments', 'totalCollected', 'byMethod');
@@ -251,7 +271,7 @@ class ReportController extends Controller
 
     private function incomeExpensesForPeriod(Property $property, array $leaseIds, int $month, int $year): array
     {
-        $totalIncome = floatval(
+        $totalIncomeSafe = Money::normalize(
             Payment::whereIn('lease_id', $leaseIds)
                 ->where('payment_type', '!=', 'deposit')
                 ->whereMonth('payment_date', $month)
@@ -264,11 +284,14 @@ class ReportController extends Controller
             ->whereYear('expense_date', $year)
             ->get();
 
-        $totalExpenses = floatval($expenses->sum('amount'));
-        $netProfit     = $totalIncome - $totalExpenses;
+        $totalExpensesSafe = $expenses->reduce(fn($carry, $expense) => Money::add($carry, $expense->amount), '0.00');
+
+        $totalIncome   = (float) $totalIncomeSafe;
+        $totalExpenses = (float) $totalExpensesSafe;
+        $netProfit     = (float) Money::sub($totalIncomeSafe, $totalExpensesSafe);
 
         $byCategory = $expenses->groupBy('category')
-            ->map(fn($g) => floatval($g->sum('amount')))
+            ->map(fn($g) => (float) $g->reduce(fn($carry, $expense) => Money::add($carry, $expense->amount), '0.00'))
             ->sortByDesc(fn($v) => $v);
 
         return compact('totalIncome', 'totalExpenses', 'netProfit', 'byCategory');
@@ -290,16 +313,16 @@ class ReportController extends Controller
             ->with('activeLease.tenant')
             ->get();
 
-        $rows       = [];
-        $totalCharge = 0;
-        $missing    = 0;
+        $rows            = [];
+        $totalChargeSafe = '0.00';
+        $missing         = 0;
 
         foreach ($units as $unit) {
             if (!$unit->activeLease) continue;
 
             foreach ($meterRates as $rate) {
                 $reading = $readings->get($unit->id . '_' . $rate->type)?->first();
-                $charge  = $reading ? floatval($reading->charge_amount) : 0;
+                $charge  = $reading ? Money::normalize($reading->charge_amount) : '0.00';
 
                 if (!$reading) {
                     $missing++;
@@ -311,12 +334,14 @@ class ReportController extends Controller
                     'tenant'       => $unit->activeLease->tenant->full_name,
                     'utility_name' => $rate->name,
                     'consumed'     => floatval($reading->units_consumed),
-                    'charge'       => $charge,
+                    'charge'       => (float) $charge,
                 ];
 
-                $totalCharge += $charge;
+                $totalChargeSafe = Money::add($totalChargeSafe, $charge);
             }
         }
+
+        $totalCharge = (float) $totalChargeSafe;
 
         return compact('rows', 'totalCharge', 'missing');
     }
@@ -331,11 +356,13 @@ class ReportController extends Controller
                 ->where('period_year', $year)
                 ->get();
 
-            $expected  = floatval($invoices->sum('total_amount'));
-            $collected = floatval($invoices->sum('amount_paid'));
-            $rate      = $expected > 0 ? round(($collected / $expected) * 100) : 0;
+            $expectedSafe  = $invoices->reduce(fn($carry, $invoice) => Money::add($carry, $invoice->total_amount), '0.00');
+            $collectedSafe = $invoices->reduce(fn($carry, $invoice) => Money::add($carry, $invoice->amount_paid), '0.00');
+            $expected      = (float) $expectedSafe;
+            $collected     = (float) $collectedSafe;
+            $rate          = Money::isPositive($expectedSafe) ? round(($collected / $expected) * 100) : 0;
 
-            $income = floatval(
+            $incomeSafe = Money::normalize(
                 Payment::whereIn('lease_id', $leaseIds)
                     ->where('payment_type', '!=', 'deposit')
                     ->whereMonth('payment_date', $m)
@@ -343,14 +370,14 @@ class ReportController extends Controller
                     ->sum('amount')
             );
 
-            $expenses = floatval(
+            $expensesSafe = Money::normalize(
                 Expense::where('property_id', $property->id)
                     ->whereMonth('expense_date', $m)
                     ->whereYear('expense_date', $year)
                     ->sum('amount')
             );
 
-            $utilityCharge = floatval(
+            $utilityChargeSafe = Money::normalize(
                 UtilityReading::whereIn('unit_id', $unitIds)
                     ->where('reading_month', $m)
                     ->where('reading_year', $year)
@@ -362,10 +389,10 @@ class ReportController extends Controller
                 'expected'  => $expected,
                 'collected' => $collected,
                 'rate'      => $rate,
-                'income'    => $income,
-                'expenses'  => $expenses,
-                'net'       => $income - $expenses,
-                'utilities' => $utilityCharge,
+                'income'    => (float) $incomeSafe,
+                'expenses'  => (float) $expensesSafe,
+                'net'       => (float) Money::sub($incomeSafe, $expensesSafe),
+                'utilities' => (float) $utilityChargeSafe,
             ];
         }
 
@@ -398,8 +425,8 @@ class ReportController extends Controller
                       ->where('period_year', $year),
             ])->get();
 
-        $totalExpected  = 0;
-        $totalCollected = 0;
+        $totalExpectedSafe  = '0.00';
+        $totalCollectedSafe = '0.00';
 
         foreach ($properties as $property) {
             foreach ($property->units as $unit) {
@@ -408,16 +435,18 @@ class ReportController extends Controller
                 $invoice = $unit->activeLease->invoices->first();
 
                 if ($invoice) {
-                    $totalExpected  += floatval($invoice->total_amount);
-                    $totalCollected += floatval($invoice->amount_paid);
+                    $totalExpectedSafe  = Money::add($totalExpectedSafe, $invoice->total_amount);
+                    $totalCollectedSafe = Money::add($totalCollectedSafe, $invoice->amount_paid);
                 } else {
-                    $totalExpected += floatval($unit->activeLease->monthly_rent);
+                    $totalExpectedSafe = Money::add($totalExpectedSafe, $unit->activeLease->monthly_rent);
                 }
             }
         }
 
-        $totalOutstanding = $totalExpected - $totalCollected;
-        $collectionRate   = $totalExpected > 0
+        $totalExpected    = (float) $totalExpectedSafe;
+        $totalCollected   = (float) $totalCollectedSafe;
+        $totalOutstanding = (float) Money::sub($totalExpectedSafe, $totalCollectedSafe);
+        $collectionRate   = Money::isPositive($totalExpectedSafe)
             ? round(($totalCollected / $totalExpected) * 100, 1)
             : 0;
 
@@ -437,12 +466,12 @@ class ReportController extends Controller
             ->whereIn('unit_id', $unitIds)
             ->get()
             ->map(function ($lease) {
-                $totalCharged = floatval($lease->invoices->sum('total_amount'));
+                $totalCharged = $lease->invoices->reduce(fn($carry, $invoice) => Money::add($carry, $invoice->total_amount), '0.00');
                 // Exclude deposits from balance calculation
-                $totalPaid    = floatval(
-                    $lease->payments->where('payment_type', '!=', 'deposit')->sum('amount')
-                );
-                $balance     = $totalCharged - $totalPaid;
+                $totalPaid = $lease->payments
+                    ->where('payment_type', '!=', 'deposit')
+                    ->reduce(fn($carry, $payment) => Money::add($carry, $payment->amount), '0.00');
+                $balance     = (float) Money::sub($totalCharged, $totalPaid);
                 $lastPayment = $lease->payments
                     ->where('payment_type', '!=', 'deposit')
                     ->sortByDesc('payment_date')
@@ -482,12 +511,14 @@ class ReportController extends Controller
             ->whereYear('payment_date', $year)
             ->get();
 
-        $totalCollected = floatval($payments->sum('amount'));
+        $totalCollected = (float) $payments->reduce(
+            fn($carry, $payment) => Money::add($carry, $payment->amount), '0.00'
+        );
 
         $byMethod = $payments->groupBy('method')
             ->map(fn($g) => [
                 'count'  => $g->count(),
-                'amount' => floatval($g->sum('amount')),
+                'amount' => (float) $g->reduce(fn($carry, $payment) => Money::add($carry, $payment->amount), '0.00'),
             ]);
 
         return view('reports.collections', compact(
@@ -503,7 +534,7 @@ class ReportController extends Controller
         $leaseIds    = $this->filteredLeaseIds();
 
         // Exclude deposits — income is rent/utilities only
-        $totalIncome = floatval(
+        $totalIncomeSafe = Money::normalize(
             Payment::whereIn('lease_id', $leaseIds)
                 ->where('payment_type', '!=', 'deposit')
                 ->whereMonth('payment_date', $month)
@@ -516,11 +547,14 @@ class ReportController extends Controller
             ->whereYear('expense_date', $year)
             ->get();
 
-        $totalExpenses = floatval($expenses->sum('amount'));
-        $netProfit     = $totalIncome - $totalExpenses;
+        $totalExpensesSafe = $expenses->reduce(fn($carry, $expense) => Money::add($carry, $expense->amount), '0.00');
+
+        $totalIncome   = (float) $totalIncomeSafe;
+        $totalExpenses = (float) $totalExpensesSafe;
+        $netProfit     = (float) Money::sub($totalIncomeSafe, $totalExpensesSafe);
 
         $expensesByCategory = $expenses->groupBy('category')
-            ->map(fn($g) => floatval($g->sum('amount')))
+            ->map(fn($g) => (float) $g->reduce(fn($carry, $expense) => Money::add($carry, $expense->amount), '0.00'))
             ->sortByDesc(fn($v) => $v);
 
         $payments = $totalIncome;
@@ -561,7 +595,7 @@ class ReportController extends Controller
                                 'date'        => $invoice->invoice_date,
                                 'description' => $item->description,
                                 'reference'   => $invoice->reference,
-                                'charged'     => floatval($item->amount),
+                                'charged'     => (float) Money::normalize($item->amount),
                                 'paid'        => null,
                                 'type'        => 'charge',
                             ]);
@@ -576,7 +610,7 @@ class ReportController extends Controller
                                 : 'Payment received',
                             'reference'   => $payment->reference ?? strtoupper($payment->method),
                             'charged'     => null,
-                            'paid'        => floatval($payment->amount),
+                            'paid'        => (float) Money::normalize($payment->amount),
                             'type'        => $payment->payment_type,
                         ]);
                     }
@@ -584,12 +618,11 @@ class ReportController extends Controller
                     $ledger = $ledger->sortBy('date')->values();
 
                     // Balance only counts rent payments, not deposits
-                    $rentPaid = floatval(
-                        $activeLease->payments
-                            ->where('payment_type', '!=', 'deposit')
-                            ->sum('amount')
-                    );
-                    $balance = floatval($activeLease->invoices->sum('total_amount')) - $rentPaid;
+                    $rentPaid = $activeLease->payments
+                        ->where('payment_type', '!=', 'deposit')
+                        ->reduce(fn($carry, $payment) => Money::add($carry, $payment->amount), '0.00');
+                    $totalCharged = $activeLease->invoices->reduce(fn($carry, $invoice) => Money::add($carry, $invoice->total_amount), '0.00');
+                    $balance      = (float) Money::sub($totalCharged, $rentPaid);
                 }
             }
         }
@@ -668,26 +701,27 @@ class ReportController extends Controller
             )
             ->get()
             ->map(function ($lease) use ($leaseIds) {
-                $paidViaPayments = floatval(
+                $paidViaPayments = (float) Money::normalize(
                     Payment::where('lease_id', $lease->id)
                         ->where('payment_type', 'deposit')
                         ->sum('amount')
                 );
 
+                $required = Money::normalize($lease->deposit_required ?? 0);
+                $paid     = Money::normalize($lease->deposit_paid ?? 0);
+
                 return [
-                    'lease'            => $lease,
-                    'tenant'           => $lease->tenant,
-                    'unit'             => $lease->unit,
-                    'property'         => $lease->unit->property,
-                    'required'         => floatval($lease->deposit_required ?? 0),
-                    'paid_on_lease'    => floatval($lease->deposit_paid ?? 0),
-                    'paid_via_payments'=> $paidViaPayments,
-                    'outstanding'      => max(0, floatval($lease->deposit_required ?? 0) - floatval($lease->deposit_paid ?? 0)),
-                    'status'           => floatval($lease->deposit_paid ?? 0) <= 0
+                    'lease'             => $lease,
+                    'tenant'            => $lease->tenant,
+                    'unit'              => $lease->unit,
+                    'property'          => $lease->unit->property,
+                    'required'          => (float) $required,
+                    'paid_on_lease'     => (float) $paid,
+                    'paid_via_payments' => $paidViaPayments,
+                    'outstanding'       => (float) Money::max('0.00', Money::sub($required, $paid)),
+                    'status'            => !Money::isPositive($paid)
                         ? 'unpaid'
-                        : (floatval($lease->deposit_paid ?? 0) >= floatval($lease->deposit_required ?? 0)
-                            ? 'paid'
-                            : 'partial'),
+                        : (Money::gte($paid, $required) ? 'paid' : 'partial'),
                 ];
             });
 

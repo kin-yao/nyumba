@@ -8,6 +8,7 @@ use App\Models\InvoiceLineItem;
 use App\Models\Lease;
 use App\Models\Property;
 use App\Models\UtilityReading;
+use App\Support\Money;
 use AfricasTalking\SDK\AfricasTalking;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -79,16 +80,17 @@ class SendMonthlyInvoices extends Command
                 $meterRates = $autoRates->whereIn('billing_type', ['per_unit', 'per_meter_reading']);
                 $flatRates  = $autoRates->where('billing_type', 'flat_fee');
 
-                $lineItems   = [];
-                $totalAmount = 0;
-                $missing     = [];
+                $lineItems = [];
+                $totalSafe = '0.00';
+                $missing   = [];
 
+                $rentAmount  = Money::normalize($lease->monthly_rent);
                 $lineItems[] = [
                     'description' => $monthName . ' rent',
-                    'amount'      => floatval($lease->monthly_rent),
+                    'amount'      => (float) $rentAmount,
                     'type'        => 'rent',
                 ];
-                $totalAmount += floatval($lease->monthly_rent);
+                $totalSafe = Money::add($totalSafe, $rentAmount);
 
                 foreach ($meterRates as $rate) {
                     $reading = UtilityReading::where('unit_id', $unit->id)
@@ -98,25 +100,29 @@ class SendMonthlyInvoices extends Command
                         ->first();
 
                     if ($reading) {
-                        $lineItems[] = [
+                        $chargeAmount = Money::normalize($reading->charge_amount);
+                        $lineItems[]  = [
                             'description' => $rate->name . ' charges',
-                            'amount'      => floatval($reading->charge_amount),
+                            'amount'      => (float) $chargeAmount,
                             'type'        => $rate->type,
                         ];
-                        $totalAmount += floatval($reading->charge_amount);
+                        $totalSafe = Money::add($totalSafe, $chargeAmount);
                     } else {
                         $missing[] = $rate->name;
                     }
                 }
 
                 foreach ($flatRates as $rate) {
+                    $rateAmount  = Money::normalize($rate->amount);
                     $lineItems[] = [
                         'description' => $rate->name,
-                        'amount'      => floatval($rate->amount),
+                        'amount'      => (float) $rateAmount,
                         'type'        => $rate->type,
                     ];
-                    $totalAmount += floatval($rate->amount);
+                    $totalSafe = Money::add($totalSafe, $rateAmount);
                 }
+
+                $totalAmount = (float) $totalSafe;
 
                 // Create invoice with TEMP reference first
                 $invoice = Invoice::create([
@@ -144,8 +150,8 @@ class SendMonthlyInvoices extends Command
                         'invoice_id'  => $invoice->id,
                         'description' => $item['description'],
                         'quantity'    => 1,
-                        'unit_price'  => $item['amount'],
-                        'amount'      => $item['amount'],
+                        'unit_price'  => Money::normalize($item['amount']),
+                        'amount'      => Money::normalize($item['amount']),
                         'type'        => $item['type'],
                     ]);
                 }

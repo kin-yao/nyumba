@@ -30,7 +30,9 @@ class Property extends Model
         'mpesa_nominated_number',
         'mpesa_c2b_registered_at',
         'mpesa_pull_registered_at',
-        'kcb_account_number',
+        'bank_code',
+        'bank_account_number',
+        'ipsl_password',
         'kcb_ipn_registered_at',
         'auto_invoice_enabled',
         'invoice_send_day',
@@ -38,6 +40,7 @@ class Property extends Model
 
     protected $casts = [
         'mpesa_consumer_secret'    => 'encrypted',
+        'ipsl_password'            => 'encrypted',
         'mpesa_c2b_registered_at'  => 'datetime',
         'mpesa_pull_registered_at' => 'datetime',
         'kcb_ipn_registered_at'    => 'datetime',
@@ -102,5 +105,10 @@ class Property extends Model
         return !empty($this->mpesa_shortcode)
             && !empty($this->mpesa_consumer_key)
             && !empty($this->mpesa_consumer_secret);
+    }
+
+    public function hasIpslCredentials(): bool
+    {
+        return !empty($this->ipsl_password);
     }
 }

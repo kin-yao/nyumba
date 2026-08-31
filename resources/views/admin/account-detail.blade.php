@@ -22,7 +22,7 @@
         .btn-blue{background:#1e40af;color:#fff}
         .btn-red{background:#fee2e2;color:#b91c1c;border:1px solid rgba(185,28,28,.2)}
         .btn-gray{background:#fff;color:#374151;border:1px solid rgba(0,0,0,.1)}
-        .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+        .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:20px}
         .kpi{background:#fff;border-radius:12px;border:1px solid rgba(0,0,0,.07);padding:16px}
         .kpi-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#8a8880;margin-bottom:6px}
         .kpi-value{font-family:'DM Serif Display',serif;font-size:24px}
@@ -107,6 +107,16 @@
             <div class="kpi">
                 <div class="kpi-label">Units managed</div>
                 <div class="kpi-value">{{ $unitCount }} / {{ $account->unit_limit }}</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-label">SMS credits</div>
+                <div class="kpi-value" style="color:{{ $account->sms_credits < 20 ? '#b91c1c' : '#111110' }}">{{ number_format($account->sms_credits) }}</div>
+            </div>
+            <div class="kpi">
+                <div class="kpi-label">Auto-match rate (30d)</div>
+                <div class="kpi-value" style="color:{{ $matchRate === null ? '#8a8880' : ($matchRate >= 90 ? '#1a6b52' : '#b91c1c') }}">
+                    {{ $matchRate !== null ? $matchRate . '%' : '—' }}
+                </div>
             </div>
         </div>
 
@@ -203,6 +213,11 @@
                 {{-- Update subscription --}}
                 <div class="card" style="margin-bottom:0">
                     <div class="card-title">Update subscription</div>
+                    <div style="display:flex;gap:6px;margin-bottom:12px">
+                        <button type="button" onclick="extendPlan(30)" class="btn btn-gray" style="font-size:11px;padding:5px 10px">+1 month</button>
+                        <button type="button" onclick="extendPlan(365)" class="btn btn-gray" style="font-size:11px;padding:5px 10px">+1 year</button>
+                        <span style="font-size:11px;color:#8a8880;align-self:center">for when a payment isn't auto-applied</span>
+                    </div>
                     <form method="POST" action="{{ route('admin.account.update', $account) }}">
                         @csrf
                         <div class="form-group">
@@ -238,6 +253,17 @@
                         <button type="submit" class="btn btn-green" style="width:100%;justify-content:center">Save changes</button>
                     </form>
                 </div>
+
+                <script>
+                    function extendPlan(days) {
+                        const input = document.querySelector('input[name="plan_expires_at"]');
+                        const today = new Date();
+                        const existing = input.value ? new Date(input.value) : today;
+                        const base = existing > today ? existing : today;
+                        base.setDate(base.getDate() + days);
+                        input.value = base.toISOString().split('T')[0];
+                    }
+                </script>
 
                 {{-- Manual SMS top-up --}}
                 <div class="card" style="margin-bottom:0">
@@ -329,28 +355,76 @@
                                 {{ $property->hasMpesaCredentials() ? 'Update & re-register' : 'Save & register C2B + Pull' }}
                             </button>
                         </form>
+
+                        <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(0,0,0,0.07)">
+                            <div style="font-size:12px;color:#8a8880;margin-bottom:10px">
+                                Bank: <strong style="color:#111110">{{ $property->bank_code ? strtoupper($property->bank_code) : 'not set' }}</strong>
+                                @if($property->bank_account_number)
+                                    &middot; Account: <strong style="color:#111110">{{ $property->bank_account_number }}</strong>
+                                @endif
+                                &middot; IPSL (Pesalink): <strong style="color:#111110">{{ $property->hasIpslCredentials() ? 'configured' : 'not set' }}</strong>
+                            </div>
+                            <form method="POST" action="{{ route('admin.account.property.bank-config', [$account, $property]) }}">
+                                @csrf
+                                <div class="mpesa-grid">
+                                    <div class="form-group">
+                                        <label>Bank</label>
+                                        <select name="bank_code">
+                                            <option value="">— None —</option>
+                                            <option value="kcb" {{ $property->bank_code === 'kcb' ? 'selected' : '' }}>KCB</option>
+                                            <option value="equity" disabled>Equity (not yet integrated)</option>
+                                            <option value="ncba" disabled>NCBA (not yet integrated)</option>
+                                            <option value="im" disabled>I&amp;M (not yet integrated)</option>
+                                            <option value="coop" disabled>Co-operative Bank (not yet integrated)</option>
+                                            <option value="stanbic" disabled>Stanbic (not yet integrated)</option>
+                                            <option value="absa" disabled>Absa (not yet integrated)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Bank account number</label>
+                                        <input type="text" name="bank_account_number"
+                                               value="{{ $property->bank_account_number }}"
+                                               placeholder="e.g. creditAccountIdentifier from KCB">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>IPSL password (Pesalink)</label>
+                                    <input type="password" name="ipsl_password"
+                                           placeholder="Leave blank to keep the existing password">
+                                </div>
+                                <button type="submit" class="btn btn-green" style="width:100%;justify-content:center">
+                                    Save bank integration details
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 @endforeach
             </div>
         @endif
 
-        {{-- Recent payments --}}
-        @if($recentPayments->count() > 0)
-            <div class="card">
-                <div class="card-title">Recent payments ({{ $recentPayments->count() }})</div>
+        {{-- Reconciliation health --}}
+        <div class="card">
+            <div class="card-title">
+                Reconciliation health
+                <span style="font-weight:400;color:#8a8880;font-size:12px">
+                    &middot; {{ $propertiesWithChannel }}/{{ $account->properties->count() }} properties have a payment channel configured
+                </span>
+            </div>
+            @if($unmatchedCount > 0)
+                <div style="font-size:12px;color:#8a8880;margin-bottom:12px">
+                    {{ $unmatchedCount }} payment(s) currently unmatched, need manual assignment.
+                </div>
                 <table>
                     <thead><tr>
-                        <th>Tenant</th>
                         <th>Amount</th>
                         <th>Method</th>
                         <th>Date</th>
                         <th>Reference</th>
                     </tr></thead>
                     <tbody>
-                        @foreach($recentPayments as $payment)
+                        @foreach($unmatchedPayments as $payment)
                             <tr>
-                                <td style="font-weight:500">{{ $payment->tenant?->full_name ?? 'N/A' }}</td>
-                                <td style="color:#1a6b52;font-weight:500">{{ currency($payment->amount) }}</td>
+                                <td style="color:#b91c1c;font-weight:500">{{ currency($payment->amount) }}</td>
                                 <td><span class="badge badge-gray">{{ strtoupper($payment->method) }}</span></td>
                                 <td style="color:#8a8880">{{ $payment->payment_date->format('d M Y') }}</td>
                                 <td style="color:#8a8880;font-size:12px">{{ $payment->reference ?? '—' }}</td>
@@ -358,8 +432,10 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
-        @endif
+            @else
+                <div style="font-size:13px;color:#8a8880">No unmatched payments right now.</div>
+            @endif
+        </div>
 
     </main>
 </div>

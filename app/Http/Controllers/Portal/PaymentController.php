@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use App\Models\ProofOfPayment;
 use App\Models\Tenant;
+use App\Support\Money;
 use Illuminate\Http\Request;
 
 class PaymentController extends Controller
@@ -33,7 +34,7 @@ class PaymentController extends Controller
                     $ledger->push([
                         'date'        => $invoice->invoice_date,
                         'description' => $item->description,
-                        'charged'     => floatval($item->amount),
+                        'charged'     => (float) Money::normalize($item->amount),
                         'paid'        => null,
                         'reference'   => $invoice->reference,
                     ]);
@@ -47,7 +48,7 @@ class PaymentController extends Controller
                         ? 'Security deposit received'
                         : 'Payment received',
                     'charged'     => null,
-                    'paid'        => floatval($payment->amount),
+                    'paid'        => (float) Money::normalize($payment->amount),
                     'reference'   => $payment->reference ?? strtoupper($payment->method),
                 ]);
             }
@@ -56,14 +57,16 @@ class PaymentController extends Controller
         $ledger = $ledger->sortBy('date')->values();
         $ledgerByMonth = $ledger->groupBy(fn($row) => $row['date']->format('F Y'));
 
-        $totalCharged = floatval($lease?->invoices->sum('total_amount') ?? 0);
-        $totalPaid    = floatval(
-            $lease?->payments->where('payment_type', '!=', 'deposit')->sum('amount') ?? 0
-        );
-        $balance = $totalCharged - $totalPaid;
+        $totalChargedSafe = $lease
+            ? $lease->invoices->reduce(fn($carry, $invoice) => Money::add($carry, $invoice->total_amount), '0.00')
+            : '0.00';
+        $totalPaidSafe = $lease
+            ? $lease->payments->where('payment_type', '!=', 'deposit')->reduce(fn($carry, $payment) => Money::add($carry, $payment->amount), '0.00')
+            : '0.00';
+        $balance = (float) Money::sub($totalChargedSafe, $totalPaidSafe);
 
-        $depositPaid     = floatval($lease?->deposit_paid ?? 0);
-        $depositRequired = floatval($lease?->deposit_required ?? 0);
+        $depositPaid     = (float) Money::normalize($lease?->deposit_paid ?? 0);
+        $depositRequired = (float) Money::normalize($lease?->deposit_required ?? 0);
 
         $proofs = $lease
             ? ProofOfPayment::where('lease_id', $lease->id)->latest()->get()

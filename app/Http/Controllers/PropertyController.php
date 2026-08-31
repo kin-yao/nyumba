@@ -39,7 +39,7 @@ class PropertyController extends Controller
             'payment_type'    => ['required', 'in:paybill,till'],
             'business_number' => ['nullable', 'string', 'max:20'],
             'till_number'     => ['nullable', 'string', 'max:20'],
-            'account_format'  => ['nullable', 'in:unit_number,tenant_name,phone_number'],
+            'account_format'  => ['nullable', 'in:unit_number'],
         ]);
 
         $validated['account_id'] = auth()->user()->account_id;
@@ -116,7 +116,7 @@ class PropertyController extends Controller
             'payment_type'    => ['required', 'in:paybill,till'],
             'business_number' => ['nullable', 'string', 'max:20'],
             'till_number'     => ['nullable', 'string', 'max:20'],
-            'account_format'  => ['nullable', 'in:unit_number,tenant_name,phone_number'],
+            'account_format'  => ['nullable', 'in:unit_number'],
         ]);
 
         if ($validated['payment_type'] === 'paybill') {

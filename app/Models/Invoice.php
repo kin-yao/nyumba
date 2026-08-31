@@ -51,9 +51,9 @@ class Invoice extends Model
         return $this->hasMany(PaymentAllocation::class);
     }
 
-    public function getBalanceAttribute(): float
+    public function getBalanceAttribute(): string
     {
-        return floatval($this->total_amount) - floatval($this->amount_paid);
+        return \App\Support\Money::sub($this->total_amount, $this->amount_paid);
     }
 
     public function isOverdue(): bool

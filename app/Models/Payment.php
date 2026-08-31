@@ -12,6 +12,7 @@ class Payment extends Model
 
     protected $fillable = [
         'account_id',
+        'payment_event_id',
         'lease_id',
         'tenant_id',
         'amount',
@@ -19,8 +20,6 @@ class Payment extends Model
         'payment_type',
         'method',
         'reference',
-        'mpesa_transaction_id',
-        'mpesa_phone',
         'is_allocated',
         'notes',
     ];
@@ -34,6 +33,11 @@ class Payment extends Model
     public function lease()
     {
         return $this->belongsTo(Lease::class);
+    }
+
+    public function paymentEvent()
+    {
+        return $this->belongsTo(PaymentEvent::class);
     }
 
     public function tenant()

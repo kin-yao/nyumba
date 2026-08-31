@@ -205,17 +205,82 @@ class AdminController extends Controller
 
         $unitCount = $account->properties->sum(fn($p) => $p->units->count());
 
-        $recentPayments = Payment::withoutGlobalScopes()
+        // Reconciliation health — automated channels only (mpesa/bank), a
+        // manually-entered cash payment is always "matched" by definition
+        // and isn't a signal of whether matching is actually working.
+        $since = now()->subDays(30);
+
+        $autoMatchedRecent = Payment::withoutGlobalScopes()
             ->where('account_id', $account->id)
-            ->with(['tenant' => fn($q) => $q->withoutGlobalScopes()])
-            ->latest()
+            ->whereIn('method', ['mpesa', 'bank'])
+            ->whereNotNull('tenant_id')
+            ->where('payment_date', '>=', $since)
+            ->count();
+
+        $autoUnmatchedRecent = Payment::withoutGlobalScopes()
+            ->where('account_id', $account->id)
+            ->whereIn('method', ['mpesa', 'bank'])
+            ->whereNull('tenant_id')
+            ->where('payment_date', '>=', $since)
+            ->count();
+
+        $autoTotal = $autoMatchedRecent + $autoUnmatchedRecent;
+        $matchRate = $autoTotal > 0 ? round($autoMatchedRecent / $autoTotal * 100) : null;
+
+        // All currently-unmatched payments, not just the last 30 days — an
+        // old one sitting unresolved is exactly what needs surfacing.
+        $unmatchedPayments = Payment::withoutGlobalScopes()
+            ->where('account_id', $account->id)
+            ->whereNull('tenant_id')
+            ->latest('payment_date')
             ->take(10)
             ->get();
 
+        $unmatchedCount = Payment::withoutGlobalScopes()
+            ->where('account_id', $account->id)
+            ->whereNull('tenant_id')
+            ->count();
+
+        $propertiesWithChannel = $account->properties->filter(fn($p) =>
+            $p->hasMpesaCredentials() || !empty($p->bank_account_number) || $p->hasIpslCredentials()
+        )->count();
+
         return view('admin.account-detail', compact(
-            'account', 'totalInvoiced', 'totalPaid',
-            'unitCount', 'recentPayments'
+            'account', 'totalInvoiced', 'totalPaid', 'unitCount',
+            'matchRate', 'unmatchedPayments', 'unmatchedCount', 'propertiesWithChannel'
         ));
+    }
+
+    /**
+     * Saves KCB account number and IPSL (Pesalink) password for a property.
+     * Unlike M-Pesa, neither has a programmatic registration API — the
+     * actual URL/credential exchange with the bank happens out of band
+     * (email, partner request letter). This just stores what comes back
+     * from that process.
+     */
+    public function updatePropertyBankConfig(Request $request, Account $account, Property $property)
+    {
+        abort_unless($property->account_id === $account->id, 404);
+
+        $validated = $request->validate([
+            'bank_code'           => ['nullable', 'in:kcb'], // widen this list only as each bank actually gets built
+            'bank_account_number' => ['nullable', 'string', 'max:30'],
+            'ipsl_password'       => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $property->update([
+            'bank_code'           => $validated['bank_code'] ?? null,
+            'bank_account_number' => $validated['bank_account_number'] ?? null,
+            'ipsl_password'       => ($validated['ipsl_password'] ?? '') ?: $property->ipsl_password,
+        ]);
+
+        AuditService::log(
+            'property.bank_config_updated',
+            'Bank integration config updated for "' . $property->name . '"',
+            $property
+        );
+
+        return redirect()->back()->with('success', 'Bank integration details saved.');
     }
 
     // ── Update subscription ────────────────────────────────────────────────

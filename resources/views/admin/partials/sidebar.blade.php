@@ -51,24 +51,6 @@
             Broadcast SMS
         </a>
 
-        <div class="nav-section">Coming soon</div>
-
-        <span class="nav-item disabled">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="1" y="3" width="12" height="8" rx="1" stroke="currentColor" stroke-width="1.2"/>
-                <path d="M1 6h12" stroke="currentColor" stroke-width="1.2"/>
-            </svg>
-            Daraja / M-Pesa
-        </span>
-
-        <span class="nav-item disabled">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.2"/>
-                <path d="M7 4v3l2 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-            </svg>
-            SMS credit store
-        </span>
-
         <div class="nav-section">Session</div>
 
         <a href="{{ route('dashboard') }}" class="nav-item">

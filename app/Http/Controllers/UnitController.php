@@ -51,4 +51,32 @@ class UnitController extends Controller
         return redirect()->route('properties.show', $property)
             ->with('success', 'Unit added successfully.');
     }
+
+    /**
+     * Sets a unit's payment_reference — the landlord's own code for bank
+     * integrations (e.g. Pesalink) that need a reference beyond the plain
+     * unit number. Left blank, matching falls back to the unit's name.
+     * Deliberately scoped to this one field — there's no general unit
+     * edit yet.
+     */
+    public function updateReference(Request $request, Unit $unit)
+    {
+        abort_unless(in_array($unit->property_id, $this->filteredPropertyIds()), 403);
+
+        $validated = $request->validate([
+            'payment_reference' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $unit->update([
+            'payment_reference' => $validated['payment_reference'] ?: null,
+        ]);
+
+        AuditService::log(
+            'unit.payment_reference_updated',
+            'Payment reference for unit ' . $unit->name . ' set to "' . ($unit->payment_reference ?? $unit->name) . '"',
+            $unit
+        );
+
+        return redirect()->back()->with('success', 'Payment reference updated.');
+    }
 }

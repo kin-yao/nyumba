@@ -10,6 +10,7 @@ use App\Models\Tenant;
 use App\Models\Unit;
 use App\Services\AuditService;
 use App\Services\SmsService;
+use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -87,7 +88,7 @@ class PaymentController extends Controller
         $isDeposit   = $validated['payment_type'] === 'deposit';
 
         $fullyPaidInvoices = collect();
-        $newBalance        = 0;
+        $newBalance        = '0.00';
 
         $payment = DB::transaction(function () use (
             $validated, $tenant, $activeLease, $isDeposit,
@@ -110,19 +111,19 @@ class PaymentController extends Controller
                 $outstanding = $activeLease->invoices()
                     ->whereIn('status', ['sent', 'partial', 'overdue'])
                     ->orderBy('invoice_date')
+                    ->lockForUpdate()
                     ->get();
 
-                $remaining = floatval($validated['amount']);
+                $remaining = Money::normalize($validated['amount']);
 
                 foreach ($outstanding as $invoice) {
-                    if ($remaining <= 0) break;
+                    if (!Money::isPositive($remaining)) break;
 
-                    $invoiceBalance = floatval($invoice->total_amount)
-                                   - floatval($invoice->amount_paid);
+                    $invoiceBalance = Money::sub($invoice->total_amount, $invoice->amount_paid);
 
-                    if ($invoiceBalance <= 0) continue;
+                    if (!Money::isPositive($invoiceBalance)) continue;
 
-                    $allocate = min($remaining, $invoiceBalance);
+                    $allocate = Money::min($remaining, $invoiceBalance);
 
                     PaymentAllocation::create([
                         'payment_id' => $payment->id,
@@ -130,8 +131,8 @@ class PaymentController extends Controller
                         'amount'     => $allocate,
                     ]);
 
-                    $newAmountPaid = floatval($invoice->amount_paid) + $allocate;
-                    $newStatus     = $newAmountPaid >= floatval($invoice->total_amount)
+                    $newAmountPaid = Money::add($invoice->amount_paid, $allocate);
+                    $newStatus     = Money::gte($newAmountPaid, $invoice->total_amount)
                         ? 'paid'
                         : 'partial';
 
@@ -144,14 +145,16 @@ class PaymentController extends Controller
                         $fullyPaidInvoices->push($invoice->fresh());
                     }
 
-                    $remaining -= $allocate;
+                    $remaining = Money::sub($remaining, $allocate);
                 }
 
                 $payment->update(['is_allocated' => true]);
 
                 $activeLease->load(['invoices', 'payments']);
-                $newBalance = floatval($activeLease->invoices->sum('total_amount'))
-                            - floatval($activeLease->payments->where('payment_type', '!=', 'deposit')->sum('amount'));
+                $newBalance = Money::sub(
+                    $activeLease->invoices->sum('total_amount'),
+                    $activeLease->payments->where('payment_type', '!=', 'deposit')->sum('amount')
+                );
             }
 
             return $payment;
@@ -200,7 +203,7 @@ class PaymentController extends Controller
         $activeLease = $tenant->activeLease;
 
         $fullyPaidInvoices = collect();
-        $newBalance        = 0;
+        $newBalance        = '0.00';
 
         DB::transaction(function () use ($payment, $tenant, $activeLease, &$fullyPaidInvoices, &$newBalance) {
             $payment->update([
@@ -214,17 +217,18 @@ class PaymentController extends Controller
                 $outstanding = $activeLease->invoices()
                     ->whereIn('status', ['sent', 'partial', 'overdue'])
                     ->orderBy('invoice_date')
+                    ->lockForUpdate()
                     ->get();
 
-                $remaining = floatval($payment->amount);
+                $remaining = Money::normalize($payment->amount);
 
                 foreach ($outstanding as $invoice) {
-                    if ($remaining <= 0) break;
+                    if (!Money::isPositive($remaining)) break;
 
-                    $invoiceBalance = floatval($invoice->total_amount) - floatval($invoice->amount_paid);
-                    if ($invoiceBalance <= 0) continue;
+                    $invoiceBalance = Money::sub($invoice->total_amount, $invoice->amount_paid);
+                    if (!Money::isPositive($invoiceBalance)) continue;
 
-                    $allocate = min($remaining, $invoiceBalance);
+                    $allocate = Money::min($remaining, $invoiceBalance);
 
                     PaymentAllocation::create([
                         'payment_id' => $payment->id,
@@ -232,8 +236,8 @@ class PaymentController extends Controller
                         'amount'     => $allocate,
                     ]);
 
-                    $newAmountPaid = floatval($invoice->amount_paid) + $allocate;
-                    $newStatus     = $newAmountPaid >= floatval($invoice->total_amount) ? 'paid' : 'partial';
+                    $newAmountPaid = Money::add($invoice->amount_paid, $allocate);
+                    $newStatus     = Money::gte($newAmountPaid, $invoice->total_amount) ? 'paid' : 'partial';
 
                     $invoice->update([
                         'amount_paid' => $newAmountPaid,
@@ -244,14 +248,16 @@ class PaymentController extends Controller
                         $fullyPaidInvoices->push($invoice->fresh());
                     }
 
-                    $remaining -= $allocate;
+                    $remaining = Money::sub($remaining, $allocate);
                 }
 
                 $payment->update(['is_allocated' => true]);
 
                 $activeLease->load(['invoices', 'payments']);
-                $newBalance = floatval($activeLease->invoices->sum('total_amount'))
-                            - floatval($activeLease->payments->where('payment_type', '!=', 'deposit')->sum('amount'));
+                $newBalance = Money::sub(
+                    $activeLease->invoices->sum('total_amount'),
+                    $activeLease->payments->where('payment_type', '!=', 'deposit')->sum('amount')
+                );
             }
         });
 
@@ -291,7 +297,7 @@ class PaymentController extends Controller
         $isDeposit   = $proofOfPayment->payment_for === 'deposit';
 
         $fullyPaidInvoices = collect();
-        $newBalance        = 0;
+        $newBalance        = '0.00';
 
         $payment = DB::transaction(function () use ($proofOfPayment, $validated, $activeLease, $isDeposit, $tenant, &$fullyPaidInvoices, &$newBalance) {
             $payment = Payment::create([
@@ -310,17 +316,18 @@ class PaymentController extends Controller
                 $outstanding = $activeLease->invoices()
                     ->whereIn('status', ['sent', 'partial', 'overdue'])
                     ->orderBy('invoice_date')
+                    ->lockForUpdate()
                     ->get();
 
-                $remaining = floatval($validated['amount']);
+                $remaining = Money::normalize($validated['amount']);
 
                 foreach ($outstanding as $invoice) {
-                    if ($remaining <= 0) break;
+                    if (!Money::isPositive($remaining)) break;
 
-                    $invoiceBalance = floatval($invoice->total_amount) - floatval($invoice->amount_paid);
-                    if ($invoiceBalance <= 0) continue;
+                    $invoiceBalance = Money::sub($invoice->total_amount, $invoice->amount_paid);
+                    if (!Money::isPositive($invoiceBalance)) continue;
 
-                    $allocate = min($remaining, $invoiceBalance);
+                    $allocate = Money::min($remaining, $invoiceBalance);
 
                     PaymentAllocation::create([
                         'payment_id' => $payment->id,
@@ -328,8 +335,8 @@ class PaymentController extends Controller
                         'amount'     => $allocate,
                     ]);
 
-                    $newAmountPaid = floatval($invoice->amount_paid) + $allocate;
-                    $newStatus     = $newAmountPaid >= floatval($invoice->total_amount) ? 'paid' : 'partial';
+                    $newAmountPaid = Money::add($invoice->amount_paid, $allocate);
+                    $newStatus     = Money::gte($newAmountPaid, $invoice->total_amount) ? 'paid' : 'partial';
 
                     $invoice->update([
                         'amount_paid' => $newAmountPaid,
@@ -340,14 +347,16 @@ class PaymentController extends Controller
                         $fullyPaidInvoices->push($invoice->fresh());
                     }
 
-                    $remaining -= $allocate;
+                    $remaining = Money::sub($remaining, $allocate);
                 }
 
                 $payment->update(['is_allocated' => true]);
 
                 $activeLease->load(['invoices', 'payments']);
-                $newBalance = floatval($activeLease->invoices->sum('total_amount'))
-                            - floatval($activeLease->payments->where('payment_type', '!=', 'deposit')->sum('amount'));
+                $newBalance = Money::sub(
+                    $activeLease->invoices->sum('total_amount'),
+                    $activeLease->payments->where('payment_type', '!=', 'deposit')->sum('amount')
+                );
             }
 
             return $payment;
@@ -437,7 +446,7 @@ class PaymentController extends Controller
         Tenant $tenant,
         Payment $payment,
         $fullyPaidInvoices,
-        float $newBalance,
+        string $newBalance,
         $account
     ): void {
         if (!$tenant->phone) return;

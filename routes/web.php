@@ -73,9 +73,16 @@ Route::post('/payments/c2b/{property}/confirmation', [App\Http\Controllers\Mpesa
 Route::post('/payments/c2b/{property}/validation', [App\Http\Controllers\MpesaC2BController::class, 'validation'])->name('payments.c2b.validation');
 Route::post('/payments/pull/{property}/callback', [App\Http\Controllers\MpesaC2BController::class, 'pullCallback'])->name('payments.pull.callback');
 
-// ─── KCB Buni IPN — public, account-wide URL KCB pushes to ────────────────
-// IPN endpoint: https://www.nyumbapc.co.ke/payments/kcb/account-notification
+// ─── KCB Buni IPN — public, account-wide URLs KCB pushes to ───────────────
+// Notification endpoint: https://www.nyumbapc.co.ke/payments/kcb/account-notification
+// Validation endpoint:   https://www.nyumbapc.co.ke/payments/kcb/validation
 Route::post('/payments/kcb/account-notification', [App\Http\Controllers\KcbIpnController::class, 'accountNotification'])->name('kcb.account-notification');
+Route::post('/payments/kcb/validation', [App\Http\Controllers\KcbIpnController::class, 'validate'])->name('kcb.validation');
+
+// ─── IPSL (Pesalink) — one URL pair per property, per landlord's own
+// bank account, since IPSL's own payloads never say which account ────────
+Route::post('/payments/ipsl/{property}/validate', [App\Http\Controllers\IpslController::class, 'validate'])->name('ipsl.validate');
+Route::post('/payments/ipsl/{property}/notification', [App\Http\Controllers\IpslController::class, 'notification'])->name('ipsl.notification');
 
 // Admin-visible self-check: hit this URL once after deploy to confirm the
 // KCB public key is actually configured, without waiting for a real payment.
@@ -145,6 +152,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/accounts/{account}/impersonate', [App\Http\Controllers\AdminController::class, 'impersonate'])->name('account.impersonate');
     Route::delete('/accounts/{account}',           [App\Http\Controllers\AdminController::class, 'deleteAccount'])->name('account.delete');
     Route::post('/accounts/{account}/properties/{property}/mpesa-register', [App\Http\Controllers\MpesaC2BController::class, 'register'])->name('account.property.mpesa-register');
+    Route::post('/accounts/{account}/properties/{property}/bank-config', [App\Http\Controllers\AdminController::class, 'updatePropertyBankConfig'])->name('account.property.bank-config');
 
     // Impersonation
     Route::post('/stop-impersonating', [App\Http\Controllers\AdminController::class, 'stopImpersonating'])->name('stop-impersonating');
@@ -183,6 +191,7 @@ Route::middleware(['auth', 'firebase.check'])->group(function () {
     Route::put('/properties/{property}', [PropertyController::class, 'update'])->name('properties.update');
     Route::post('/properties/{property}/invoice-schedule', [PropertyController::class, 'updateInvoiceSchedule'])->name('properties.invoice-schedule');
     Route::post('/properties/{property}/units', [UnitController::class, 'store'])->name('units.store');
+    Route::patch('/units/{unit}/reference', [UnitController::class, 'updateReference'])->name('units.reference.update');
     Route::get('/properties/{property}/import/sample',   [App\Http\Controllers\ImportController::class, 'sampleCsv'])->name('properties.import.sample');
     Route::post('/properties/{property}/import/preview', [App\Http\Controllers\ImportController::class, 'preview'])->name('properties.import.preview');
     Route::post('/properties/{property}/import/store',   [App\Http\Controllers\ImportController::class, 'store'])->name('properties.import.store');

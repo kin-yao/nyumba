@@ -212,6 +212,7 @@
                         <th style="font-size:10px;letter-spacing:.05em;color:#8a8880;text-transform:uppercase;padding:9px 14px;text-align:left;border-bottom:1px solid rgba(0,0,0,0.07);font-weight:500">Unit</th>
                         <th style="font-size:10px;letter-spacing:.05em;color:#8a8880;text-transform:uppercase;padding:9px 14px;text-align:left;border-bottom:1px solid rgba(0,0,0,0.07);font-weight:500">Type</th>
                         <th style="font-size:10px;letter-spacing:.05em;color:#8a8880;text-transform:uppercase;padding:9px 14px;text-align:left;border-bottom:1px solid rgba(0,0,0,0.07);font-weight:500">Rent ({{ currency_symbol() }})</th>
+                        <th style="font-size:10px;letter-spacing:.05em;color:#8a8880;text-transform:uppercase;padding:9px 14px;text-align:left;border-bottom:1px solid rgba(0,0,0,0.07);font-weight:500">Payment ref</th>
                         <th style="font-size:10px;letter-spacing:.05em;color:#8a8880;text-transform:uppercase;padding:9px 14px;text-align:left;border-bottom:1px solid rgba(0,0,0,0.07);font-weight:500">Tenant</th>
                         <th style="font-size:10px;letter-spacing:.05em;color:#8a8880;text-transform:uppercase;padding:9px 14px;text-align:left;border-bottom:1px solid rgba(0,0,0,0.07);font-weight:500">Status</th>
                         <th style="border-bottom:1px solid rgba(0,0,0,0.07)"></th>
@@ -227,6 +228,17 @@
                             <td style="padding:11px 14px;font-size:13px"><strong>{{ $unit->name }}</strong></td>
                             <td style="padding:11px 14px;font-size:13px;color:#8a8880">{{ $unit->type }}</td>
                             <td style="padding:11px 14px;font-size:13px;font-weight:500">{{ number_format($unit->rent_amount) }}</td>
+                            <td style="padding:11px 14px">
+                                <form method="POST" action="{{ route('units.reference.update', $unit) }}" style="display:flex;gap:4px;align-items:center">
+                                    @csrf
+                                    @method('PATCH')
+                                    <input type="text" name="payment_reference" value="{{ $unit->payment_reference }}"
+                                           placeholder="{{ $unit->name }}" title="Falls back to unit name if left blank"
+                                           style="width:90px;height:28px;padding:0 8px;border:1px solid rgba(0,0,0,0.1);border-radius:5px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none">
+                                    <button type="submit" title="Save reference"
+                                            style="width:28px;height:28px;background:#f5f5f0;border:1px solid rgba(0,0,0,0.1);border-radius:5px;cursor:pointer;font-size:12px">✓</button>
+                                </form>
+                            </td>
                             <td style="padding:11px 14px;font-size:13px">
                                 @if($tenant)
                                     <div style="display:flex;align-items:center;gap:8px">
@@ -290,6 +302,15 @@
                             <span style="font-size:12px;color:#8a8880">No tenant</span>
                         @endif
                     </div>
+                    <form method="POST" action="{{ route('units.reference.update', $unit) }}" style="display:flex;gap:4px;align-items:center;margin-top:8px">
+                        @csrf
+                        @method('PATCH')
+                        <input type="text" name="payment_reference" value="{{ $unit->payment_reference }}"
+                               placeholder="Payment ref (defaults to {{ $unit->name }})"
+                               style="flex:1;height:30px;padding:0 8px;border:1px solid rgba(0,0,0,0.1);border-radius:5px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none">
+                        <button type="submit"
+                                style="height:30px;padding:0 10px;background:#f5f5f0;border:1px solid rgba(0,0,0,0.1);border-radius:5px;cursor:pointer;font-size:12px">Save</button>
+                    </form>
                     @if($unit->isVacant())
                         <a href="{{ route('tenants.create') }}"
                            style="display:block;text-align:center;padding:7px;background:#1a6b52;color:#fff;border-radius:7px;font-size:12px;text-decoration:none;font-weight:500">
@@ -488,8 +509,6 @@
                             <label style="display:block;font-size:10px;font-weight:500;color:#8a8880;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px">Account format</label>
                             <select name="account_format" style="width:100%;height:36px;padding:0 11px;border:1px solid rgba(0,0,0,0.1);border-radius:7px;font-size:13px;font-family:'DM Sans',sans-serif;outline:none">
                                 <option value="unit_number" {{ $property->account_format=='unit_number'?'selected':'' }}>Unit number</option>
-                                <option value="tenant_name" {{ $property->account_format=='tenant_name'?'selected':'' }}>Tenant name</option>
-                                <option value="phone_number" {{ $property->account_format=='phone_number'?'selected':'' }}>Phone number</option>
                             </select>
                         </div>
                     </div>

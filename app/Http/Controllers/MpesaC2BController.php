@@ -11,6 +11,7 @@ use App\Models\Unit;
 use App\Services\AuditService;
 use App\Services\MpesaService;
 use App\Services\SmsService;
+use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -33,7 +34,7 @@ class MpesaC2BController extends Controller
 
         $confirmationUrl = url("/mpesa/c2b/{$property->id}/confirmation");
         $validationUrl   = url("/mpesa/c2b/{$property->id}/validation");
-        $pullCallbackUrl = url("/mpesa/pull/{$property->id}/callback");
+        $pullCallbackUrl = route('payments.pull.callback', $property->id);
 
         $errors = [];
 
@@ -102,6 +103,26 @@ class MpesaC2BController extends Controller
         ]);
     }
 
+    // ── Public: Pull API callback — Safaricom requires this URL to be
+    // registered, but actual reconciliation goes through the scheduled
+    // pullTransactions() query instead, not this callback. Log and
+    // acknowledge only, since we don't have a confirmed payload shape
+    // for this from Safaricom's docs. ────────────────────────────────────
+    public function pullCallback(Request $request, int $property)
+    {
+        $property = Property::withoutGlobalScopes()->findOrFail($property);
+
+        Log::info('M-Pesa Pull API callback', [
+            'property_id' => $property->id,
+            'payload'     => $request->all(),
+        ]);
+
+        return response()->json([
+            'ResultCode' => 0,
+            'ResultDesc' => 'Accepted',
+        ]);
+    }
+
     // ── Public: C2B confirmation — actual payment notification ─────────────
     public function confirmation(Request $request, int $property)
     {
@@ -135,16 +156,29 @@ class MpesaC2BController extends Controller
      *
      * @return string 'matched' | 'unmatched' | 'duplicate'
      */
-    public function processTransaction(Property $property, array $txn, string $method = 'mpesa', string $providerLabel = 'M-Pesa'): string
+    public function processTransaction(Property $property, array $txn, string $method = 'mpesa', string $providerLabel = 'M-Pesa', ?Unit $preMatchedUnit = null): string
     {
         $transId   = $txn['TransID'] ?? null;
-        $amount    = (float) ($txn['TransAmount'] ?? 0);
+        $rawAmount = $txn['TransAmount'] ?? null;
         $billRef   = trim((string) ($txn['BillRefNumber'] ?? ''));
         $msisdn    = (string) ($txn['MSISDN'] ?? '');
         $transTime = $txn['TransTime'] ?? null;
 
-        if (!$transId || $amount <= 0) {
-            Log::warning($providerLabel . ' C2B: incomplete transaction payload', [
+        // Numeric-ness is checked before Money::normalize() ever runs, so a
+        // malformed amount degrades to the same graceful 'unmatched' path
+        // as a missing one, instead of throwing out of a webhook handler.
+        if (!$transId || $rawAmount === null || !is_numeric($rawAmount)) {
+            Log::warning($providerLabel . ' C2B: incomplete or non-numeric transaction payload', [
+                'property_id' => $property->id,
+                'txn'         => $txn,
+            ]);
+            return 'unmatched';
+        }
+
+        $amount = Money::normalize($rawAmount);
+
+        if (!Money::isPositive($amount)) {
+            Log::warning($providerLabel . ' C2B: non-positive transaction amount', [
                 'property_id' => $property->id,
                 'txn'         => $txn,
             ]);
@@ -156,8 +190,12 @@ class MpesaC2BController extends Controller
             return 'duplicate';
         }
 
-        $accountFormat = $property->account_format ?? 'unit_number';
-        $unit          = $this->matchUnit($property, $accountFormat, $billRef, $msisdn);
+        if ($preMatchedUnit) {
+            $unit = $preMatchedUnit;
+        } else {
+            $accountFormat = $property->account_format ?? 'unit_number';
+            $unit          = $this->matchUnit($property, $accountFormat, $billRef, $msisdn);
+        }
 
         $paymentDate = $transTime
             ? \Carbon\Carbon::createFromFormat('YmdHis', $transTime)->toDateString()
@@ -182,7 +220,8 @@ class MpesaC2BController extends Controller
             ]);
 
             try {
-                AuditService::log(
+                AuditService::system(
+                    $property->account_id,
                     'payment.' . $method . '_unmatched',
                     'Unmatched ' . $providerLabel . ' payment of ' . currency($amount) . ' (ref: ' . $transId . ') for "'
                         . $property->name . '" — needs manual assignment',
@@ -195,7 +234,7 @@ class MpesaC2BController extends Controller
                     ]
                 );
             } catch (\Exception $e) {
-                Log::error('AuditService::log failed: ' . $e->getMessage());
+                Log::error('AuditService::system failed: ' . $e->getMessage());
             }
 
             return 'unmatched';
@@ -205,8 +244,8 @@ class MpesaC2BController extends Controller
         $tenant = $lease?->tenant;
 
         $fullyPaidInvoices = collect();
-        $newBalance        = 0;
-        $creditCarried     = 0;
+        $newBalance        = '0.00';
+        $creditCarried     = '0.00';
 
         $payment = DB::transaction(function () use (
             $property, $amount, $paymentDate, $transId, $billRef, $msisdn,
@@ -229,35 +268,40 @@ class MpesaC2BController extends Controller
                 $outstanding = $lease->invoices()
                     ->whereIn('status', ['sent', 'partial', 'overdue'])
                     ->orderBy('invoice_date')
+                    ->lockForUpdate()
                     ->get();
 
-                // Include any unallocated rent credits from previous overpayments
-                $existingCredit = floatval(
-                    $lease->payments()
-                        ->where('payment_type', 'rent')
-                        ->where('is_allocated', false)
-                        ->where('reference', 'like', '%-CR')
-                        ->sum('amount')
+                // Include any unallocated rent credits from previous overpayments.
+                // Locked (fetched, not summed) so a concurrent payment against the
+                // same lease can't also read and consume this same credit before
+                // this transaction commits.
+                $existingCreditPayments = $lease->payments()
+                    ->where('payment_type', 'rent')
+                    ->where('is_allocated', false)
+                    ->where('reference', 'like', '%-CR')
+                    ->lockForUpdate()
+                    ->get();
+
+                $existingCredit = $existingCreditPayments->reduce(
+                    fn($carry, $creditPayment) => Money::add($carry, $creditPayment->amount), '0.00'
                 );
 
-                $remaining = $amount + $existingCredit;
+                $remaining = Money::add($amount, $existingCredit);
 
                 // Mark those credit payments as allocated since we're absorbing them now
-                if ($existingCredit > 0) {
-                    $lease->payments()
-                        ->where('payment_type', 'rent')
-                        ->where('is_allocated', false)
-                        ->where('reference', 'like', '%-CR')
-                        ->update(['is_allocated' => true]);
+                if (Money::isPositive($existingCredit)) {
+                    foreach ($existingCreditPayments as $creditPayment) {
+                        $creditPayment->update(['is_allocated' => true]);
+                    }
                 }
 
                 foreach ($outstanding as $invoice) {
-                    if ($remaining <= 0) break;
+                    if (!Money::isPositive($remaining)) break;
 
-                    $invoiceBalance = floatval($invoice->total_amount) - floatval($invoice->amount_paid);
-                    if ($invoiceBalance <= 0) continue;
+                    $invoiceBalance = Money::sub($invoice->total_amount, $invoice->amount_paid);
+                    if (!Money::isPositive($invoiceBalance)) continue;
 
-                    $allocate = min($remaining, $invoiceBalance);
+                    $allocate = Money::min($remaining, $invoiceBalance);
 
                     PaymentAllocation::create([
                         'payment_id' => $payment->id,
@@ -265,8 +309,8 @@ class MpesaC2BController extends Controller
                         'amount'     => $allocate,
                     ]);
 
-                    $newAmountPaid = floatval($invoice->amount_paid) + $allocate;
-                    $newStatus     = $newAmountPaid >= floatval($invoice->total_amount) ? 'paid' : 'partial';
+                    $newAmountPaid = Money::add($invoice->amount_paid, $allocate);
+                    $newStatus     = Money::gte($newAmountPaid, $invoice->total_amount) ? 'paid' : 'partial';
 
                     $invoice->update([
                         'amount_paid' => $newAmountPaid,
@@ -277,13 +321,13 @@ class MpesaC2BController extends Controller
                         $fullyPaidInvoices->push($invoice->fresh());
                     }
 
-                    $remaining -= $allocate;
+                    $remaining = Money::sub($remaining, $allocate);
                 }
 
                 $payment->update(['is_allocated' => true]);
 
                 // Store any excess as a rent credit to apply against future invoices
-                if ($remaining > 0) {
+                if (Money::isPositive($remaining)) {
                     $creditCarried = $remaining;
                     Payment::create([
                         'account_id'   => $property->account_id,
@@ -299,21 +343,24 @@ class MpesaC2BController extends Controller
                     ]);
                 }
 
-                $newBalance = floatval($lease->invoices()->sum('total_amount'))
-                            - floatval($lease->payments()
-                                ->where('payment_type', '!=', 'deposit')
-                                ->where(function ($q) {
-                                    $q->where('is_allocated', true)
-                                      ->orWhere('reference', 'not like', '%-CR');
-                                })
-                                ->sum('amount'));
+                $newBalance = Money::sub(
+                    $lease->invoices()->sum('total_amount'),
+                    $lease->payments()
+                        ->where('payment_type', '!=', 'deposit')
+                        ->where(function ($q) {
+                            $q->where('is_allocated', true)
+                              ->orWhere('reference', 'not like', '%-CR');
+                        })
+                        ->sum('amount')
+                );
             }
 
             return $payment;
         });
 
         try {
-            AuditService::log(
+            AuditService::system(
+                $property->account_id,
                 'payment.' . $method . '_reconciled',
                 $providerLabel . ' payment of ' . currency($amount) . ' auto-reconciled for '
                     . ($tenant?->full_name ?? 'unit ' . $unit->name)
@@ -328,7 +375,7 @@ class MpesaC2BController extends Controller
                 ]
             );
         } catch (\Exception $e) {
-            Log::error('AuditService::log failed: ' . $e->getMessage());
+            Log::error('AuditService::system failed: ' . $e->getMessage());
         }
 
         if ($tenant && $tenant->phone) {
@@ -339,53 +386,14 @@ class MpesaC2BController extends Controller
     }
 
     /**
-     * Match BillRefNumber/MSISDN to a unit based on the property's account_format.
+     * Match BillRefNumber to a unit. Only unit_number matching is supported —
+     * a property still configured with the old phone_number/tenant_name
+     * modes will simply fall through to unmatched/review instead of erroring.
      */
     private function matchUnit(Property $property, string $accountFormat, string $billRef, string $msisdn): ?Unit
     {
         if ($accountFormat === 'unit_number') {
-            if ($billRef === '') return null;
-
-            return Unit::withoutGlobalScopes()
-                ->where('property_id', $property->id)
-                ->whereRaw('LOWER(name) = ?', [strtolower($billRef)])
-                ->first();
-        }
-
-        if ($accountFormat === 'phone_number') {
-            $candidates = array_filter([$msisdn, $billRef]);
-
-            foreach ($candidates as $phone) {
-                $normalized = $this->normalizePhoneForMatch($phone);
-                if (!$normalized) continue;
-
-                $lease = Lease::withoutGlobalScopes()
-                    ->where('status', 'active')
-                    ->whereHas('unit', fn($q) => $q->withoutGlobalScopes()->where('property_id', $property->id))
-                    ->whereHas('tenant', fn($q) => $q->withoutGlobalScopes()->where('phone', $normalized))
-                    ->with('unit')
-                    ->first();
-
-                if ($lease) return $lease->unit;
-            }
-
-            return null;
-        }
-
-        if ($accountFormat === 'tenant_name') {
-            if ($billRef === '') return null;
-
-            $lease = Lease::withoutGlobalScopes()
-                ->where('status', 'active')
-                ->whereHas('unit', fn($q) => $q->withoutGlobalScopes()->where('property_id', $property->id))
-                ->whereHas('tenant', function ($q) use ($billRef) {
-                    $q->withoutGlobalScopes()
-                      ->whereRaw('LOWER(CONCAT(first_name, " ", last_name)) = ?', [strtolower(trim($billRef))]);
-                })
-                ->with('unit')
-                ->first();
-
-            return $lease?->unit;
+            return \App\Services\UnitMatcher::match($property, $billRef);
         }
 
         return null;
@@ -419,8 +427,8 @@ class MpesaC2BController extends Controller
         Tenant $tenant,
         Payment $payment,
         $fullyPaidInvoices,
-        float $newBalance,
-        float $creditCarried = 0,
+        string $newBalance,
+        string $creditCarried = '0.00',
         string $providerLabel = 'MPESA'
     ): void {
         $providerLabel = strtoupper($providerLabel);

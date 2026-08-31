@@ -8,6 +8,7 @@ use App\Models\Property;
 use App\Models\Tenant;
 use App\Models\Unit;
 use App\Services\AuditService;
+use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -89,15 +90,15 @@ class TenantController extends Controller
 
         $ledger = $ledger->sortBy('date')->values();
 
-        $totalCharged = floatval($activeLease?->invoices->sum('total_amount') ?? 0);
+        $totalCharged = $activeLease
+            ? $activeLease->invoices->reduce(fn($carry, $invoice) => Money::add($carry, $invoice->total_amount), '0.00')
+            : '0.00';
 
-        $totalPaid = floatval(
-            $activeLease?->payments
-                ->where('payment_type', '!=', 'deposit')
-                ->sum('amount') ?? 0
-        );
+        $totalPaid = $activeLease
+            ? $activeLease->payments->where('payment_type', '!=', 'deposit')->reduce(fn($carry, $payment) => Money::add($carry, $payment->amount), '0.00')
+            : '0.00';
 
-        $balance = $totalCharged - $totalPaid;
+        $balance = (float) Money::sub($totalCharged, $totalPaid);
 
         // Load vacant units in the same property for the transfer modal
         $vacantUnits = collect();
@@ -287,18 +288,20 @@ class TenantController extends Controller
         DB::transaction(function () use (
             $tenant, $activeLease, $oldUnit, $newUnit, $validated
         ) {
-            $depositToCarry = 0;
+            $depositToCarrySafe = '0.00';
 
             if ($validated['deposit_action'] === 'carry_forward') {
-                $depositToCarry = floatval($activeLease->deposit_paid);
+                $depositToCarrySafe = Money::normalize($activeLease->deposit_paid);
             } elseif ($validated['deposit_action'] === 'keep') {
-                $depositToCarry = 0;
+                $depositToCarrySafe = '0.00';
             } elseif ($validated['deposit_action'] === 'refund') {
-                $depositToCarry = 0;
+                $depositToCarrySafe = '0.00';
             }
 
+            $depositToCarry = (float) $depositToCarrySafe;
+
             // Use custom new deposit if provided, otherwise use carried amount
-            $newDepositPaid     = floatval($validated['new_deposit'] ?? $depositToCarry);
+            $newDepositPaid     = (float) Money::normalize($validated['new_deposit'] ?? $depositToCarrySafe);
             $newDepositRequired = $newUnit->deposit_amount > 0
                 ? $newUnit->deposit_amount
                 : $newDepositPaid;

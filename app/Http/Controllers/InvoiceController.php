@@ -10,6 +10,7 @@ use App\Models\Unit;
 use App\Models\UtilityReading;
 use App\Services\AuditService;
 use App\Services\SmsService;
+use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -359,25 +360,30 @@ class InvoiceController extends Controller
 
                 $lineItems = [];
                 $warnings  = [];
-                $total     = 0;
+                $totalSafe = '0.00';
 
-                $lineItems[] = ['description' => $monthName . ' rent', 'amount' => floatval($lease->monthly_rent), 'type' => 'rent'];
-                $total += floatval($lease->monthly_rent);
+                $rentAmount  = Money::normalize($lease->monthly_rent);
+                $lineItems[] = ['description' => $monthName . ' rent', 'amount' => (float) $rentAmount, 'type' => 'rent'];
+                $totalSafe   = Money::add($totalSafe, $rentAmount);
 
                 foreach ($meterRates as $rate) {
                     $reading = $readings->get($rate->type);
                     if ($reading) {
-                        $lineItems[] = ['description' => $rate->name . ' charges', 'amount' => floatval($reading->charge_amount), 'type' => $rate->type];
-                        $total += floatval($reading->charge_amount);
+                        $chargeAmount = Money::normalize($reading->charge_amount);
+                        $lineItems[]  = ['description' => $rate->name . ' charges', 'amount' => (float) $chargeAmount, 'type' => $rate->type];
+                        $totalSafe    = Money::add($totalSafe, $chargeAmount);
                     } else {
                         $warnings[] = $rate->name . ' reading not entered for ' . $monthName;
                     }
                 }
 
                 foreach ($flatRates as $rate) {
-                    $lineItems[] = ['description' => $rate->name, 'amount' => floatval($rate->amount), 'type' => $rate->type];
-                    $total += floatval($rate->amount);
+                    $rateAmount  = Money::normalize($rate->amount);
+                    $lineItems[] = ['description' => $rate->name, 'amount' => (float) $rateAmount, 'type' => $rate->type];
+                    $totalSafe   = Money::add($totalSafe, $rateAmount);
                 }
+
+                $total = (float) $totalSafe;
 
                 $previews[] = [
                     'lease_id'         => $lease->id,
@@ -456,10 +462,14 @@ class InvoiceController extends Controller
             $lineItems     = $lineItemsJson ? json_decode($lineItemsJson, true) : [];
 
             if (empty($lineItems)) {
-                $lineItems = [['description' => $monthName . ' rent', 'amount' => floatval($lease->monthly_rent), 'type' => 'rent']];
+                $lineItems = [['description' => $monthName . ' rent', 'amount' => (float) Money::normalize($lease->monthly_rent), 'type' => 'rent']];
             }
 
-            $totalAmount = array_sum(array_column($lineItems, 'amount'));
+            $totalAmount = (float) array_reduce(
+                $lineItems,
+                fn($carry, $item) => Money::add($carry, $item['amount']),
+                '0.00'
+            );
             $reference   = $this->nextReference($accountId);
 
             $invoice = Invoice::create([
@@ -479,8 +489,8 @@ class InvoiceController extends Controller
                     'invoice_id'  => $invoice->id,
                     'description' => $item['description'],
                     'quantity'    => 1,
-                    'unit_price'  => $item['amount'],
-                    'amount'      => $item['amount'],
+                    'unit_price'  => Money::normalize($item['amount']),
+                    'amount'      => Money::normalize($item['amount']),
                     'type'        => $item['type'],
                 ]);
             }
