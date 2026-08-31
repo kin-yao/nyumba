@@ -55,4 +55,28 @@ class UnitMatcher
                 return strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $reference)) === $normalized;
             });
     }
+
+    /**
+     * Matches a payment reference across EVERY property that has opted into
+     * Pesalink central collection (bank_code = 'pesalink_central'), not
+     * just one. This is the one case where the reference has to carry the
+     * full weight of disambiguation — uniqueness across all of these units
+     * is enforced separately in UnitController, not here.
+     */
+    public static function matchCentralCollection(string $billRef): ?Unit
+    {
+        $normalized = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $billRef));
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        return Unit::withoutGlobalScopes()
+            ->whereHas('property', fn($q) => $q->withoutGlobalScopes()->where('bank_code', 'pesalink_central'))
+            ->get()
+            ->first(function ($unit) use ($normalized) {
+                $reference = $unit->payment_reference ?: $unit->name;
+                return strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $reference)) === $normalized;
+            });
+    }
 }

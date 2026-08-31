@@ -372,6 +372,7 @@
                                         <select name="bank_code">
                                             <option value="">— None —</option>
                                             <option value="kcb" {{ $property->bank_code === 'kcb' ? 'selected' : '' }}>KCB</option>
+                                            <option value="pesalink_central" {{ $property->bank_code === 'pesalink_central' ? 'selected' : '' }}>Pesalink Central Collection (shared account)</option>
                                             <option value="equity" disabled>Equity (not yet integrated)</option>
                                             <option value="ncba" disabled>NCBA (not yet integrated)</option>
                                             <option value="im" disabled>I&amp;M (not yet integrated)</option>

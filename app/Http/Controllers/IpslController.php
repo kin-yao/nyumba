@@ -10,10 +10,13 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 
 /**
- * IPSL (Pesalink) Biller PGW — one landlord's own bank account per
- * property, so the property is identified by the URL itself, not by a
- * field in the payload (IPSL's own request bodies never say which
- * account they're for).
+ * IPSL (Pesalink) Biller PGW — covers two modes:
+ * - Per-landlord: one bank account per property, identified by the URL
+ *   itself (validate/notification).
+ * - Central collection: one shared pooled account across every opted-in
+ *   property (bank_code = 'pesalink_central'), identified purely by the
+ *   billRef since there's no per-property URL for it
+ *   (validateCentral/notificationCentral).
  */
 class IpslController extends Controller
 {
@@ -67,7 +70,7 @@ class IpslController extends Controller
 
     /**
      * IPN — POST /payments/ipsl/{property}/notification
-     * Sent after a successful transfer into the landlord's account.
+     * Sent after a successful transfer into the landlord's own account.
      */
     public function notification(Request $request, int $property, MpesaC2BController $reconciler): JsonResponse
     {
@@ -78,7 +81,7 @@ class IpslController extends Controller
 
         $rrn = (string) ($payload['rrn'] ?? 'unknown');
 
-        if (!$this->verifySignature($request, $property)) {
+        if (!$this->verifyHmacSignature($request, $property->ipsl_password, "property #{$property->id}")) {
             return response()->json(['rrn' => $rrn, 'status' => 'INSECURE'], 401);
         }
 
@@ -107,15 +110,103 @@ class IpslController extends Controller
         return response()->json(['rrn' => $rrn, 'status' => 'SUCCESS']);
     }
 
-    private function verifySignature(Request $request, Property $property): bool
+    /**
+     * Bill-Validation for the shared central-collection account —
+     * POST /payments/ipsl-central/validate
+     * No {property} in the URL — every opted-in landlord shares this one
+     * account, so the unit is found purely from billRef, searched across
+     * every property with bank_code = 'pesalink_central'.
+     */
+    public function validateCentral(Request $request): JsonResponse
     {
-        $password = $property->ipsl_password;
+        $payload = $request->all();
 
+        Log::info('IPSL central validate received', [
+            'payload'        => $payload,
+            'body_signature' => $payload['signature'] ?? null, // not verified — see note on validate()
+        ]);
+
+        $billRef = (string) ($payload['billRef'] ?? '');
+        $amount  = Money::normalize($payload['amount'] ?? 0);
+
+        $unit = UnitMatcher::matchCentralCollection($billRef);
+
+        if (!$unit) {
+            Log::warning('IPSL central validate: no unit matches billRef', ['billRef' => $billRef]);
+
+            return response()->json([
+                'billRef'           => $billRef,
+                'amount'            => $amount,
+                'status'            => 'error',
+                'statusDescription' => 'Bill Ref does not exist',
+            ]);
+        }
+
+        return response()->json([
+            'billRef'           => $billRef,
+            'amount'            => $amount,
+            'billId'            => (string) $unit->id,
+            'status'            => 'valid',
+            'statusDescription' => '',
+        ]);
+    }
+
+    /**
+     * IPN for the shared central-collection account —
+     * POST /payments/ipsl-central/notification
+     * The property is resolved from the matched unit, not from a URL
+     * parameter — there isn't one for this shared account.
+     */
+    public function notificationCentral(Request $request, MpesaC2BController $reconciler): JsonResponse
+    {
+        $payload = $request->all();
+
+        Log::info('IPSL central IPN received', ['payload' => $payload]);
+
+        $rrn = (string) ($payload['rrn'] ?? 'unknown');
+
+        if (!$this->verifyHmacSignature($request, config('services.ipsl_central.password'), 'central collection')) {
+            return response()->json(['rrn' => $rrn, 'status' => 'INSECURE'], 401);
+        }
+
+        $status = strtolower((string) ($payload['status'] ?? ''));
+        if (!in_array($status, ['success', 'accp'], true)) {
+            Log::info('IPSL central IPN: ignoring non-success status', ['status' => $payload['status'] ?? null]);
+            return response()->json(['rrn' => $rrn, 'status' => 'SUCCESS']);
+        }
+
+        $billRef = (string) ($payload['Bill_reference'] ?? $payload['paymentReason'] ?? '');
+        $unit    = UnitMatcher::matchCentralCollection($billRef);
+
+        if (!$unit) {
+            Log::warning('IPSL central IPN: no unit matches billRef, cannot reconcile', [
+                'billRef' => $billRef,
+                'rrn'     => $rrn,
+            ]);
+            return response()->json(['rrn' => $rrn, 'status' => 'SUCCESS']);
+        }
+
+        $property = $unit->property;
+
+        $result = $reconciler->processTransaction($property, [
+            'TransID'           => $rrn,
+            'TransAmount'       => $payload['amount'] ?? null,
+            'BillRefNumber'     => $billRef,
+            'MSISDN'            => $payload['phoneSrc'] ?? null,
+            'TransTime'         => $this->normalizeTimestamp($payload['date'] ?? null),
+            'BusinessShortCode' => null,
+        ], method: 'bank', providerLabel: 'Pesalink Central', preMatchedUnit: $unit);
+
+        Log::info('IPSL central IPN processed', ['property_id' => $property->id, 'status' => $result]);
+
+        return response()->json(['rrn' => $rrn, 'status' => 'SUCCESS']);
+    }
+
+    private function verifyHmacSignature(Request $request, ?string $password, string $context): bool
+    {
         if (empty($password)) {
             if (app()->environment('production')) {
-                Log::critical('IPSL IPN rejected: ipsl_password not configured for this property in production.', [
-                    'property_id' => $property->id,
-                ]);
+                Log::critical("IPSL IPN rejected: no password configured for {$context} in production.");
                 return false;
             }
             return true;

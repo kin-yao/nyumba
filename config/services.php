@@ -60,6 +60,12 @@ return [
         'verify_signature' => env('KCB_IPN_VERIFY_SIGNATURE', true),
     ],
 
+    'ipsl_central' => [
+        // One shared IPSL Biller password for the pooled central-collection
+        // account (not per-property, there's only one of these accounts).
+        'password' => env('IPSL_CENTRAL_PASSWORD'),
+    ],
+
     'firebase' => [
         // Firebase Web API keys are public by design (same one used
         // client-side on the login page) — used server-side only to verify

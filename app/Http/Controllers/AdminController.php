@@ -263,7 +263,7 @@ class AdminController extends Controller
         abort_unless($property->account_id === $account->id, 404);
 
         $validated = $request->validate([
-            'bank_code'           => ['nullable', 'in:kcb'], // widen this list only as each bank actually gets built
+            'bank_code'           => ['nullable', 'in:kcb,pesalink_central'], // widen this list only as each bank actually gets built
             'bank_account_number' => ['nullable', 'string', 'max:30'],
             'ipsl_password'       => ['nullable', 'string', 'max:255'],
         ]);
