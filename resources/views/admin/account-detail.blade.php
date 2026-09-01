@@ -403,6 +403,39 @@
             </div>
         @endif
 
+        {{-- Central collection wallet --}}
+        @if($recentWalletTransactions->isNotEmpty() || $walletBalance !== '0.00')
+            <div class="card">
+                <div class="card-title">
+                    Central collection wallet
+                    <span style="font-weight:400;color:#8a8880;font-size:12px">&middot; money Nyumba is holding for this landlord, not yet disbursed</span>
+                </div>
+                <div style="font-size:28px;font-weight:600;color:#1a6b52;margin-bottom:14px">{{ currency($walletBalance) }}</div>
+                @if($recentWalletTransactions->isNotEmpty())
+                    <table>
+                        <thead><tr>
+                            <th>Date</th>
+                            <th>Description</th>
+                            <th>Amount</th>
+                            <th>Balance after</th>
+                        </tr></thead>
+                        <tbody>
+                            @foreach($recentWalletTransactions as $tx)
+                                <tr>
+                                    <td style="color:#8a8880">{{ $tx->created_at->format('d M Y') }}</td>
+                                    <td style="font-size:12px">{{ $tx->description }}</td>
+                                    <td style="color:{{ $tx->type === 'credit' ? '#1a6b52' : '#b91c1c' }};font-weight:500">
+                                        {{ $tx->type === 'credit' ? '+' : '-' }}{{ currency($tx->amount) }}
+                                    </td>
+                                    <td>{{ currency($tx->balance_after) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
+            </div>
+        @endif
+
         {{-- Reconciliation health --}}
         <div class="card">
             <div class="card-title">

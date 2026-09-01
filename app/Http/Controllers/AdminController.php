@@ -284,9 +284,17 @@ class AdminController extends Controller
             $p->hasMpesaCredentials() || !empty($p->bank_account_number) || $p->hasIpslCredentials()
         )->count();
 
+        $walletBalance = \App\Models\WalletTransaction::currentBalance($account->id);
+        $recentWalletTransactions = \App\Models\WalletTransaction::withoutGlobalScopes()
+            ->where('account_id', $account->id)
+            ->latest()
+            ->take(10)
+            ->get();
+
         return view('admin.account-detail', compact(
             'account', 'totalInvoiced', 'totalPaid', 'unitCount',
-            'matchRate', 'unmatchedPayments', 'unmatchedCount', 'propertiesWithChannel'
+            'matchRate', 'unmatchedPayments', 'unmatchedCount', 'propertiesWithChannel',
+            'walletBalance', 'recentWalletTransactions'
         ));
     }
 

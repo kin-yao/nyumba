@@ -279,7 +279,7 @@ class MpesaC2BController extends Controller
 
         $payment = DB::transaction(function () use (
             $property, $amount, $paymentDate, $transId, $billRef, $msisdn,
-            $tenant, $lease, $method, $providerLabel, $paymentEvent, &$fullyPaidInvoices, &$newBalance, &$creditCarried
+            $tenant, $lease, $method, $providerLabel, $paymentEvent, $providerCode, &$fullyPaidInvoices, &$newBalance, &$creditCarried
         ) {
             $payment = Payment::create([
                 'account_id'       => $property->account_id,
@@ -384,6 +384,21 @@ class MpesaC2BController extends Controller
                               ->orWhere('reference', 'not like', '%-CR');
                         })
                         ->sum('amount')
+                );
+            }
+
+            // Central collection money isn't the landlord's yet — it's
+            // sitting in Nyumba's pooled account. Credit their wallet in
+            // the SAME transaction as the payment/allocation, so this
+            // can't ever record one without the other.
+            if ($providerCode === 'pesalink_collection') {
+                \App\Models\WalletTransaction::credit(
+                    accountId: $property->account_id,
+                    amount: $amount,
+                    propertyId: $property->id,
+                    paymentId: $payment->id,
+                    paymentEventId: $paymentEvent->id,
+                    description: 'Central collection payment for "' . $property->name . '" (ref: ' . $transId . ')'
                 );
             }
 
