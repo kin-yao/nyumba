@@ -1,7 +1,7 @@
 # Railway / Nixpacks build configuration for Nyumba (Laravel 12, PHP 8.2)
 
 [phases.setup]
-nixPkgs = ['php82', 'php82Packages.composer', 'nodejs_20']
+nixPkgs = ['php82', 'php82Extensions.bcmath', 'php82Packages.composer', 'nodejs_20']
 
 [phases.install]
 cmds = [
