@@ -183,6 +183,34 @@ class IpslController extends Controller
                 'billRef' => $billRef,
                 'rrn'     => $rrn,
             ]);
+
+            // Real money arrived but we don't know whose it is yet —
+            // record it rather than letting it vanish into a log line.
+            // account_id/property_id stay null until an admin manually
+            // resolves which landlord this belongs to — payment_events was
+            // deliberately built nullable for exactly this case.
+            try {
+                $orphanEvent = \App\Models\PaymentEvent::create([
+                    'account_id'              => null,
+                    'property_id'             => null,
+                    'provider'                => 'pesalink_collection',
+                    'channel'                 => 'bank',
+                    'provider_transaction_id' => $rrn,
+                    'amount'                  => Money::normalize($payload['amount'] ?? 0),
+                    'currency'                => 'KES',
+                    'raw_payload'             => $request->getContent(),
+                    'signature_valid'         => true, // verifyHmacSignature() already passed to reach this point
+                    'received_at'             => now(),
+                ]);
+
+                $orphanEvent->transitionTo(\App\Models\PaymentEvent::STATUS_VERIFIED);
+                $orphanEvent->transitionTo(\App\Models\PaymentEvent::STATUS_QUEUED);
+                $orphanEvent->transitionTo(\App\Models\PaymentEvent::STATUS_PROCESSING);
+                $orphanEvent->transitionTo(\App\Models\PaymentEvent::STATUS_UNMATCHED);
+            } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+                // Already recorded from a previous delivery attempt of the same rrn — fine, not an error
+            }
+
             return response()->json(['rrn' => $rrn, 'status' => 'SUCCESS']);
         }
 
