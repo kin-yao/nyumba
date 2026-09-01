@@ -76,8 +76,8 @@ Route::post('/payments/pull/{property}/callback', [App\Http\Controllers\MpesaC2B
 // ─── KCB Buni IPN — public, account-wide URLs KCB pushes to ───────────────
 // Notification endpoint: https://www.nyumbapc.co.ke/payments/kcb/account-notification
 // Validation endpoint:   https://www.nyumbapc.co.ke/payments/kcb/validation
-Route::post('/payments/kcb/account-notification', [App\Http\Controllers\KcbIpnController::class, 'accountNotification'])->name('kcb.account-notification');
-Route::post('/payments/kcb/validation', [App\Http\Controllers\KcbIpnController::class, 'validate'])->name('kcb.validation');
+Route::post('/payments/kcb/account-notification', [App\Http\Controllers\BankIpnController::class, 'notification'])->name('kcb.account-notification')->defaults('bankCode', 'kcb');
+Route::post('/payments/kcb/validation', [App\Http\Controllers\BankIpnController::class, 'validate'])->name('kcb.validation')->defaults('bankCode', 'kcb');
 
 // ─── IPSL (Pesalink) — one URL pair per property, per landlord's own
 // bank account, since IPSL's own payloads never say which account ────────
