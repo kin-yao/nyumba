@@ -122,7 +122,7 @@ class KcbIpnController extends Controller
             'MSISDN'            => $payload['customerMobileNumber'] ?? null,
             'TransTime'         => $this->normalizeTimestamp($payload['timestamp'] ?? null),
             'BusinessShortCode' => $accountNumber,
-        ], method: 'bank', providerLabel: 'KCB');
+        ], method: 'bank', providerLabel: 'KCB', provider: 'kcb', rawPayload: $request->getContent());
 
         Log::info('KCB account-notification processed', [
             'property_id' => $property->id,

@@ -103,7 +103,7 @@ class IpslController extends Controller
             'MSISDN'            => $payload['phoneSrc'] ?? null,
             'TransTime'         => $this->normalizeTimestamp($payload['date'] ?? null),
             'BusinessShortCode' => null,
-        ], method: 'bank', providerLabel: 'Pesalink', preMatchedUnit: $unit);
+        ], method: 'bank', providerLabel: 'Pesalink', preMatchedUnit: $unit, provider: 'ipsl', rawPayload: $request->getContent());
 
         Log::info('IPSL IPN processed', ['property_id' => $property->id, 'status' => $result]);
 
@@ -195,7 +195,7 @@ class IpslController extends Controller
             'MSISDN'            => $payload['phoneSrc'] ?? null,
             'TransTime'         => $this->normalizeTimestamp($payload['date'] ?? null),
             'BusinessShortCode' => null,
-        ], method: 'bank', providerLabel: 'Pesalink Central', preMatchedUnit: $unit);
+        ], method: 'bank', providerLabel: 'Pesalink Central', preMatchedUnit: $unit, provider: 'pesalink_collection', rawPayload: $request->getContent());
 
         Log::info('IPSL central IPN processed', ['property_id' => $property->id, 'status' => $result]);
 

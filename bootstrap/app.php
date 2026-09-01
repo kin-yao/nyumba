@@ -24,6 +24,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'payments/c2b/*/validation',
             'payments/pull/*/callback',
             'payments/kcb/account-notification',
+            'payments/kcb/validation',
+            'payments/ipsl/*/validate',
+            'payments/ipsl/*/notification',
+            'payments/ipsl-central/validate',
+            'payments/ipsl-central/notification',
         ]);
         $middleware->alias([
             'subscription'   => \App\Http\Middleware\CheckSubscription::class,

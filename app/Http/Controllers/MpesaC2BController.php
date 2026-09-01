@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Lease;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Models\PaymentEvent;
 use App\Models\Property;
 use App\Models\Tenant;
 use App\Models\Unit;
@@ -142,7 +143,7 @@ class MpesaC2BController extends Controller
             'MSISDN'            => $payload['MSISDN'] ?? null,
             'TransTime'         => $payload['TransTime'] ?? null,
             'BusinessShortCode' => $payload['BusinessShortCode'] ?? null,
-        ]);
+        ], provider: 'mpesa', rawPayload: $request->getContent());
 
         return response()->json([
             'ResultCode' => 0,
@@ -156,7 +157,7 @@ class MpesaC2BController extends Controller
      *
      * @return string 'matched' | 'unmatched' | 'duplicate'
      */
-    public function processTransaction(Property $property, array $txn, string $method = 'mpesa', string $providerLabel = 'M-Pesa', ?Unit $preMatchedUnit = null): string
+    public function processTransaction(Property $property, array $txn, string $method = 'mpesa', string $providerLabel = 'M-Pesa', ?Unit $preMatchedUnit = null, ?string $provider = null, ?string $rawPayload = null, bool $signatureValid = true): string
     {
         $transId   = $txn['TransID'] ?? null;
         $rawAmount = $txn['TransAmount'] ?? null;
@@ -185,10 +186,36 @@ class MpesaC2BController extends Controller
             return 'unmatched';
         }
 
-        // Idempotency — don't double-record the same receipt
-        if (Payment::withoutGlobalScopes()->where('reference', $transId)->exists()) {
+        // Idempotency — enforced at the database via PaymentEvent's
+        // UNIQUE(provider, provider_transaction_id) constraint, not just an
+        // application-level check-then-act SELECT. Two near-simultaneous
+        // duplicate notifications can both pass a SELECT check before either
+        // INSERT completes; they cannot both pass a real unique constraint.
+        $providerCode = $provider ?? ($method === 'mpesa' ? 'mpesa' : strtolower(str_replace(' ', '_', $providerLabel)));
+
+        try {
+            $paymentEvent = PaymentEvent::create([
+                'account_id'              => $property->account_id,
+                'property_id'             => $property->id,
+                'provider'                => $providerCode,
+                'channel'                 => $method,
+                'provider_transaction_id' => $transId,
+                'amount'                  => $amount,
+                'currency'                => 'KES',
+                'raw_payload'             => $rawPayload ?? json_encode($txn),
+                'signature_valid'         => $signatureValid,
+                'received_at'             => now(),
+            ]);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
             return 'duplicate';
         }
+
+        // Synchronous today (no queue worker yet), but the state machine
+        // still records the real stages so this is ready for an async
+        // worker later without changing what each state means.
+        $paymentEvent->transitionTo(PaymentEvent::STATUS_VERIFIED);
+        $paymentEvent->transitionTo(PaymentEvent::STATUS_QUEUED);
+        $paymentEvent->transitionTo(PaymentEvent::STATUS_PROCESSING);
 
         if ($preMatchedUnit) {
             $unit = $preMatchedUnit;
@@ -204,20 +231,23 @@ class MpesaC2BController extends Controller
         if (!$unit) {
             // Unmatched — record for manual assignment
             Payment::create([
-                'account_id'   => $property->account_id,
-                'tenant_id'    => null,
-                'lease_id'     => null,
-                'amount'       => $amount,
-                'payment_type' => 'rent',
-                'payment_date' => $paymentDate,
-                'method'       => $method,
-                'reference'    => $transId,
-                'notes'        => 'Unmatched ' . $providerLabel . ' C2B payment. BillRef: "' . $billRef
+                'account_id'       => $property->account_id,
+                'payment_event_id' => $paymentEvent->id,
+                'tenant_id'        => null,
+                'lease_id'         => null,
+                'amount'           => $amount,
+                'payment_type'     => 'rent',
+                'payment_date'     => $paymentDate,
+                'method'           => $method,
+                'reference'        => $transId,
+                'notes'            => 'Unmatched ' . $providerLabel . ' C2B payment. BillRef: "' . $billRef
                     . '", Phone: ' . $msisdn
                     . ', Property: ' . $property->name
                     . '. Needs manual assignment.',
                 'is_allocated' => false,
             ]);
+
+            $paymentEvent->transitionTo(PaymentEvent::STATUS_UNMATCHED);
 
             try {
                 AuditService::system(
@@ -249,18 +279,19 @@ class MpesaC2BController extends Controller
 
         $payment = DB::transaction(function () use (
             $property, $amount, $paymentDate, $transId, $billRef, $msisdn,
-            $tenant, $lease, $method, $providerLabel, &$fullyPaidInvoices, &$newBalance, &$creditCarried
+            $tenant, $lease, $method, $providerLabel, $paymentEvent, &$fullyPaidInvoices, &$newBalance, &$creditCarried
         ) {
             $payment = Payment::create([
-                'account_id'   => $property->account_id,
-                'tenant_id'    => $tenant?->id,
-                'lease_id'     => $lease?->id,
-                'amount'       => $amount,
-                'payment_type' => 'rent',
-                'payment_date' => $paymentDate,
-                'method'       => $method,
-                'reference'    => $transId,
-                'notes'        => 'Auto-reconciled ' . $providerLabel . ' C2B payment. Phone: ' . $msisdn . ', Account: ' . $billRef,
+                'account_id'       => $property->account_id,
+                'payment_event_id' => $paymentEvent->id,
+                'tenant_id'        => $tenant?->id,
+                'lease_id'         => $lease?->id,
+                'amount'           => $amount,
+                'payment_type'     => 'rent',
+                'payment_date'     => $paymentDate,
+                'method'           => $method,
+                'reference'        => $transId,
+                'notes'            => 'Auto-reconciled ' . $providerLabel . ' C2B payment. Phone: ' . $msisdn . ', Account: ' . $billRef,
                 'is_allocated' => false,
             ]);
 
@@ -330,14 +361,15 @@ class MpesaC2BController extends Controller
                 if (Money::isPositive($remaining)) {
                     $creditCarried = $remaining;
                     Payment::create([
-                        'account_id'   => $property->account_id,
-                        'tenant_id'    => $tenant?->id,
-                        'lease_id'     => $lease->id,
-                        'amount'       => $remaining,
-                        'payment_type' => 'rent',
-                        'payment_date' => $paymentDate,
-                        'method'       => $method,
-                        'reference'    => $transId . '-CR',
+                        'account_id'       => $property->account_id,
+                        'payment_event_id' => $paymentEvent->id,
+                        'tenant_id'        => $tenant?->id,
+                        'lease_id'         => $lease->id,
+                        'amount'           => $remaining,
+                        'payment_type'     => 'rent',
+                        'payment_date'     => $paymentDate,
+                        'method'           => $method,
+                        'reference'        => $transId . '-CR',
                         'notes'        => 'Rent credit carried forward from ' . $providerLabel . ' payment ' . $transId . '. To be applied to next invoice.',
                         'is_allocated' => false,
                     ]);
@@ -357,6 +389,8 @@ class MpesaC2BController extends Controller
 
             return $payment;
         });
+
+        $paymentEvent->transitionTo(PaymentEvent::STATUS_RECONCILED);
 
         try {
             AuditService::system(

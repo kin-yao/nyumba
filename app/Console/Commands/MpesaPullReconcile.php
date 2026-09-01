@@ -61,7 +61,7 @@ class MpesaPullReconcile extends Command
                         ? \Carbon\Carbon::parse($txn['trxDate'])->format('YmdHis')
                         : null,
                     'BusinessShortCode' => $property->mpesa_shortcode,
-                ]);
+                ], provider: 'mpesa', rawPayload: json_encode($txn));
 
                 match ($status) {
                     'matched'   => $matched++,
