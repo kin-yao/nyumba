@@ -82,12 +82,51 @@ class AdminController extends Controller
         $recentAccounts = Account::with('users')->latest()->take(8)->get();
         $totalUsers     = User::where('is_admin', false)->count();
 
+        // Reconciliation monitoring, platform-wide, last 24h — how much is
+        // coming through each channel, how often signatures fail (a spike
+        // is a security signal), how often payments actually reconcile
+        // automatically vs need manual attention.
+        $since24h = now()->subDay();
+
+        $eventsByProvider = \App\Models\PaymentEvent::withoutGlobalScopes()
+            ->where('received_at', '>=', $since24h)
+            ->selectRaw('provider, count(*) as total')
+            ->groupBy('provider')
+            ->pluck('total', 'provider');
+
+        $totalEvents24h = $eventsByProvider->sum();
+
+        $signatureFailures24h = \App\Models\PaymentEvent::withoutGlobalScopes()
+            ->where('received_at', '>=', $since24h)
+            ->where('signature_valid', false)
+            ->count();
+
+        $signatureFailureRate = $totalEvents24h > 0
+            ? round($signatureFailures24h / $totalEvents24h * 100, 1)
+            : null;
+
+        $reconciledCount24h = \App\Models\PaymentEvent::withoutGlobalScopes()
+            ->where('received_at', '>=', $since24h)
+            ->where('status', 'RECONCILED')
+            ->count();
+
+        $unmatchedCount24h = \App\Models\PaymentEvent::withoutGlobalScopes()
+            ->where('received_at', '>=', $since24h)
+            ->whereIn('status', ['UNMATCHED', 'REQUIRES_REVIEW'])
+            ->count();
+
+        $reconciledRate24h = $totalEvents24h > 0
+            ? round($reconciledCount24h / $totalEvents24h * 100, 1)
+            : null;
+
         return view('admin.dashboard', compact(
             'totalAccounts', 'activeAccounts', 'trialAccounts',
             'expiredAccounts', 'graceAccounts', 'totalUsers',
             'totalUnits', 'totalProperties', 'totalTenants',
             'totalSmsCredits', 'totalMrr', 'revenueByPlan', 'byPlan',
-            'recentAccounts', 'approachingLimit'
+            'recentAccounts', 'approachingLimit',
+            'eventsByProvider', 'totalEvents24h', 'signatureFailureRate',
+            'reconciledRate24h', 'unmatchedCount24h'
         ));
     }
 

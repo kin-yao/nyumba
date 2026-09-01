@@ -111,6 +111,43 @@
             </div>
         </div>
 
+        {{-- Reconciliation monitoring, last 24h --}}
+        <div class="card">
+            <div class="card-title">Reconciliation (last 24h)</div>
+            <div class="health-grid" style="margin-bottom:0">
+                <div class="health-card">
+                    <div class="health-label">Payments received</div>
+                    <div class="health-value">{{ number_format($totalEvents24h) }}</div>
+                    <div style="font-size:11px;color:#8a8880;margin-top:4px">
+                        @forelse($eventsByProvider as $provider => $count)
+                            {{ strtoupper($provider) }}: {{ $count }}{{ !$loop->last ? ' · ' : '' }}
+                        @empty
+                            No payments yet
+                        @endforelse
+                    </div>
+                </div>
+                <div class="health-card">
+                    <div class="health-label">Auto-reconciled</div>
+                    <div class="health-value" style="color:{{ $reconciledRate24h === null ? '#8a8880' : ($reconciledRate24h >= 90 ? '#1a6b52' : '#b91c1c') }}">
+                        {{ $reconciledRate24h !== null ? $reconciledRate24h . '%' : '—' }}
+                    </div>
+                    <div style="font-size:11px;color:#8a8880;margin-top:4px">Of payments received</div>
+                </div>
+                <div class="health-card">
+                    <div class="health-label">Needs manual review</div>
+                    <div class="health-value" style="color:{{ $unmatchedCount24h > 0 ? '#d97706' : '#1a6b52' }}">{{ number_format($unmatchedCount24h) }}</div>
+                    <div style="font-size:11px;color:#8a8880;margin-top:4px">Unmatched, all channels</div>
+                </div>
+                <div class="health-card">
+                    <div class="health-label">Signature failure rate</div>
+                    <div class="health-value" style="color:{{ $signatureFailureRate === null ? '#8a8880' : ($signatureFailureRate > 5 ? '#b91c1c' : '#1a6b52') }}">
+                        {{ $signatureFailureRate !== null ? $signatureFailureRate . '%' : '—' }}
+                    </div>
+                    <div style="font-size:11px;color:#8a8880;margin-top:4px">A spike is a security signal</div>
+                </div>
+            </div>
+        </div>
+
         <div class="grid-2">
             {{-- Recent signups --}}
             <div class="card">
