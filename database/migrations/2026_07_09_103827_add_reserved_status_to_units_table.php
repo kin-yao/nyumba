@@ -10,12 +10,16 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE units MODIFY status ENUM('vacant', 'occupied', 'maintenance', 'reserved') DEFAULT 'vacant'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE units MODIFY status ENUM('vacant', 'occupied', 'maintenance', 'reserved') DEFAULT 'vacant'");
+        }
     }
 
     public function down(): void
     {
         DB::statement("UPDATE units SET status = 'vacant' WHERE status = 'reserved'");
-        DB::statement("ALTER TABLE units MODIFY status ENUM('vacant', 'occupied', 'maintenance') DEFAULT 'vacant'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE units MODIFY status ENUM('vacant', 'occupied', 'maintenance') DEFAULT 'vacant'");
+        }
     }
 };

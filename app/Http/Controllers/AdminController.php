@@ -268,6 +268,26 @@ class AdminController extends Controller
             'ipsl_password'       => ['nullable', 'string', 'max:255'],
         ]);
 
+        $newBankCode = $validated['bank_code'] ?? null;
+
+        // Opting a property INTO central collection requires every one of
+        // its units' references to be free platform-wide first — otherwise
+        // a payment could silently land on the wrong landlord's tenant.
+        if ($newBankCode === 'pesalink_central' && $property->bank_code !== 'pesalink_central') {
+            foreach ($property->units as $unit) {
+                $reference = $unit->payment_reference ?: $unit->name;
+                $collision = \App\Services\UnitMatcher::findCollisionInCentralCollection($reference, excludePropertyId: $property->id);
+
+                if ($collision) {
+                    return redirect()->back()->with('error',
+                        'Cannot enable central collection: unit "' . $unit->name . '" has the same payment reference as "'
+                        . $collision->name . '" at "' . $collision->property->name . '", already on central collection. '
+                        . 'Change one of the references first, then try again.'
+                    );
+                }
+            }
+        }
+
         $property->update([
             'bank_code'           => $validated['bank_code'] ?? null,
             'bank_account_number' => $validated['bank_account_number'] ?? null,

@@ -9,12 +9,16 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE move_out_requests MODIFY status ENUM('pending', 'acknowledged', 'accepted', 'completed', 'cancelled') DEFAULT 'pending'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE move_out_requests MODIFY status ENUM('pending', 'acknowledged', 'accepted', 'completed', 'cancelled') DEFAULT 'pending'");
+        }
     }
 
     public function down(): void
     {
         DB::statement("UPDATE move_out_requests SET status = 'acknowledged' WHERE status = 'accepted'");
-        DB::statement("ALTER TABLE move_out_requests MODIFY status ENUM('pending', 'acknowledged', 'completed', 'cancelled') DEFAULT 'pending'");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE move_out_requests MODIFY status ENUM('pending', 'acknowledged', 'completed', 'cancelled') DEFAULT 'pending'");
+        }
     }
 };

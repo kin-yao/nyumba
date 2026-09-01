@@ -8,13 +8,13 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('invoices', function (Blueprint $table) {
-            // Drop old global unique constraint only if it still exists
-            $indexes = collect(\DB::select("SHOW INDEX FROM invoices"))
-                ->pluck('Key_name')
-                ->unique()
-                ->toArray();
+        $indexes = collect(Schema::getIndexes('invoices'))
+            ->pluck('name')
+            ->unique()
+            ->toArray();
 
+        Schema::table('invoices', function (Blueprint $table) use ($indexes) {
+            // Drop old global unique constraint only if it still exists
             if (in_array('invoices_reference_unique', $indexes)) {
                 $table->dropUnique('invoices_reference_unique');
             }
@@ -28,12 +28,12 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('invoices', function (Blueprint $table) {
-            $indexes = collect(\DB::select("SHOW INDEX FROM invoices"))
-                ->pluck('Key_name')
-                ->unique()
-                ->toArray();
+        $indexes = collect(Schema::getIndexes('invoices'))
+            ->pluck('name')
+            ->unique()
+            ->toArray();
 
+        Schema::table('invoices', function (Blueprint $table) use ($indexes) {
             if (in_array('invoices_account_reference_unique', $indexes)) {
                 $table->dropUnique('invoices_account_reference_unique');
             }

@@ -67,9 +67,23 @@ class UnitController extends Controller
             'payment_reference' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $unit->update([
-            'payment_reference' => $validated['payment_reference'] ?: null,
-        ]);
+        $newReference = $validated['payment_reference'] ?: null;
+
+        if ($newReference) {
+            $collision = $unit->property->bank_code === 'pesalink_central'
+                ? \App\Services\UnitMatcher::findCollisionInCentralCollection($newReference, excludeUnitId: $unit->id)
+                : \App\Services\UnitMatcher::findCollisionWithinProperty($unit->property, $newReference, excludeUnitId: $unit->id);
+
+            if ($collision) {
+                return redirect()->back()->with('error',
+                    'That payment reference is already used by unit "' . $collision->name . '"'
+                    . ($collision->property_id !== $unit->property_id ? ' at "' . $collision->property->name . '"' : '')
+                    . '. Choose a different one.'
+                );
+            }
+        }
+
+        $unit->update(['payment_reference' => $newReference]);
 
         AuditService::log(
             'unit.payment_reference_updated',

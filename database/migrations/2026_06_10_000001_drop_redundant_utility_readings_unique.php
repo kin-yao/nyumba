@@ -9,8 +9,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $exists = collect(DB::select('SHOW INDEX FROM utility_readings'))
-            ->pluck('Key_name')
+        $exists = collect(Schema::getIndexes('utility_readings'))
+            ->pluck('name')
             ->contains('utility_readings_unit_id_reading_month_reading_year_unique');
 
         if ($exists) {
