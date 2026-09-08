@@ -27,8 +27,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'payments/kcb/validation',
             'payments/ipsl/*/validate',
             'payments/ipsl/*/notification',
+            'payments/ipsl/*/ipn',
             'payments/ipsl-central/validate',
             'payments/ipsl-central/notification',
+            'payments/ipsl-central/ipn',
         ]);
         $middleware->alias([
             'subscription'   => \App\Http\Middleware\CheckSubscription::class,
