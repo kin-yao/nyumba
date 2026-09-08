@@ -85,8 +85,10 @@ Route::post('/payments/kcb/validation', [App\Http\Controllers\BankIpnController:
 // bank account, since IPSL's own payloads never say which account ────────
 Route::post('/payments/ipsl/{property}/validate', [App\Http\Controllers\IpslController::class, 'validate'])->name('ipsl.validate');
 Route::post('/payments/ipsl/{property}/notification', [App\Http\Controllers\IpslController::class, 'notification'])->name('ipsl.notification');
+Route::post('/payments/ipsl/{property}/ipn', [App\Http\Controllers\IpslController::class, 'notification'])->name('ipsl.ipn');
 Route::post('/payments/ipsl-central/validate', [App\Http\Controllers\IpslController::class, 'validateCentral'])->name('ipsl.central.validate');
 Route::post('/payments/ipsl-central/notification', [App\Http\Controllers\IpslController::class, 'notificationCentral'])->name('ipsl.central.notification');
+Route::post('/payments/ipsl-central/ipn', [App\Http\Controllers\IpslController::class, 'notificationCentral'])->name('ipsl.central.ipn');
 
 // Admin-visible self-check: hit this URL once after deploy to confirm the
 // KCB public key is actually configured, without waiting for a real payment.
