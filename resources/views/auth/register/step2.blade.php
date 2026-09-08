@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+@include('partials.consent-mode')
 <!-- Google Tag Manager -->
 <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
 new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -175,5 +176,6 @@ function countdown(){
     const t=setInterval(()=>{s--;c.textContent=`(resend in ${s}s)`;if(s<=0){clearInterval(t);c.textContent='';btn.disabled=false;btn.textContent='Resend verification email';}},1000);
 }
 </script>
+@include('partials.cookie-consent')
 </body>
 </html>

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+@include('partials.consent-mode')
 <!-- Google Tag Manager -->
 <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
 new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -309,5 +310,6 @@ window.googleSignUp = async function() {
     }
 };
 </script>
+@include('partials.cookie-consent')
 </body>
 </html>

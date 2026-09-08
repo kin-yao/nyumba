@@ -13,13 +13,52 @@ use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
-    public function showLogin()
+    public function showLogin(Request $request)
     {
         if (session('portal_tenant_id')) {
             return redirect()->route('portal.dashboard');
         }
 
+        // A remembered device should never see the phone form, and should never
+        // cost an SMS. This is the same check the middleware does, moved to the
+        // front door where tenants actually arrive.
+        if ($tenant = $this->tenantFromDeviceCookie($request)) {
+            session(['portal_tenant_id' => $tenant->id]);
+            return redirect()->route('portal.dashboard');
+        }
+
         return view('portal.auth.login');
+    }
+
+    /**
+     * Resolve a tenant from the remembered-device cookie, refreshing the
+     * expiry so an active tenant never falls off the end of the window.
+     */
+    private function tenantFromDeviceCookie(Request $request): ?Tenant
+    {
+        $token = $request->cookie('nyumba_tenant_device');
+
+        if (!$token) {
+            return null;
+        }
+
+        foreach (TenantDevice::where('expires_at', '>', now())->get() as $device) {
+            if (Hash::check($token, $device->token_hash)) {
+                $tenant = Tenant::find($device->tenant_id);
+
+                if ($tenant && $tenant->activeLease) {
+                    $device->update([
+                        'last_used_at' => now(),
+                        'expires_at'   => now()->addDays(180),
+                    ]);
+                    return $tenant;
+                }
+
+                return null;
+            }
+        }
+
+        return null;
     }
 
     public function sendOtp(Request $request)
@@ -27,6 +66,12 @@ class AuthController extends Controller
         $validated = $request->validate([
             'phone' => ['required', 'string'],
         ]);
+
+        // Catch a stale form submitted from a device we already trust.
+        if ($tenant = $this->tenantFromDeviceCookie($request)) {
+            session(['portal_tenant_id' => $tenant->id]);
+            return redirect()->route('portal.dashboard');
+        }
 
         $normalized = $this->normalizePhone($validated['phone']);
         $tenants    = $this->findTenantsByPhone($normalized);
@@ -274,13 +319,13 @@ class AuthController extends Controller
                 'user_agent'   => substr($request->userAgent() ?? '', 0, 255),
                 'ip_address'   => $request->ip(),
                 'last_used_at' => now(),
-                'expires_at'   => now()->addDays(30),
+                'expires_at'   => now()->addDays(180),
             ]);
 
             $response->withCookie(cookie(
                 'nyumba_tenant_device',
                 $token,
-                60 * 24 * 30, // minutes — 30 days
+                60 * 24 * 180, // minutes — 180 days
                 null, null, true, true, false, 'Lax'
             ));
         }

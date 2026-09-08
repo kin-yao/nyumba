@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
 <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600&f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
 
+@include('partials.consent-mode')
 <!-- Google Tag Manager -->
 <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
 new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -83,7 +84,10 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
         Questions about this document? Contact us on WhatsApp: <a href="https://wa.me/254705056343">+254 705 056 343</a>
         &middot; <a href="{{ route('terms') }}">Terms of Service</a>
         &middot; <a href="{{ route('privacy') }}">Privacy Policy</a>
+        &middot; <a href="{{ route('cookies') }}">Cookie Policy</a>
+        &middot; <a href="#" onclick="nyumbaCookieSettings();return false;">Cookie settings</a>
     </div>
 </div>
+@include('partials.cookie-consent')
 </body>
 </html>

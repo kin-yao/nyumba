@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+@include('partials.consent-mode')
 <!-- Google Tag Manager -->
 <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
 new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -709,6 +710,8 @@ button{font-family:inherit;color:inherit}
       <a class="fa" href="{{ route('portal.login') }}">Tenant login</a>
       <a class="fa" href="{{ route('privacy') }}">Privacy</a>
       <a class="fa" href="{{ route('terms') }}">Terms</a>
+      <a class="fa" href="{{ route('cookies') }}">Cookie Policy</a>
+      <a class="fa" href="#" onclick="nyumbaCookieSettings();return false;">Cookie settings</a>
     </div>
     <div>
       <div class="fh">Talk to us</div>
@@ -946,5 +949,6 @@ button{font-family:inherit;color:inherit}
 })();
 </script>
 @endverbatim
+@include('partials.cookie-consent')
 </body>
 </html>
