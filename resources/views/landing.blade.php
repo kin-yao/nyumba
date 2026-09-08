@@ -10,6 +10,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 })(window,document,'script','dataLayer','GTM-P5FWPX45');</script>
 <!-- End Google Tag Manager -->
 <meta charset="UTF-8">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NyumbaPc | Rent Collection Software for Property Agents & Landlords</title>
 <meta name="description" content="NyumbaPc is rent collection software for landlords and property managers in Kenya. Send SMS rent reminders, match M-Pesa payments to the right unit, and see who has paid. Free for 7 days.">

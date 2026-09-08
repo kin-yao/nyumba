@@ -10,6 +10,9 @@
         })(window,document,'script','dataLayer','GTM-P5FWPX45');</script>
         <!-- End Google Tag Manager -->
         <meta charset="utf-8">
+        <link rel="icon" href="/favicon.ico" sizes="any">
+        <link rel="icon" type="image/png" sizes="32x32" href="/icon-192.png">
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <title>{{ config('app.name', 'Nyumba') }}</title>
