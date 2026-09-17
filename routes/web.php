@@ -63,32 +63,46 @@ Route::get('/invoices/{invoice}/download', [InvoiceController::class, 'publicPdf
     ->name('invoices.pdf.public')
     ->middleware('signed');
 
-// ─── M-Pesa STK callback — public, Safaricom calls this directly ──────────────
-Route::post('/mpesa/stk/callback', [SubscriptionController::class, 'callback'])->name('mpesa.stk.callback');
+// ─── Bank, mobile money and Pesalink webhooks — all machine-to-machine ────
+// endpoints with no browser on the other end. Session and cookie middleware
+// are stripped for the whole group: Laravel's Set-Cookie / session headers
+// were showing up in these responses and at least one integration (IPSL)
+// flagged them as invalid, since their client has no cookie jar to put them
+// in. None of these routes read or write session state, so nothing here
+// depends on it.
+Route::withoutMiddleware([
+    \Illuminate\Cookie\Middleware\EncryptCookies::class,
+    \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+    \Illuminate\Session\Middleware\StartSession::class,
+    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+])->group(function () {
+    // ─── M-Pesa STK callback — public, Safaricom calls this directly ──────
+    Route::post('/mpesa/stk/callback', [SubscriptionController::class, 'callback'])->name('mpesa.stk.callback');
 
-// ─── M-Pesa C2B webhooks — public, Safaricom calls these directly ─────────
-Route::post('/mpesa/c2b/{property}/confirmation', [App\Http\Controllers\MpesaC2BController::class, 'confirmation'])->name('mpesa.c2b.confirmation');
-Route::post('/mpesa/c2b/{property}/validation', [App\Http\Controllers\MpesaC2BController::class, 'validation'])->name('mpesa.c2b.validation');
+    // ─── M-Pesa C2B webhooks — public, Safaricom calls these directly ─────
+    Route::post('/mpesa/c2b/{property}/confirmation', [App\Http\Controllers\MpesaC2BController::class, 'confirmation'])->name('mpesa.c2b.confirmation');
+    Route::post('/mpesa/c2b/{property}/validation', [App\Http\Controllers\MpesaC2BController::class, 'validation'])->name('mpesa.c2b.validation');
 
-// ── Alias routes for Safaricom sandbox (rejects URLs containing 'mpesa') ──────
-Route::post('/payments/c2b/{property}/confirmation', [App\Http\Controllers\MpesaC2BController::class, 'confirmation'])->name('payments.c2b.confirmation');
-Route::post('/payments/c2b/{property}/validation', [App\Http\Controllers\MpesaC2BController::class, 'validation'])->name('payments.c2b.validation');
-Route::post('/payments/pull/{property}/callback', [App\Http\Controllers\MpesaC2BController::class, 'pullCallback'])->name('payments.pull.callback');
+    // ── Alias routes for Safaricom sandbox (rejects URLs containing 'mpesa') ──
+    Route::post('/payments/c2b/{property}/confirmation', [App\Http\Controllers\MpesaC2BController::class, 'confirmation'])->name('payments.c2b.confirmation');
+    Route::post('/payments/c2b/{property}/validation', [App\Http\Controllers\MpesaC2BController::class, 'validation'])->name('payments.c2b.validation');
+    Route::post('/payments/pull/{property}/callback', [App\Http\Controllers\MpesaC2BController::class, 'pullCallback'])->name('payments.pull.callback');
 
-// ─── KCB Buni IPN — public, account-wide URLs KCB pushes to ───────────────
-// Notification endpoint: https://www.nyumbapc.co.ke/payments/kcb/account-notification
-// Validation endpoint:   https://www.nyumbapc.co.ke/payments/kcb/validation
-Route::post('/payments/kcb/account-notification', [App\Http\Controllers\BankIpnController::class, 'notification'])->name('kcb.account-notification')->defaults('bankCode', 'kcb');
-Route::post('/payments/kcb/validation', [App\Http\Controllers\BankIpnController::class, 'validate'])->name('kcb.validation')->defaults('bankCode', 'kcb');
+    // ─── KCB Buni IPN — public, account-wide URLs KCB pushes to ───────────
+    // Notification endpoint: https://www.nyumbapc.co.ke/payments/kcb/account-notification
+    // Validation endpoint:   https://www.nyumbapc.co.ke/payments/kcb/validation
+    Route::post('/payments/kcb/account-notification', [App\Http\Controllers\BankIpnController::class, 'notification'])->name('kcb.account-notification')->defaults('bankCode', 'kcb');
+    Route::post('/payments/kcb/validation', [App\Http\Controllers\BankIpnController::class, 'validate'])->name('kcb.validation')->defaults('bankCode', 'kcb');
 
-// ─── IPSL (Pesalink) — one URL pair per property, per landlord's own
-// bank account, since IPSL's own payloads never say which account ────────
-Route::post('/payments/ipsl/{property}/validate', [App\Http\Controllers\IpslController::class, 'validate'])->name('ipsl.validate');
-Route::post('/payments/ipsl/{property}/notification', [App\Http\Controllers\IpslController::class, 'notification'])->name('ipsl.notification');
-Route::post('/payments/ipsl/{property}/ipn', [App\Http\Controllers\IpslController::class, 'notification'])->name('ipsl.ipn');
-Route::post('/payments/ipsl-central/validate', [App\Http\Controllers\IpslController::class, 'validateCentral'])->name('ipsl.central.validate');
-Route::post('/payments/ipsl-central/notification', [App\Http\Controllers\IpslController::class, 'notificationCentral'])->name('ipsl.central.notification');
-Route::post('/payments/ipsl-central/ipn', [App\Http\Controllers\IpslController::class, 'notificationCentral'])->name('ipsl.central.ipn');
+    // ─── IPSL (Pesalink) — one URL pair per property, per landlord's own
+    // bank account, since IPSL's own payloads never say which account ─────
+    Route::post('/payments/ipsl/{property}/validate', [App\Http\Controllers\IpslController::class, 'validate'])->name('ipsl.validate');
+    Route::post('/payments/ipsl/{property}/notification', [App\Http\Controllers\IpslController::class, 'notification'])->name('ipsl.notification');
+    Route::post('/payments/ipsl/{property}/ipn', [App\Http\Controllers\IpslController::class, 'notification'])->name('ipsl.ipn');
+    Route::post('/payments/ipsl-central/validate', [App\Http\Controllers\IpslController::class, 'validateCentral'])->name('ipsl.central.validate');
+    Route::post('/payments/ipsl-central/notification', [App\Http\Controllers\IpslController::class, 'notificationCentral'])->name('ipsl.central.notification');
+    Route::post('/payments/ipsl-central/ipn', [App\Http\Controllers\IpslController::class, 'notificationCentral'])->name('ipsl.central.ipn');
+});
 
 // Admin-visible self-check: hit this URL once after deploy to confirm the
 // KCB public key is actually configured, without waiting for a real payment.
